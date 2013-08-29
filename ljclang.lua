@@ -4,6 +4,15 @@
 -- See COPYRIGHT.TXT for the Copyright Notice of LJClang.
 -- LICENSE_LLVM.TXT is the license for libclang.
 
+local assert = assert
+local error = error
+local print = print
+local require = require
+local setmetatable = setmetatable
+local tonumber = tonumber
+local type = type
+local unpack = unpack
+
 local ffi = require("ffi")
 
 local bit = require("bit")
@@ -11,20 +20,22 @@ local io = require("io")
 
 local clang = ffi.load("clang")
 require("ljclang_Index_h")
-
-local assert = assert
-local error = error
-local setmetatable = setmetatable
-local type = type
-local unpack = unpack
+local support = ffi.load("ljclang_support")
+local ckind_name = require("ljclang_cursor_kind").name
 
 
 --==========##########==========--
 
-
 -- The table of externally exposed elements, returned at the end.
 local api = {}
 
+--[[
+local function debugf(fmt, ...)
+    print(string.format("ljclang: "..fmt, ...))
+end
+--[=[]]
+local function debugf() end
+--]=]
 
 -- CXIndex is a pointer type, wrap it to be able to define a metatable.
 local Index_t = ffi.typeof "struct { CXIndex _idx; }"
@@ -32,6 +43,18 @@ local TranslationUnit_t = ffi.typeof "struct { CXTranslationUnit _tu; }"
 -- NOTE: CXCursor is a struct type by itself, but we wrap it to e.g. provide a
 -- kind() *method* (CXCursor contains a member of the same name).
 local Cursor_t = ffi.typeof "struct { CXCursor _cur; }"
+
+assert(ffi.sizeof("CXCursor") == ffi.sizeof(Cursor_t))
+
+ffi.cdef([[
+typedef enum CXChildVisitResult (*LJCX_CursorVisitor)(
+    $ *cursor, $ *parent, CXClientData client_data);
+]], Cursor_t, Cursor_t)
+
+ffi.cdef[[
+int ljclang_regCursorVisitor(LJCX_CursorVisitor visitor, enum CXCursorKind *kinds, int numkinds);
+int ljclang_visitChildren(CXCursor parent, int visitoridx);
+]]
 
 -- A table mapping Index_t cdata objects to sequences (tables indexed by 1, 2,
 -- ... some N) containing TranslationUnit_t objects.
@@ -63,7 +86,10 @@ end
 -- dispose of the CXString afterwards.
 local function getString(cxstr)
     local cstr = clang.clang_getCString(cxstr)
-    assert(cstr ~= nil)
+    if (cstr == nil) then
+        return "???"
+    end
+--    assert(cstr ~= nil)
     local str = ffi.string(cstr)
     clang.clang_disposeString(cxstr)
     return str
@@ -140,6 +166,20 @@ local Cursor_mt = {
             return getString(clang.clang_getCursorDisplayName(self._cur))
         end,
 
+        kind = function(self)
+            local kindnum = tonumber(self:kindnum())
+            local kindstr = ckind_name[kindnum]
+            return kindstr or "Unknown"
+        end,
+
+        arguments = function(self)
+            local tab = {}
+            local numargs = clang.clang_getNumArguments(self._cur)
+            for i=1,numargs do
+                tab[i] = clang.clang_getArgument(self._cur, i-1)
+            end
+        end,
+
         referenced = function(self)
             return getCursor(clang.clang_getCursorReferenced(self._cur))
         end,
@@ -170,6 +210,20 @@ local Cursor_mt = {
             else
                 return self:kindnum() == kind
             end
+        end,
+
+        enumValue = function(self, unsigned)
+            assert(self:haskind("EnumConstantDecl"), "cursor must have kind EnumConstantDecl")
+
+            if (unsigned) then
+                return clang.clang_getEnumConstantDeclUnsignedValue(self._cur)
+            else
+                return clang.clang_getEnumConstantDeclValue(self._cur)
+            end
+        end,
+
+        enumval = function(self, unsigned)
+            return tonumber(self:enumValue(unsigned))
         end,
     },
 }
@@ -214,7 +268,9 @@ end
 --| <opts>: number or sequence of strings (CXTranslationUnit_* enum members,
 --|  without the prefix)
 function Index_mt.__index.parse(self, srcfile, args, opts)
-    if (type(args) ~= "string" and type(args) ~= "table") then
+    if (type(srcfile) ~= "string" or
+        type(args) ~= "string" and type(args) ~= "table")
+    then
         -- Called us like index:parse(args [, opts]), shift input arguments
         opts = args
         args = srcfile
@@ -272,6 +328,32 @@ function Index_mt.__index.parse(self, srcfile, args, opts)
     IndexTUs[self][len+1] = tunit
 
     return tunit
+end
+
+
+-- enum CXChildVisitResult constants
+api.ChildVisitResult = ffi.new[[struct{
+    static const int Break = 0;
+    static const int Continue = 1;
+    static const int Recurse = 2;
+}]]
+
+function api.regCursorVisitor(visitorfunc)
+    assert(type(visitorfunc)=="function", "<visitorfunc> must be a Lua function")
+
+    local ret = support.ljclang_regCursorVisitor(visitorfunc, nil, 0)
+    if (ret < 0) then
+        error("failed registering visitor function, code "..ret, 2)
+    end
+
+--    debugf("registered cursor visitor %s", ret)
+    return ret
+end
+
+function Cursor_mt.__index.children(self, visitoridx)
+--    debugf("visiting %d", visitoridx)
+    local ret = support.ljclang_visitChildren(self._cur, visitoridx)
+    return {}, ret  -- NYI: collect results in a table
 end
 
 
