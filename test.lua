@@ -27,6 +27,7 @@ end
 
 local cur = tu:cursor()
 assert(cur==cur)
+assert(cur ~= nil)
 assert(cur:kindnum() == "CXCursor_TranslationUnit")
 assert(cur:haskind("TranslationUnit"))
 

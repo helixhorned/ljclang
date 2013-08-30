@@ -5,12 +5,15 @@ local arg = arg
 local string = require("string")
 local io = require("io")
 local os = require("os")
+local table = require("table")
 
 local cl = require("ljclang")
 
+local print = print
+
 ----------
 
-function printf(fmt, ...)
+local function printf(fmt, ...)
     print(string.format(fmt, ...))
 end
 
@@ -25,15 +28,17 @@ local function usage(hline)
     print "  -1 <string to print before everything>"
     print "  -2 <string to print after everything>"
     print "  -C: print lines like"
-    print "      static const int membname = 123;"
+    print "      static const int membname = 123;  (enums/macros only)"
     print "  -R: reverse mapping, only if one-to-one. Print lines like"
-    print "      [123] = \"membname\";"
+    print "      [123] = \"membname\";  (enums/macros only)"
     print "  -Q: be quiet"
+    print "  -w: extract what? Can be"
+    print "      EnumConstantDecl (default), TypedefDecl, FunctionDecl, MacroDefinition"
     os.exit(1)
 end
 
 local opt_hasarg = { p=true, x=true, s=true, C=false, R=false, Q=false,
-                     ['1']=true, ['2']=true }
+                     ['1']=true, ['2']=true, w=true }
 local opts = { x={} }
 
 -- The arguments to be eventually passed to libclang
@@ -83,6 +88,10 @@ local spat = opts.s
 local constint = opts.C
 local reverse = opts.R
 local quiet = opts.Q
+local what = opts.w or "EnumConstantDecl"
+
+local extractEnum = (what == "EnumConstantDecl")
+local extractMacro = (what:find("^Macro"))
 
 local printbefore = opts['1']
 local printafter = opts['2']
@@ -91,8 +100,14 @@ if (#args == 0) then
     usage()
 end
 
+if (not (extractEnum or extractMacro) and (constint or reverse)) then
+    usage("Options -C and -R only available for enum or macro extraction")
+end
+
+local opts = extractMacro and {"DetailedPreprocessingRecord"} or nil
+
 local index = cl.createIndex(true, false)
-local tu = index:parse(args)
+local tu = index:parse(args, opts)
 if (tu == nil) then
     print('Parsing failed')
     os.exit(1)
@@ -118,40 +133,81 @@ local enumseq = {}
 
 local V = cl.ChildVisitResult
 
+local function checkexclude(name)
+    for i=1,#xpats do
+        if (name:find(xpats[i])) then
+            return true
+        end
+    end
+end
+
+-- Get definition string of #define macro definition cursor.
+local function getDefStr(cur)
+    local tokens = cur:_tokens(tu)
+    return table.concat(tokens, " ", 2, #tokens-1)
+end
+
 local visitor = cl.regCursorVisitor(
 function(cur, parent)
-    if (cur:haskind("EnumDecl")) then
-        return V.Recurse
+    if (extractEnum) then
+        if (cur:haskind("EnumDecl")) then
+            return V.Recurse
+        end
     end
 
-    if (cur:haskind("EnumConstantDecl")) then
-        local name = cur:name()
+    if (cur:haskind(what)) then
+        local name = cur:displayName()
 
         if (pat == nil or name:find(pat)) then
             local exclude = false
 
-            for i=1,#xpats do
-                if (name:find(xpats[i])) then
-                    exclude = true
-                    break
-                end
-            end
-
-            if (not exclude) then
+            if (not checkexclude(name)) then
                 local ourname = spat and name:gsub(spat, "") or name
-                local val = cur:enumval()
-                if (reverse) then
-                    if (enumname[val]) then
-                        printf("Error: enumeration value %d not unique: %s and %s",
-                               val, enumname[val], ourname)
-                        os.exit(2)
+
+                if (extractEnum or extractMacro) then
+                    -- Enumeration constants
+                    local val = extractEnum and cur:enumval() or getDefStr(cur)
+
+                    -- NOTE: tonumber(val) == nil can only happen with #defines that are not
+                    -- like a literal number.
+                    if (not extractMacro or tonumber(val) ~= nil) then
+                        if (reverse) then
+                            if (enumname[val]) then
+                                printf("Error: enumeration value %d not unique: %s and %s",
+                                       val, enumname[val], ourname)
+                                os.exit(2)
+                            end
+                            enumname[val] = ourname
+                            enumseq[#enumseq+1] = val
+                        elseif (constint) then
+                            printf("static const int %s = %s;", ourname, val)
+                        else
+                            printf("%s = %s,", ourname, val)
+                        end
                     end
-                    enumname[val] = ourname
-                    enumseq[#enumseq+1] = val
-                elseif (constint) then
-                    printf("static const int %s = %d;", ourname, val)
+                elseif (what=="FunctionDecl") then
+                    -- Function declaration
+                    local rettype = cur:resultType()
+                    if (not checkexclude(rettype:name())) then
+                        printf("%s %s;", rettype, ourname)
+                    end
+                elseif (what=="TypedefDecl") then
+                    -- Type definition
+                    local utype = cur:typedefType()
+                    if (not checkexclude(utype:name())) then
+                        printf("typedef %s %s;", utype, ourname)
+                    end
+--[[
+                elseif (extractMacro) then
+                    local fn, linebeg, lineend = cur:location(true)
+                    local defstr = getDefStr(cur)
+
+                    printf("%s @ %s:%d%s :: %s", ourname, fn, linebeg,
+                           (lineend~=linebeg) and "--"..lineend or "", defstr)
+--]]
                 else
-                    printf("%s = %d,", ourname, val)
+                    -- Anything else
+                    printf("%s", ourname)
                 end
             end
         end

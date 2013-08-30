@@ -43,6 +43,7 @@ local TranslationUnit_t = ffi.typeof "struct { CXTranslationUnit _tu; }"
 -- NOTE: CXCursor is a struct type by itself, but we wrap it to e.g. provide a
 -- kind() *method* (CXCursor contains a member of the same name).
 local Cursor_t = ffi.typeof "struct { CXCursor _cur; }"
+local Type_t = ffi.typeof "struct { CXType _typ; }"
 
 assert(ffi.sizeof("CXCursor") == ffi.sizeof(Cursor_t))
 
@@ -89,7 +90,6 @@ local function getString(cxstr)
     if (cstr == nil) then
         return "???"
     end
---    assert(cstr ~= nil)
     local str = ffi.string(cstr)
     clang.clang_disposeString(cxstr)
     return str
@@ -119,7 +119,9 @@ local TranslationUnit_mt = {
 
         file = function(self, filename)
             check_tu_valid(self)
-            assert(type(filename)=="string", "<filename> must be a string")
+            if (type(filename) ~= "string") then
+                error("<filename> must be a string", 2)
+            end
             local cxfile = clang.clang_getFile(self._tu, filename)
             return getString(clang.clang_getFileName(cxfile))  -- NYI: modification time
         end,
@@ -147,15 +149,38 @@ local TranslationUnit_mt = {
 
 TranslationUnit_mt.__gc = TranslationUnit_mt.__index._cleanup
 
+local function getType(cxtyp)
+    return cxtyp.kind ~= 'CXType_Invalid' and Type_t(cxtyp) or nil
+end
+
+local CXFileAr = ffi.typeof("CXFile [1]")
+local TwoUnsignedAr = ffi.typeof("unsigned [2]")
+
+local function getLineCol(cxsrcrange, cxfile, clang_funcname)
+    local cxsrcloc = clang[clang_funcname](cxsrcrange)
+    local linecol = TwoUnsignedAr()
+    clang.clang_getSpellingLocation(cxsrcloc, cxfile, linecol, linecol+1, nil)
+    return linecol
+end
+
+local function getSourceRange(cxcur)
+    local cxsrcrange = clang.clang_getCursorExtent(cxcur)
+    return (clang.clang_Range_isNull(cxsrcrange) == 0) and cxsrcrange or nil
+end
+
 -- Metatable for our Cursor_t.
 local Cursor_mt = {
     __eq = function(cur1, cur2)
-        return (clang.clang_equalCursors(cur1._cur, cur2._cur) ~= 0)
+        if (ffi.istype(Cursor_t, cur1) and ffi.istype(Cursor_t, cur2)) then
+            return (clang.clang_equalCursors(cur1._cur, cur2._cur) ~= 0)
+        else
+            return false
+        end
     end,
 
     __index = {
         parent = function(self)
-            return getCursor(clang.clang_getSemanticParent(self._cur))
+            return getCursor(clang.clang_getCursorSemanticParent(self._cur))
         end,
 
         name = function(self)
@@ -180,6 +205,27 @@ local Cursor_mt = {
             end
         end,
 
+        location = function(self, linesfirst)
+            local cxsrcrange = getSourceRange(self._cur)
+            if (cxsrcrange == nil) then
+                return nil
+            end
+
+            local cxfilear = CXFileAr()
+            local linecolB = getLineCol(cxsrcrange, cxfilear, "clang_getRangeStart")
+            local filename = getString(clang.clang_getFileName(cxfilear[0]))
+            local linecolE = getLineCol(cxsrcrange, cxfilear, "clang_getRangeEnd")
+
+            if (linesfirst) then
+                -- LJClang order -- IMO you're usually more interested in the
+                -- line number
+                return filename, linecolB[0], linecolE[0], linecolB[1], linecolE[1]
+            else
+                -- luaclang-parser order
+                return filename, linecolB[0], linecolB[1], linecolE[0], linecolE[1]
+            end
+        end,
+
         referenced = function(self)
             return getCursor(clang.clang_getCursorReferenced(self._cur))
         end,
@@ -196,7 +242,54 @@ local Cursor_mt = {
             return clang.clang_CXXMethod_isStatic(self._cur)
         end,
 
+        type = function(self)
+            return getType(clang.clang_getCursorType(self._cur))
+        end,
+
+        resultType = function(self)
+            return getType(clang.clang_getCursorResultType(self._cur))
+        end,
+
         --== LJClang-specific ==--
+
+        -- XXX: Should be a TranslationUnit_t method instead.
+        -- NOTE: Returns one token too much (always?), see
+        -- http://clang-developers.42468.n3.nabble.com/querying-information-about-preprocessing-directives-in-libclang-td2740612.html
+        --  and related bug report
+        -- http://llvm.org/bugs/show_bug.cgi?id=9069
+        _tokens = function(self, tu)
+            if (not ffi.istype(TranslationUnit_t, tu)) then
+                error("<tu> must be a TranslationUnit_t object", 2)
+            end
+            local cxtu = tu._tu
+
+            local cxsrcrange = getSourceRange(self._cur)
+            if (cxsrcrange == nil) then
+                return nil
+            end
+
+            local ntoksar = ffi.new("unsigned [1]")
+            local tokensar = ffi.new("CXToken *[1]")
+            clang.clang_tokenize(cxtu, cxsrcrange, tokensar, ntoksar)
+            local numtoks = ntoksar[0]
+            local tokens = tokensar[0]
+
+            local tab = {}
+
+            for i=0,numtoks-1 do
+                if (clang.clang_getTokenKind(tokens[i]) ~= 'CXToken_Comment') then
+                    tab[#tab+1] = getString(clang.clang_getTokenSpelling(cxtu, tokens[i]))
+                end
+            end
+
+            clang.clang_disposeTokens(cxtu, tokens, numtoks)
+
+            return tab
+        end,
+
+        lexicalParent = function(self)
+            return getCursor(clang.clang_getCursorLexicalParent(self._cur))
+        end,
 
         -- Returns an enumeration constant, which in LuaJIT can be compared
         -- against a *string*, too.
@@ -213,7 +306,9 @@ local Cursor_mt = {
         end,
 
         enumValue = function(self, unsigned)
-            assert(self:haskind("EnumConstantDecl"), "cursor must have kind EnumConstantDecl")
+            if (not self:haskind("EnumConstantDecl")) then
+                error("cursor must have kind EnumConstantDecl", 2)
+            end
 
             if (unsigned) then
                 return clang.clang_getEnumConstantDeclUnsignedValue(self._cur)
@@ -225,10 +320,88 @@ local Cursor_mt = {
         enumval = function(self, unsigned)
             return tonumber(self:enumValue(unsigned))
         end,
+--[=[
+        --| tab = cur:argtypes([alsoret])
+        argtypes = function(self, alsoret)
+            if (clang.clang_getNumArguments(self._cur) == -1) then
+                return nil
+            end
+
+            local tab = self:arguments()
+
+            if (alsoret) then
+                tab[0] = self:resultType()
+            end
+
+            for i=1,#tab do
+                tab[i] = tab[i]:type()
+            end
+        end,
+--]=]
+        typedefType = function(self)
+            return getType(clang.clang_getTypedefDeclUnderlyingType(self._cur))
+        end,
     },
 }
 
 Cursor_mt.__tostring = Cursor_mt.__index.name
+
+-- Metatable for our Type_t.
+local Type_mt = {
+    __eq = function(typ1, typ2)
+        if (ffi.istype(Type_t, typ1) and ffi.istype(Type_t, typ2)) then
+            return (clang.clang_equalTypes(typ1._typ, typ2._typ) ~= 0)
+        else
+            return false
+        end
+    end,
+
+    __index = {
+        name = function(self)
+            return getString(clang.clang_getTypeSpelling(self._typ))
+        end,
+
+        canonical = function(self)
+            -- NOTE: no multiplexing with getPointeeType for pointer types like
+            -- luaclang-parser.
+            return getType(clang.clang_getCanonicalType(self._typ))
+        end,
+
+        pointee = function(self)
+            return getType(clang.clang_getPointeeType(self._typ))
+        end,
+
+        isConst = function(self)
+            return (clang.clang_isConstQualifiedType(self._typ) ~= 0);
+        end,
+
+        isPod = function(self)
+            return (clang.clang_isPODType(self._typ) ~= 0);
+        end,
+
+        declaration = function(self)
+            return getCursor(clang.clang_getTypeDeclaration(self._typ))
+        end,
+
+        --== LJClang-specific ==--
+--[=[
+        -- Returns an enumeration constant.
+        kindnum = function(self)
+            return self._typ.kind
+        end,
+
+        haskind = function(self, kind)
+            if (type(kind) == "string") then
+                return self:kindnum() == "CXType_"..kind
+            else
+                return self:kindnum() == kind
+            end
+        end,
+]=]
+    },
+}
+
+Type_mt.__tostring = Type_mt.__index.name
 
 
 --| index = clang.createIndex([excludeDeclarationsFromPCH [, displayDiagnostics]])
@@ -258,7 +431,17 @@ end
 
 local function check_iftab_iscellstr(tab, name)
     if (type(tab)=="table") then
-        assert(iscellstr(tab), name.." must be a string sequence when a table")
+        if (not iscellstr(tab)) then
+            error(name.." must be a string sequence when a table", 3)
+        end
+    end
+end
+
+-- Wrap 'error' in assert-like call to write type checks in one line instead of
+-- three.
+local function errassert(pred, msg, level)
+    if (not pred) then
+        error(msg, level+1)
     end
 end
 
@@ -279,15 +462,15 @@ function Index_mt.__index.parse(self, srcfile, args, opts)
 
     -- Input argument type checking.
 
-    assert(srcfile==nil or type(srcfile)=="string", "<srcfile> must be a string")
+    errassert(srcfile==nil or type(srcfile)=="string", "<srcfile> must be a string", 2)
 
-    assert(type(args)=="string" or type(args)=="table", "<args> must be a string or table")
+    errassert(type(args)=="string" or type(args)=="table", "<args> must be a string or table", 2)
     check_iftab_iscellstr(args, "<args>")
 
     if (opts == nil) then
         opts = 0
     else
-        assert(type(opts)=="number" or type(opts)=="table")
+        errassert(type(opts)=="number" or type(opts)=="table", 2)
         check_iftab_iscellstr(args, "<opts>")
     end
 
@@ -339,19 +522,17 @@ api.ChildVisitResult = ffi.new[[struct{
 }]]
 
 function api.regCursorVisitor(visitorfunc)
-    assert(type(visitorfunc)=="function", "<visitorfunc> must be a Lua function")
+    errassert(type(visitorfunc)=="function", "<visitorfunc> must be a Lua function", 2)
 
     local ret = support.ljclang_regCursorVisitor(visitorfunc, nil, 0)
     if (ret < 0) then
         error("failed registering visitor function, code "..ret, 2)
     end
 
---    debugf("registered cursor visitor %s", ret)
     return ret
 end
 
 function Cursor_mt.__index.children(self, visitoridx)
---    debugf("visiting %d", visitoridx)
     local ret = support.ljclang_visitChildren(self._cur, visitoridx)
     return {}, ret  -- NYI: collect results in a table
 end
@@ -361,6 +542,7 @@ end
 ffi.metatype(Index_t, Index_mt)
 ffi.metatype(TranslationUnit_t, TranslationUnit_mt)
 ffi.metatype(Cursor_t, Cursor_mt)
+ffi.metatype(Type_t, Type_mt)
 
 -- Done!
 return api
