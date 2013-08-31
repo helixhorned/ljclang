@@ -16,10 +16,12 @@ assert(arg[1], "Usage: "..arg[0].." <filename> ...")
 
 local cl = require("ljclang")
 
-local index = cl.createIndex(true,false)
-
 arg[0] = nil
-local tu = index:parse(arg, {"DetailedPreprocessingRecord"})
+local tu = cl.createIndex(true,false):parse(arg, {"DetailedPreprocessingRecord"})
+
+-- NOTE: we don't need to keep the Index_t reference around, test this.
+collectgarbage()
+
 if (tu == nil) then
     print('TU is nil')
     os.exit(1)

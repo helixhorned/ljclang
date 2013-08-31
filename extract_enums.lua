@@ -121,11 +121,6 @@ if (not quiet) then
     end
 end
 
--- TODO: implications of
--- local tu = cl.createIndex(true, false):parse(args)
--- collectgarbage()
--- tu:file()
-
 -- Mapping of enum value to its name for -R.
 local enumname = {}
 -- Mapping of running index to enum value for -R.

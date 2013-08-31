@@ -37,6 +37,14 @@ end
 local function debugf() end
 --]=]
 
+-- Wrap 'error' in assert-like call to write type checks in one line instead of
+-- three.
+local function errassert(pred, msg, level)
+    if (not pred) then
+        error(msg, level+1)
+    end
+end
+
 -- CXIndex is a pointer type, wrap it to be able to define a metatable.
 local Index_t = ffi.typeof "struct { CXIndex _idx; }"
 local TranslationUnit_t = ffi.typeof "struct { CXTranslationUnit _tu; }"
@@ -57,25 +65,26 @@ int ljclang_regCursorVisitor(LJCX_CursorVisitor visitor, enum CXCursorKind *kind
 int ljclang_visitChildren(CXCursor parent, int visitoridx);
 ]]
 
--- A table mapping Index_t cdata objects to sequences (tables indexed by 1, 2,
--- ... some N) containing TranslationUnit_t objects.
-local IndexTUs = setmetatable({}, {__mode="v"})
-
 -- Metatable for our Index_t.
 local Index_mt = {
     __index = {},
 
     __gc = function(self)
-        local tunits = IndexTUs[self]
-        IndexTUs[self] = nil
         -- "The index must not be destroyed until all of the translation units created
         --  within that index have been destroyed."
-        for i=1,#tunits do
-            tunits[i]:_cleanup()
+        for i=1,#self._tus do
+            self._tus[i]:_cleanup()
         end
         clang.clang_disposeIndex(self._idx)
     end,
 }
+
+local function NewIndex(cxidx)
+    assert(ffi.istype("CXIndex", cxidx))
+    -- _tus is a list of the Index_t's TranslationUnit_t objects.
+    local index = { _idx=cxidx, _tus={} }
+    return setmetatable(index, Index_mt)
+end
 
 local function check_tu_valid(self)
     if (self._tu == nil) then
@@ -83,9 +92,12 @@ local function check_tu_valid(self)
     end
 end
 
+local CXString = ffi.typeof("CXString")
+
 -- Convert from a libclang's encapsulated CXString to a plain Lua string and
 -- dispose of the CXString afterwards.
 local function getString(cxstr)
+    assert(ffi.istype(CXString, cxstr))
     local cstr = clang.clang_getCString(cxstr)
     if (cstr == nil) then
         return "???"
@@ -411,10 +423,7 @@ function api.createIndex(excludeDeclarationsFromPCH, displayDiagnostics)
         return nil
     end
 
-    local index = Index_t(cxidx)
-    IndexTUs[index] = {}
-
-    return index
+    return NewIndex(cxidx)
 end
 
 -- Is <tab> a sequence of strings?
@@ -434,14 +443,6 @@ local function check_iftab_iscellstr(tab, name)
         if (not iscellstr(tab)) then
             error(name.." must be a string sequence when a table", 3)
         end
-    end
-end
-
--- Wrap 'error' in assert-like call to write type checks in one line instead of
--- three.
-local function errassert(pred, msg, level)
-    if (not pred) then
-        error(msg, level+1)
     end
 end
 
@@ -506,9 +507,8 @@ function Index_mt.__index.parse(self, srcfile, args, opts)
     -- Wrap it in a TranslationUnit_t.
     local tunit = TranslationUnit_t(tunitptr)
 
-    -- Register this TranslationUnit_t with its Index_t.
-    local len = #IndexTUs[self]
-    IndexTUs[self][len+1] = tunit
+    -- Add this TranslationUnit_t to the list of its Index_t's TUs.
+    self._tus[#self._tus+1] = tunit
 
     return tunit
 end
