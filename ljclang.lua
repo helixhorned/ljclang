@@ -135,6 +135,7 @@ local TranslationUnit_mt = {
                 error("<filename> must be a string", 2)
             end
             local cxfile = clang.clang_getFile(self._tu, filename)
+            -- XXX: winds up empty ("???") for tests...
             return getString(clang.clang_getFileName(cxfile))  -- NYI: modification time
         end,
 
@@ -262,6 +263,21 @@ local Cursor_mt = {
             return getType(clang.clang_getCursorResultType(self._cur))
         end,
 
+        access = function(self)
+            local spec = clang.clang_getCXXAccessSpecifier(self._cur);
+
+            if (spec == 'CX_CXXPublic') then
+                return "public"
+            elseif (spec == 'CX_CXXProtected') then
+                return "protected"
+            elseif (spec == 'CX_CXXPrivate') then
+                return "private"
+            else
+                assert(spec == 'CX_CXXInvalidAccessSpecifier')
+                return nil
+            end
+        end,
+
         --== LJClang-specific ==--
 
         -- XXX: Should be a TranslationUnit_t method instead.
@@ -305,6 +321,7 @@ local Cursor_mt = {
 
         -- Returns an enumeration constant, which in LuaJIT can be compared
         -- against a *string*, too.
+        -- XXX: Should we split into 'kindenum' (giving the enum) and 'kindnum'?
         kindnum = function(self)
             return clang.clang_getCursorKind(self._cur)
         end,
@@ -374,7 +391,7 @@ local Type_mt = {
         end,
 
         canonical = function(self)
-            -- NOTE: no multiplexing with getPointeeType for pointer types like
+            -- NOTE: no dispatching to getPointeeType() for pointer types like
             -- luaclang-parser.
             return getType(clang.clang_getCanonicalType(self._typ))
         end,

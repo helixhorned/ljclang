@@ -52,6 +52,11 @@ function(cur, parent)
 
 --    print(string.format("[%3d] %50s <- %s", tonumber(cur:kindnum()), tostring(cur), tostring(parent)))
     print(string.format("[%12s] %50s <- %s", cur:kind(), tostring(cur), tostring(parent)))
+
+    if (cur:haskind("CXXMethod")) then
+        print("("..cur:access()..")")
+    end
+
     return V.Recurse
 end)
 
