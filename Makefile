@@ -19,11 +19,13 @@ ifneq ($(DEBUG),0)
     CFLAGS += -g
 endif
 
+asciidoc=asciidoctor
+
 libljclang_support$(so): ljclang_support.c Makefile
 	$(CC) $(CFLAGS) $(WARN) -O$(OPTLEV) -shared -fPIC $< -lclang -o $@
 
 
-.PHONY: clean bootstrap
+.PHONY: clean bootstrap doc
 
 clean:
 	rm -f libljclang_support$(so)
@@ -38,3 +40,6 @@ bootstrap:
 	@LD_LIBRARY_PATH=$(THIS_DIR) $(luajit) ./extractdecls.lua $(EXTRACT_OPTS) $(clang-c)/Index.h > $(CKIND_LUA).tmp
 	@mv $(CKIND_LUA).tmp $(CKIND_LUA)
 	@printf "\033[1mGenerated $(CKIND_LUA)\033[0m\n"
+
+doc:
+	$(asciidoc) README.adoc
