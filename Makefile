@@ -35,6 +35,6 @@ EXTRACT_OPTS := -R -p '^CXCursor_' -x '_First' -x '_Last' -x '_GCCAsmStmt' -x '_
 # Generate list of CXCursorKind names
 bootstrap:
 	@echo 'return {}' > $(CKIND_LUA)
-	@LD_LIBRARY_PATH=$(THIS_DIR) $(luajit) ./extract_enums.lua $(EXTRACT_OPTS) $(clang-c)/Index.h > $(CKIND_LUA).tmp
+	@LD_LIBRARY_PATH=$(THIS_DIR) $(luajit) ./extractdecls.lua $(EXTRACT_OPTS) $(clang-c)/Index.h > $(CKIND_LUA).tmp
 	@mv $(CKIND_LUA).tmp $(CKIND_LUA)
 	@printf "\033[1mGenerated $(CKIND_LUA)\033[0m\n"
