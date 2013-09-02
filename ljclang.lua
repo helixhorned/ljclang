@@ -53,6 +53,7 @@ local TranslationUnit_t = ffi.typeof "struct { CXTranslationUnit _tu; }"
 local Cursor_t = ffi.typeof "struct { CXCursor _cur; }"
 local Type_t = ffi.typeof "struct { CXType _typ; }"
 
+-- Our wrapping type Cursor_t is seen as raw CXCursor on the C side.
 assert(ffi.sizeof("CXCursor") == ffi.sizeof(Cursor_t))
 
 ffi.cdef([[
@@ -549,11 +550,40 @@ function api.regCursorVisitor(visitorfunc)
     return ret
 end
 
-function Cursor_mt.__index.children(self, visitoridx)
-    local ret = support.ljclang_visitChildren(self._cur, visitoridx)
-    return {}, ret  -- NYI: collect results in a table
+-- Support for legacy luaclang-parser API collecting direct descendants of a
+-- cursor: this will be the table where they go.
+local collectTab
+
+local function collectDirectChildren(cur)
+    debugf("collectDirectChildren: %s, child cursor kind: %s", tostring(collectTab), cur:kind())
+    if (not cur:haskind("Unknown")) then
+        collectTab[#collectTab+1] = cur
+    end
+    return 1  -- Continue
 end
 
+local cdc_visitoridx = api.regCursorVisitor(collectDirectChildren)
+
+function Cursor_mt.__index.children(self, visitoridx)
+    if (visitoridx ~= nil) then
+        -- LJClang way of visiting
+        local ret = support.ljclang_visitChildren(self._cur, visitoridx)
+        return ret
+    else
+        -- luaclang-parser way
+        if (collectTab ~= nil) then
+            error("children() must not be called while another invocation is active", 2)
+            collectTab = nil
+        end
+
+        collectTab = {}
+        support.ljclang_visitChildren(self._cur, cdc_visitoridx)
+        local tab = collectTab
+        collectTab = nil
+        return tab
+    end
+end
+--require("jit").off(Cursor_mt.__index.children, true)
 
 -- Register the metatables for the custom ctypes.
 ffi.metatype(Index_t, Index_mt)

@@ -61,3 +61,11 @@ function(cur, parent)
 end)
 
 cur:children(visitor)
+
+local tab = cur:children()
+print("TU has "..#tab.." direct descendants:")
+for i=1,#tab do
+    print(i..": "..tab[i]:kind())
+    do break end  -- XXX: Segfaults:
+    print("("..tab[i]:displayName()..")")
+end
