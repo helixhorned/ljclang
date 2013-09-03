@@ -34,7 +34,8 @@ assert(cur:kindnum() == "CXCursor_TranslationUnit")
 assert(cur:haskind("TranslationUnit"))
 
 print("TU: "..cur:name()..", "..cur:displayName())
-print("Index.h in TU: "..tu:file("Index.h"))
+local fn = arg[1]:gsub(".*/","")
+print(fn.." in TU: "..tu:file(fn)..", "..tu:file(arg[1]))
 
 local diags = tu:diagnostics()
 for i=1,#diags do
@@ -44,20 +45,24 @@ end
 
 local V = cl.ChildVisitResult
 
+local ourtab = {}
+
 local visitor = cl.regCursorVisitor(
 function(cur, parent)
+    ourtab[#ourtab+1] = cl.Cursor(cur)
+
     if (cur:haskind("EnumConstantDecl")) then
         print(string.format("%s: %d", cur:name(), cur:enumval()))
     end
 
 --    print(string.format("[%3d] %50s <- %s", tonumber(cur:kindnum()), tostring(cur), tostring(parent)))
-    print(string.format("[%12s] %50s <- %s", cur:kind(), tostring(cur), tostring(parent)))
+    print(string.format("%3d [%12s] %50s <- %s", #ourtab, cur:kind(), tostring(cur), tostring(parent)))
 
     if (cur:haskind("CXXMethod")) then
         print("("..cur:access()..")")
     end
 
-    return V.Recurse
+    return V.Continue
 end)
 
 cur:children(visitor)
@@ -65,7 +70,6 @@ cur:children(visitor)
 local tab = cur:children()
 print("TU has "..#tab.." direct descendants:")
 for i=1,#tab do
-    print(i..": "..tab[i]:kind())
-    do break end  -- XXX: Segfaults:
-    print("("..tab[i]:displayName()..")")
+    print(i..": "..tab[i]:kind()..": "..tab[i]:displayName())
+    assert(tab[i] == ourtab[i])
 end

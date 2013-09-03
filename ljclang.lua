@@ -136,7 +136,6 @@ local TranslationUnit_mt = {
                 error("<filename> must be a string", 2)
             end
             local cxfile = clang.clang_getFile(self._tu, filename)
-            -- XXX: winds up empty ("???") for tests...
             return getString(clang.clang_getFileName(cxfile))  -- NYI: modification time
         end,
 
@@ -552,15 +551,20 @@ function api.regCursorVisitor(visitorfunc)
     return ret
 end
 
+local Cursor_ptr_t = ffi.typeof("$ *", Cursor_t)
+
+function api.Cursor(cur)
+    errassert(ffi.istype(Cursor_ptr_t, cur), "<cur> must be a cursor as passed to the visitor callback", 2)
+    return Cursor_t(cur[0])
+end
+
 -- Support for legacy luaclang-parser API collecting direct descendants of a
 -- cursor: this will be the table where they go.
 local collectTab
 
 local function collectDirectChildren(cur)
     debugf("collectDirectChildren: %s, child cursor kind: %s", tostring(collectTab), cur:kind())
-    if (not cur:haskind("Unknown")) then
-        collectTab[#collectTab+1] = cur
-    end
+    collectTab[#collectTab+1] = Cursor_t(cur[0])
     return 1  -- Continue
 end
 
@@ -570,7 +574,7 @@ function Cursor_mt.__index.children(self, visitoridx)
     if (visitoridx ~= nil) then
         -- LJClang way of visiting
         local ret = support.ljclang_visitChildren(self._cur, visitoridx)
-        return ret
+        return (ret ~= 0)
     else
         -- luaclang-parser way
         if (collectTab ~= nil) then
@@ -579,13 +583,14 @@ function Cursor_mt.__index.children(self, visitoridx)
         end
 
         collectTab = {}
+        -- XXX: We'll be blocked if the visitor callback errors.
         support.ljclang_visitChildren(self._cur, cdc_visitoridx)
         local tab = collectTab
         collectTab = nil
         return tab
     end
 end
---require("jit").off(Cursor_mt.__index.children, true)
+
 
 -- Register the metatables for the custom ctypes.
 ffi.metatype(Index_t, Index_mt)

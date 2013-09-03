@@ -141,6 +141,7 @@ default to *false*.
 +
 NOTE: Loading pre-compiled translation units in not implemented.
 
+[[ChildVisitResult]]
 `ChildVisitResult`::
 
     An object containing a mapping of names to values permissible as values
@@ -156,6 +157,16 @@ function receives two input arguments, `(cursor, parent)` -- with the cursors
 of the currently visited entity as well as its parent, and must return a value
 from the `ChildVisitResult` enumeration to indicate whether or how libclang
 should carry on AST visiting.
++
+
+NOTE: The `cursor` passed to the visitor callback is only valid during one
+particular callback invocation. If it is to be used after the function has
+returned, it *must* be copied using the `Cursor` constructor mentioned below.
+
+`Cursor([cur : Cursor])` -> `Cursor`::
+
+A constructor to create a permanent cursor from that received by the visitor
+callback.
 
 
 `Index`
@@ -265,23 +276,22 @@ and a `time_t` last modification time
 You can compare whether two ++Cursor++s represent the same element using the
 standard `==` Lua operator. Comparisons with any other type yield *false*.
 
-//////////
-`Cursor:children()` -> `{ Cursor * }`::
-//////////
-`Cursor:children(vf_handle)`::
+`Cursor:children()` -> `{ Cursor* }`::
+`Cursor:children(vf_handle)` -> `boolean`::
 
 Binding over {clang_visitChildren}[clang_visitChildren]. This is the main
-function for AST traversal. It differs from `luaclang-parser` by accepting
-a handle of a visitor function previously registered with
-<<regCursorVisitor,`regCursorVisitor()`>> instead of returning a table with
-all of the cursor's direct descendats.
+function for AST traversal. The first form collects the direct descendats of
+the given cursor in a table, returning an empty one if none are found. The
+second, preferred form accepts a handle of a visitor function previously
+registered with <<regCursorVisitor,`regCursorVisitor()`>> instead. Here, the
+returned value indicates whether the traversal was aborted prematurely due to
+the callback returning +<<ChildVisitResult,ChildVisitResult>>.Break+.
 +
-
 NOTE: Currently, the recommended procedure is to encapsulate the logic of one
 particular ``analysis'' into one visitor callback, which may run different
 portions of code e.g. conditional on the cursor's kind. (Instead of calling
-`Cursor:children()` with a different visitor function while another invocation
-of it is active.)
+`Cursor:children(visitor_function_handle)` with a different visitor function
+while another invocation of it is active.)
 
 //////////
     Traverses the direct descendats of a given
