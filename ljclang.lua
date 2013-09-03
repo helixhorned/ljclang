@@ -436,7 +436,8 @@ Type_mt.__tostring = Type_mt.__index.name
 
 --| index = clang.createIndex([excludeDeclarationsFromPCH [, displayDiagnostics]])
 function api.createIndex(excludeDeclarationsFromPCH, displayDiagnostics)
-    local cxidx = clang.clang_createIndex(excludeDeclarationsFromPCH, displayDiagnostics)
+    local cxidx = clang.clang_createIndex(excludeDeclarationsFromPCH or false,
+                                          displayDiagnostics or false)
     if (cxidx == nil) then
         return nil
     end

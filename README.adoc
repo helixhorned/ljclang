@@ -38,7 +38,7 @@ NOTE: As yet, LJClang has not been tested on OSes other than Linux, but only
 minor modifications to the build process should be necessary to get it working.
 
 From here on, LJClang can be used with LuaJIT by issuing a `require` for
-``++ljclang++''. One likely wants to use LJClang from its development directory
+`"ljclang"`. One likely wants to use LJClang from its development directory
 without installing it to a system-wide path. Because it expects to find
 `libljclang_support.so` and several supporting Lua files, one approach is to
 wrap client programs into scripts starting LuaJIT with an environment
@@ -58,7 +58,7 @@ and assuming that LJClang resides in `~/dl/ljclang`, the `extractdecls.lua`
 program described below could be run from anywhere like this:
 
 ----------
-$~/some/other/dir: ljwp ~/dl/ljclang/extractdecls.lua [options...]
+$~/some/other/dir: ljwp ~/dl/ljclang/extractdecls.lua [args...]
 ----------
 
 Overview
@@ -133,10 +133,11 @@ Reference
 
 The module retuned by `require("ljclang")` contains the following:
 
-`createIndex(excludePch : boolean, showDiagnostics : boolean) -> Index`::
+`createIndex([excludePch : boolean [, showDiagnostics : boolean]])` -> `Index`::
 
 Binding for {clang_createIndex}[clang_createIndex]. Will create an `Index` into
-which you can parse ++TranslationUnit++s.
+which you can parse ++TranslationUnit++s. Both input arguments are optional and
+default to *false*.
 +
 NOTE: Loading pre-compiled translation units in not implemented.
 
@@ -171,7 +172,7 @@ paths or defines. If `sourceFile` is ommitted (i.e. the arguments shifted left
 by one), the source file is expected to be named in `args`.
 +
 The last optional argument `opts` is expected to be a sequence containing
-{TUFlags}[`CXTranslationUnit_*`] enum names without then `"CXTranslationUnit_"`
+{TUFlags}[`CXTranslationUnit_*`] enum names without the `"CXTranslationUnit_"`
 prefix, for example `{ "DetailedPreprocessingRecord" }`.
 +
 NOTE: Both `args` and `opts` (if given) must not contain an element at index 0.
@@ -353,7 +354,7 @@ Otherwise, returns *nil*.
 
 `Cursor:type()` -> `Type`::
 
-	Returns the `Type` of a given element or `nil` if not available.
+	Returns the `Type` of a given element or *nil* if not available.
 
 `Cursor:location([linesfirst : boolean])` -> `string, number, number, number, number`::
 
@@ -372,13 +373,13 @@ This can be used to look up the text a cursor consists of.
 
 	Binding for {clang_getCursorDefinition}[clang_getCursorDefinition]. For a
 	reference or declaration, returns a cursor to the definition of the entity,
-	otherwise returns `nil`.
+	otherwise returns *nil*.
 
 `Cursor:referenced()` -> `Cursor`::
 
 	Binding for {clang_getCursorReferenced}[clang_getCursorReferenced]. For a
 	reference type, returns a cursor to the element it references, otherwise
-	returns `nil`.
+	returns *nil*.
 
 `Cursor:access()` -> `string`::
 
@@ -460,7 +461,7 @@ XXX: What was the intention of that? Test out stuff...
 `Type:declaration()` -> `Cursor`::
 
 	Binding of {clang_getTypeDeclaration}[clang_getTypeDeclaration]. Returns a
-	`Cursor` to the declaration of a given type, or `nil`.
+	`Cursor` to the declaration of a given type, or *nil*.
 
 
 License
