@@ -213,10 +213,11 @@ local Cursor_mt = {
 
         arguments = function(self)
             local tab = {}
-            local numargs = clang.clang_getNumArguments(self._cur)
+            local numargs = clang.clang_Cursor_getNumArguments(self._cur)
             for i=1,numargs do
-                tab[i] = clang.clang_getArgument(self._cur, i-1)
+                tab[i] = getCursor(clang.clang_Cursor_getArgument(self._cur, i-1))
             end
+            return tab
         end,
 
         location = function(self, linesfirst)
@@ -353,7 +354,7 @@ local Cursor_mt = {
 --[=[
         --| tab = cur:argtypes([alsoret])
         argtypes = function(self, alsoret)
-            if (clang.clang_getNumArguments(self._cur) == -1) then
+            if (clang.clang_Cursor_getNumArguments(self._cur) == -1) then
                 return nil
             end
 
