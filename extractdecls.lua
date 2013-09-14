@@ -37,13 +37,16 @@ local function usage(hline)
     os.exit(1)
 end
 
-local opt_hasarg = { p=true, x=true, s=true, C=false, R=false, Q=false,
+-- Meta-information about options:
+--  false: doesn't have argument (i.e. is switch)
+--  true: has argument, collect once
+--  1: has argument, collect all
+local opt_hasarg = { p=true, x=1, s=true, C=false, R=false, Q=false,
                      ['1']=true, ['2']=true, w=true }
 local opts = { x={} }
 
 -- The arguments to be eventually passed to libclang
 local args = {}
-local filename
 
 do  -- Get options from command line.
     local skipnext = false
@@ -62,7 +65,7 @@ do  -- Get options from command line.
                 if (arg[i+1] == nil) then
                     usage()
                 end
-                if (opt=='x') then
+                if (skipnext~=true) then
                     opts.x[#opts.x+1] = arg[i+1]
                 else
                     opts[opt] = arg[i+1]
