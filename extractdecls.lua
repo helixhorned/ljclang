@@ -37,53 +37,13 @@ local function usage(hline)
     os.exit(1)
 end
 
--- Meta-information about options:
---  false: doesn't have argument (i.e. is switch)
---  true: has argument, collect once
---  1: has argument, collect all
-local opt_hasarg = { p=true, x=1, s=true, C=false, R=false, Q=false,
-                     ['1']=true, ['2']=true, w=true }
-local opts = { x={} }
+local parsecmdline = require("parsecmdline_pk")
 
--- The arguments to be eventually passed to libclang
-local args = {}
+-- Meta-information about options, see parsecmdline_pk.
+local opt_meta = { p=true, x=1, s=true, C=false, R=false, Q=false,
+                   ['1']=true, ['2']=true, w=true }
 
-do  -- Get options from command line.
-    local skipnext = false
-    for i=1,#arg do
-        if (skipnext) then
-            skipnext = false
-            goto next
-        end
-
-        if (arg[i]:sub(1,1)=="-") then
-            local opt = arg[i]:sub(2)
-            skipnext = opt_hasarg[opt]
-            if (skipnext == nil) then
-                usage("Unrecognized option "..arg[i])
-            elseif (skipnext) then
-                if (arg[i+1] == nil) then
-                    usage()
-                end
-                if (skipnext~=true) then
-                    opts.x[#opts.x+1] = arg[i+1]
-                else
-                    opts[opt] = arg[i+1]
-                end
-            else
-                opts[opt] = true
-            end
-        else
-            local ii=1
-            for j=i,#arg do
-                args[ii] = arg[j]
-                ii = ii+1
-            end
-            break
-        end
-::next::
-    end
-end
+local opts, args = parsecmdline.getopts(opt_meta, arg, usage)
 
 local pat = opts.p
 local xpats = opts.x
