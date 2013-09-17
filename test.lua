@@ -55,8 +55,11 @@ function(cur, parent)
         print(string.format("%s: %d", cur:name(), cur:enumval()))
     end
 
+    local isdef = (cur:haskind("FunctionDecl")) and cur:isDefinition()
+
 --    print(string.format("[%3d] %50s <- %s", tonumber(cur:kindnum()), tostring(cur), tostring(parent)))
-    print(string.format("%3d [%12s] %50s <- %s", #ourtab, cur:kind(), tostring(cur), tostring(parent)))
+    print(string.format("%3d [%12s%s] %50s <- %s", #ourtab, cur:kind(),
+                        isdef and " (def)" or "", tostring(cur), tostring(parent)))
 
     if (cur:haskind("CXXMethod")) then
         print("("..cur:access()..")")

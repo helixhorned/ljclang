@@ -47,11 +47,24 @@ end
 
 -- CXIndex is a pointer type, wrap it to be able to define a metatable.
 local Index_t = ffi.typeof "struct { CXIndex _idx; }"
-local TranslationUnit_t = ffi.typeof "struct { CXTranslationUnit _tu; }"
+local TranslationUnit_t_ = ffi.typeof "struct { CXTranslationUnit _tu; }"
 -- NOTE: CXCursor is a struct type by itself, but we wrap it to e.g. provide a
 -- kind() *method* (CXCursor contains a member of the same name).
 local Cursor_t = ffi.typeof "struct { CXCursor _cur; }"
 local Type_t = ffi.typeof "struct { CXType _typ; }"
+
+-- [<address of CXTranslationUnit as string>] = count
+local TUCount = {}
+
+local function getCXTUaddr(cxtu)
+    return tostring(cxtu):gsub(".*: 0x", "")
+end
+
+local function TranslationUnit_t(cxtu)
+    local addr = getCXTUaddr(cxtu)
+    TUCount[addr] = (TUCount[addr] or 0) + 1
+    return TranslationUnit_t_(cxtu)
+end
 
 -- Our wrapping type Cursor_t is seen as raw CXCursor on the C side.
 assert(ffi.sizeof("CXCursor") == ffi.sizeof(Cursor_t))
@@ -119,7 +132,12 @@ local TranslationUnit_mt = {
     __index = {
         _cleanup = function(self)
             if (self._tu ~= nil) then
-                clang.clang_disposeTranslationUnit(self._tu)
+                local addr = getCXTUaddr(self._tu)
+                TUCount[addr] = TUCount[addr]-1
+                if (TUCount[addr] == 0) then
+                    clang.clang_disposeTranslationUnit(self._tu)
+                    TUCount[addr] = nil
+                end
                 self._tu = nil
             end
         end,
@@ -281,15 +299,17 @@ local Cursor_mt = {
 
         --== LJClang-specific ==--
 
+        translationUnit = function(self)
+            return TranslationUnit_t(clang.clang_Cursor_getTranslationUnit(self._cur))
+        end,
+
         -- XXX: Should be a TranslationUnit_t method instead.
         -- NOTE: Returns one token too much (always?), see
         -- http://clang-developers.42468.n3.nabble.com/querying-information-about-preprocessing-directives-in-libclang-td2740612.html
         --  and related bug report
         -- http://llvm.org/bugs/show_bug.cgi?id=9069
-        _tokens = function(self, tu)
-            if (not ffi.istype(TranslationUnit_t, tu)) then
-                error("<tu> must be a TranslationUnit_t object", 2)
-            end
+        _tokens = function(self)
+            local tu = self:translationUnit()
             local cxtu = tu._tu
 
             local cxsrcrange = getSourceRange(self._cur)
@@ -350,6 +370,11 @@ local Cursor_mt = {
         enumval = function(self, unsigned)
             return tonumber(self:enumValue(unsigned))
         end,
+
+        isDefinition = function(self)
+            return (clang.clang_isCursorDefinition(self._cur) ~= 0)
+        end,
+
 --[=[
         --| tab = cur:argtypes([alsoret])
         argtypes = function(self, alsoret)
@@ -594,7 +619,7 @@ end
 
 -- Register the metatables for the custom ctypes.
 ffi.metatype(Index_t, Index_mt)
-ffi.metatype(TranslationUnit_t, TranslationUnit_mt)
+ffi.metatype(TranslationUnit_t_, TranslationUnit_mt)
 ffi.metatype(Cursor_t, Cursor_mt)
 ffi.metatype(Type_t, Type_mt)
 

@@ -101,7 +101,7 @@ end
 
 -- Get definition string of #define macro definition cursor.
 local function getDefStr(cur)
-    local tokens = cur:_tokens(tu)
+    local tokens = cur:_tokens()
     return table.concat(tokens, " ", 2, #tokens-1)
 end
 
