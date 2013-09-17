@@ -68,6 +68,25 @@ function(cur, parent)
     return V.Continue
 end)
 
+-- Get a line from a source file.
+-- XXX: we could coalesce all queries for one file into one io.open() and file
+-- traversal, but it seems that parsing is the bottleneck anyway.
+local function getline(fn, line)
+    local f = io.open(fn)
+    if (f == nil) then
+        return
+    end
+
+    local str
+    while (line > 0) do
+        str = f:read("*l")
+        line = line-1
+    end
+
+    f:close()
+    return str
+end
+
 local visitor = cl.regCursorVisitor(
 function(cur, parent)
     if (cur:haskind("MemberRefExpr")) then
@@ -75,9 +94,9 @@ function(cur, parent)
         if (membname==memberName) then
             local def = cur:definition():parent()
             if (def:haskind("StructDecl") and def == g_structDecl) then
-                local _, line = cur:location()
+                local fn, line = cur:location()
                 local str = table.concat(cur:_tokens(tu), "")
-                printf("%s:%d: %s", g_curFileName, line, str)
+                printf("%s:%d: %s", g_curFileName, line, getline(fn,line) or str)
             end
         end
     end
