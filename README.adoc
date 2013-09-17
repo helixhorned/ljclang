@@ -273,6 +273,9 @@ and a `time_t` last modification time
 :clang_getEnumConstantUnsignedDeclValue: http://clang.llvm.org/doxygen/group__CINDEX__TYPES.html#gaf7cbd4f2d371dd93e8bc997c951a1aef
 :clang_getTypedefDeclUnderlyingType: http://clang.llvm.org/doxygen/group__CINDEX__TYPES.html#ga8de899fc18dc859b6fe3b97309f4fd52
 
+:clang_Cursor_getTranslationUnit: http://clang.llvm.org/doxygen/group__CINDEX__CURSOR__MANIP.html#ga529f1504710a41ce358d4e8c3161848d
+:clang_isCursorDefinition: http://clang.llvm.org/doxygen/group__CINDEX__CURSOR__XREF.html#ga6ad05634a73e693217088eaa693f0010
+
 You can compare whether two ++Cursor++s represent the same element using the
 standard `==` Lua operator. Comparisons with any other type yield *false*.
 
@@ -347,6 +350,12 @@ kindnum
 	table array of ++Cursor++s representing arguments of a function or a
 	method. Returns an empty table if a cursor is not a method or function.
 
+`Cursor:translationUnit()` -> `TranslationUnit`::
+
+    Binding for
+    {clang_Cursor_getTranslationUnit}[clang_Cursor_getTranslationUnit]. Returns
+    the translation unit that a cursor originated from.
+
 `Cursor:resultType()` -> `Type`::
 
 	Binding for {clang_getCursorResultType}[clang_getCursorResultType]. For a
@@ -395,6 +404,12 @@ This can be used to look up the text a cursor consists of.
 
 	When cursor kind is `"AccessSpecifier"`, returns one of `"private"`,
 	`"protected"` and `"public"`.
+
+`Cursor:isDefinition()` -> `boolean`::
+
+    Binding for {clang_isCursorDefinition}[clang_isCursorDefinition]. Determine
+    whether the declaration pointed to by this cursor is also a definition of
+    that entity.
 
 `Cursor:isVirtual()` -> `boolean`::
 
