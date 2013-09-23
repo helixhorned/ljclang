@@ -28,12 +28,16 @@ local function usage(hline)
     print "  -1 <string to print before everything>"
     print "  -2 <string to print after everything>"
     print "  -C: print lines like"
-    print "      static const int membname = 123;  (enums/macros only)"
+    print "       static const int membname = 123;  (enums/macros only)"
     print "  -R: reverse mapping, only if one-to-one. Print lines like"
-    print "      [123] = \"membname\";  (enums/macros only)"
+    print "       [123] = \"membname\";  (enums/macros only)"
+    print "  -f <formatFunc>: user-provided body for formatting function (enums/macros only)"
+    print "       Accepts args `k', `v'; `f' is string.format. Must return a formatted line."
+    print[[       Example: "return f('%s = %s%s,', k, k:find('KEY_') and '65536+' or '', v)"]]
+    print "       Incompatible with -C or -R."
     print "  -Q: be quiet"
     print "  -w: extract what? Can be"
-    print "      EnumConstantDecl (default), TypedefDecl, FunctionDecl, MacroDefinition"
+    print "       EnumConstantDecl (default), TypedefDecl, FunctionDecl, MacroDefinition"
     os.exit(1)
 end
 
@@ -41,7 +45,7 @@ local parsecmdline = require("parsecmdline_pk")
 
 -- Meta-information about options, see parsecmdline_pk.
 local opt_meta = { p=true, x=1, s=true, C=false, R=false, Q=false,
-                   ['1']=true, ['2']=true, w=true }
+                   ['1']=true, ['2']=true, w=true, f=true }
 
 local opts, args = parsecmdline.getopts(opt_meta, arg, usage)
 
@@ -52,6 +56,7 @@ local constint = opts.C
 local reverse = opts.R
 local quiet = opts.Q
 local what = opts.w or "EnumConstantDecl"
+local fmtfuncCode = opts.f
 
 local extractEnum = (what == "EnumConstantDecl")
 local extractMacro = (what:find("^Macro"))
@@ -65,6 +70,30 @@ end
 
 if (not (extractEnum or extractMacro) and (constint or reverse)) then
     usage("Options -C and -R only available for enum or macro extraction")
+end
+
+local fmtfunc
+if (fmtfuncCode) then
+    if (not (extractEnum or extractMacro)) then
+        usage("Option -f only available for enum or macro extraction")
+    end
+
+    if (constint or reverse) then
+        usage("Option -f is incompatible with -C or -R")
+    end
+
+    local func, errmsg = loadstring([[
+local f=string.format
+return function(k, v)
+]]..fmtfuncCode..[[
+end
+]])
+    if (func == nil) then
+        io.stderr:write("Error loading string: "..errmsg.."\n")
+        os.exit(1)
+    end
+
+    fmtfunc = func()
 end
 
 local opts = extractMacro and {"DetailedPreprocessingRecord"} or nil
@@ -134,7 +163,9 @@ function(cur, parent)
                     -- NOTE: tonumber(val) == nil can only happen with #defines that are not
                     -- like a literal number.
                     if (not extractMacro or tonumber(val) ~= nil) then
-                        if (reverse) then
+                        if (fmtfunc) then
+                            print(fmtfunc(ourname, val))
+                        elseif (reverse) then
                             if (enumname[val]) then
                                 printf("Error: enumeration value %d not unique: %s and %s",
                                        val, enumname[val], ourname)
