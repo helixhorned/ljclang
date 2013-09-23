@@ -304,10 +304,12 @@ local Cursor_mt = {
         end,
 
         -- XXX: Should be a TranslationUnit_t method instead.
-        -- NOTE: Returns one token too much (always?), see
-        -- http://clang-developers.42468.n3.nabble.com/querying-information-about-preprocessing-directives-in-libclang-td2740612.html
-        --  and related bug report
-        -- http://llvm.org/bugs/show_bug.cgi?id=9069
+        --
+        -- NOTE: *Sometimes* returns one token too much, see
+        --   http://clang-developers.42468.n3.nabble.com/querying-information-about-preprocessing-directives-in-libclang-td2740612.html
+        -- Related bug report:
+        --   http://llvm.org/bugs/show_bug.cgi?id=9069
+        -- Also, see TOKENIZE_WORKAROUND in extractdecls.lua
         _tokens = function(self)
             local tu = self:translationUnit()
             local cxtu = tu._tu
