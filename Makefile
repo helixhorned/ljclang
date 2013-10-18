@@ -1,14 +1,36 @@
 
-clang-c := /usr/local/include/clang-c
-so := .so
-
+OS := $(shell uname -s)
+MINGW := $(findstring MINGW,$(OS))
 THIS_DIR := $(abspath $(dir $(lastword $(MAKEFILE_LIST))))
-luajit=luajit
+
+
+########## PATHS ##########
+
+ifeq ($(OS),Linux)
+    inc := /usr/local/include
+    lib := -lclang
+    so := .so
+else
+ ifeq ($(MINGW),MINGW)
+    rdir := /f/g/mod/clang3.3_march2013
+    inc := $(rdir)/include
+    lib := $(rdir)/lib/libclang.lib $(rdir)/libclang.dll
+    so := .dll
+ else
+    $(error unknown platform)
+ endif
+endif
+
+luajit := luajit
+asciidoc := asciidoctor
+
+
+########## OPTIONS ##########
 
 OPTLEV ?= 2
 DEBUG ?= 0
 SAN ?= 0
-WARN := -pedantic -Wall -Werror-implicit-function-declaration
+WARN := -std=c99 -pedantic -Wall -Werror-implicit-function-declaration
 CFLAGS :=
 
 ifneq ($(SAN),0)
@@ -19,10 +41,19 @@ ifneq ($(DEBUG),0)
     CFLAGS += -g
 endif
 
-asciidoc=asciidoctor
+ifeq ($(OS),Linux)
+    CFLAGS += -fPIC
+else
+ ifeq ($(MINGW),MINGW)
+    CFLAGS += -I$(inc) $(lib)
+ endif
+endif
+
+
+########## RULES ##########
 
 libljclang_support$(so): ljclang_support.c Makefile
-	$(CC) $(CFLAGS) $(WARN) -O$(OPTLEV) -shared -fPIC $< -lclang -o $@
+	$(CC) $(CFLAGS) $(WARN) -O$(OPTLEV) -shared $< $(lib) -o $@
 
 
 .PHONY: clean bootstrap doc
@@ -37,7 +68,7 @@ EXTRACT_OPTS := -R -p '^CXCursor_' -x '_First' -x '_Last' -x '_GCCAsmStmt' -x '_
 # Generate list of CXCursorKind names
 bootstrap:
 	@echo 'return {}' > $(CKIND_LUA)
-	@LD_LIBRARY_PATH=$(THIS_DIR) $(luajit) ./extractdecls.lua $(EXTRACT_OPTS) $(clang-c)/Index.h > $(CKIND_LUA).tmp
+	@LD_LIBRARY_PATH=$(THIS_DIR) $(luajit) ./extractdecls.lua $(EXTRACT_OPTS) $(inc)/clang-c/Index.h > $(CKIND_LUA).tmp
 	@mv $(CKIND_LUA).tmp $(CKIND_LUA)
 	@printf "\033[1mGenerated $(CKIND_LUA)\033[0m\n"
 

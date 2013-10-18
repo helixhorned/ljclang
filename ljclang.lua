@@ -18,9 +18,13 @@ local ffi = require("ffi")
 local bit = require("bit")
 local io = require("io")
 
-local clang = ffi.load("clang")
+function lib(basename)
+    return (ffi.os=="Windows" and "lib" or "")..basename
+end
+
+local clang = ffi.load(lib"clang")
 require("ljclang_Index_h")
-local support = ffi.load("ljclang_support")
+local support = ffi.load(lib"ljclang_support")
 local ckind_name = require("ljclang_cursor_kind").name
 
 
