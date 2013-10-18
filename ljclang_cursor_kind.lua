@@ -142,6 +142,7 @@ return { name={
 [405] = "CXXOverrideAttr";
 [406] = "AnnotateAttr";
 [407] = "AsmLabelAttr";
+[408] = "PackedAttr";
 [500] = "PreprocessingDirective";
 [501] = "MacroDefinition";
 [502] = "MacroExpansion";
