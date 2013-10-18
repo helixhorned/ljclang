@@ -28,14 +28,17 @@ Requirements
 Building and usage
 ------------------
 
+:Clang-Win32: http://www.ishani.org/web/articles/code/clang-win32/
+
 Most of LJClang is written in Lua (extensively using LuaJIT's FFI), but due
 to currently existing limitations, a support C library has to be built.
 
 In the provided `Makefile`, adjust the libclang include path, and issue `make`
 to build `libljclang_support.so`.
 
-NOTE: As yet, LJClang has not been tested on OSes other than Linux, but only
-minor modifications to the build process should be necessary to get it working.
+NOTE: LJClang has been tested on Ubuntu Linux and Windows (using
+{Clang-Win32}[Clang-Win32]), but only minor modifications to the build process
+should be necessary to get it working with other OSes or configurations.
 
 From here on, LJClang can be used with LuaJIT by issuing a `require` for
 `"ljclang"`. One likely wants to use LJClang from its development directory
