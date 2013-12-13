@@ -89,7 +89,7 @@ Example program
 
 The `extractdecls.lua` script accompanied by LJClang can be used to extract
 various kinds of C declarations from (usually) headers and print them in
-various forms useable as FFI C declarations or descriptive tables with LuaJIT.
+various forms usable as FFI C declarations or descriptive tables with LuaJIT.
 
 ----------
 Usage: ./extractdecls.lua [our_options...] <file.h> [clang_options...]
@@ -138,7 +138,7 @@ Reference
 :clang_parseTranslationUnit: http://clang.llvm.org/doxygen/group__CINDEX__TRANSLATION__UNIT.html#ga2baf83f8c3299788234c8bce55e4472e
 :clang_createTranslationUnit: http://clang.llvm.org/doxygen/group__CINDEX__TRANSLATION__UNIT.html#gaa2e74f6e28c438692fd4f5e3d3abda97
 
-The module retuned by `require("ljclang")` contains the following:
+The module returned by `require("ljclang")` contains the following:
 
 `createIndex([excludePch : boolean [, showDiagnostics : boolean]])` -> `Index`::
 
@@ -186,7 +186,7 @@ callback.
 Binding for {clang_parseTranslationUnit}[clang_parseTranslationUnit]. This will
 parse a given source file `sourceFile` with the command line arguments `args`,
 which would be given to the compiler for compilation, containing e.g. include
-paths or defines. If `sourceFile` is ommitted (i.e. the arguments shifted left
+paths or defines. If `sourceFile` is omitted (i.e. the arguments shifted left
 by one), the source file is expected to be named in `args`.
 +
 The last optional argument `opts` is expected to be a sequence containing
@@ -290,7 +290,7 @@ standard `==` Lua operator. Comparisons with any other type yield *false*.
 `Cursor:children(vf_handle)` -> `boolean`::
 
 Binding over {clang_visitChildren}[clang_visitChildren]. This is the main
-function for AST traversal. The first form collects the direct descendats of
+function for AST traversal. The first form collects the direct descendants of
 the given cursor in a table, returning an empty one if none are found. The
 second, preferred form accepts a handle of a visitor function previously
 registered with <<regCursorVisitor,`regCursorVisitor()`>> instead. Here, the
@@ -304,7 +304,7 @@ portions of code e.g. conditional on the cursor's kind. (Instead of calling
 while another invocation of it is active.)
 
 //////////
-    Traverses the direct descendats of a given
+    Traverses the direct descendants of a given
     cursor and collects them in a table. If no child cursors are found, returns
     an empty table.
 //////////
@@ -433,7 +433,7 @@ returns its numeric value as a {clang_getEnumConstantDeclValue}[signed] 64-bit
 signed integer, or a 64-bit {clang_getEnumConstantUnsignedDeclValue}[unsigned]
 integer if `unsigned` is true.
 +
-NOTE: In C99, en enumeration constant must be in the range of values
+NOTE: In C99, an enumeration constant must be in the range of values
 representable by an `int` (6.7.2.2#2). LJClang does not check for this
 constraint.
 
