@@ -463,6 +463,10 @@ local Type_mt = {
             return not not clang.clang_isConstQualifiedType(self._typ)
         end,
 
+        resultType = function(self)
+            return getType(clang.clang_getResultType(self._typ))
+        end,
+
         arrayElementType = function(self)
             return getType(clang.clang_getArrayElementType(self._typ))
         end,
