@@ -345,6 +345,7 @@ local Cursor_mt = {
             local tu = self:translationUnit()
             local cxtu = tu._tu
 
+            local _, b, e = self:location('offset')
             local cxsrcrange = getSourceRange(self._cur)
             if (cxsrcrange == nil) then
                 return nil
@@ -357,16 +358,42 @@ local Cursor_mt = {
             local tokens = tokensar[0]
 
             local tab = {}
+            local tabextra = {}
 
+            local kinds = {
+                [tonumber(ffi.C.CXToken_Punctuation)] = 'Punctuation',
+                [tonumber(ffi.C.CXToken_Keyword)] = 'Keyword',
+                [tonumber(ffi.C.CXToken_Identifier)] = 'Identifier',
+                [tonumber(ffi.C.CXToken_Literal)] = 'Literal',
+                [tonumber(ffi.C.CXToken_Comment)] = 'Comment',
+            }
             for i=0,numtoks-1 do
+                local sourcerange = clang.clang_getTokenExtent(cxtu, tokens[i])
+                local cxfilear = CXFileAr()
+                local offset = TwoUnsignedAr()
+                local linecolB = getLineCol(sourcerange, cxfilear, "clang_getRangeStart", offset)
+                local filename = getString(clang.clang_getFileName(cxfilear[0]))
+                local linecolE = getLineCol(sourcerange, cxfilear, "clang_getRangeEnd", offset + 1)
+                local tb, te = offset[0], offset[1]
+
+                local kind = clang.clang_getTokenKind(tokens[i])
                 if (clang.clang_getTokenKind(tokens[i]) ~= 'CXToken_Comment') then
-                    tab[#tab+1] = getString(clang.clang_getTokenSpelling(cxtu, tokens[i]))
+                    if tb >= b and te <= e then
+                        local extent = getString(clang.clang_getTokenSpelling(cxtu, tokens[i]))
+                        tab[#tab+1] = extent
+                        tabextra[#tabextra+1] = {
+                            extent = extent,
+                            kind = kinds[tonumber(kind)],
+                            b = b, e = e,
+                            tb = tb, te = te
+                        }
+                    end
                 end
             end
 
             clang.clang_disposeTokens(cxtu, tokens, numtoks)
 
-            return tab
+            return tab, tabextra
         end,
 
         lexicalParent = function(self)
