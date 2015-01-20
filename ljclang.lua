@@ -459,6 +459,18 @@ local Type_mt = {
             return getType(clang.clang_getPointeeType(self._typ))
         end,
 
+        isConstQualified = function(self)
+            return not not clang.clang_isConstQualifiedType(self._typ)
+        end,
+
+        arrayElementType = function(self)
+            return getType(clang.clang_getArrayElementType(self._typ))
+        end,
+
+        arraySize = function(self)
+            return tonumber(clang.clang_getArraySize(self._typ))
+        end,
+
         isConst = function(self)
             return (clang.clang_isConstQualifiedType(self._typ) ~= 0);
         end,
