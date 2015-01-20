@@ -472,7 +472,6 @@ local Type_mt = {
         end,
 
         --== LJClang-specific ==--
---[=[
         -- Returns an enumeration constant.
         kindnum = function(self)
             return self._typ.kind
@@ -485,6 +484,7 @@ local Type_mt = {
                 return self:kindnum() == kind
             end
         end,
+--[=[
 ]=]
     },
 }
