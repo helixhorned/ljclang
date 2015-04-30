@@ -7,8 +7,9 @@ THIS_DIR := $(abspath $(dir $(lastword $(MAKEFILE_LIST))))
 ########## PATHS ##########
 
 ifeq ($(OS),Linux)
-    inc := /usr/local/include
-    lib := -lclang
+    inc := /usr/include
+    libdir := /usr/lib
+    lib := -L$(libdir) -lclang
     so := .so
 else
  ifeq ($(MINGW),MINGW)
@@ -42,7 +43,7 @@ ifneq ($(DEBUG),0)
 endif
 
 ifeq ($(OS),Linux)
-    CFLAGS += -fPIC
+    CFLAGS += -I$(inc) -fPIC
 else
  ifeq ($(MINGW),MINGW)
     CFLAGS += -I$(inc) $(lib)

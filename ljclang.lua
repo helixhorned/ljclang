@@ -191,11 +191,19 @@ end
 local CXFileAr = ffi.typeof("CXFile [1]")
 local TwoUnsignedAr = ffi.typeof("unsigned [2]")
 
-local function getLineCol(cxsrcrange, cxfile, clang_funcname)
-    local cxsrcloc = clang[clang_funcname](cxsrcrange)
+local function getLineCol(cxsrcrange, cxfile, clang_rangefunc, offset)
+    local cxsrcloc = clang[clang_rangefunc](cxsrcrange)
     local linecol = TwoUnsignedAr()
-    clang.clang_getSpellingLocation(cxsrcloc, cxfile, linecol, linecol+1, nil)
+    clang.clang_getSpellingLocation(cxsrcloc, cxfile, linecol, linecol+1, offset)
     return linecol
+end
+
+local function getPresumedLineCol(cxsrcrange, clang_rangefunc)
+    local cxsrcloc = clang[clang_rangefunc](cxsrcrange)
+    local linecol = TwoUnsignedAr()
+    local file = CXString()
+    clang.clang_getPresumedLocation(cxsrcloc, file, linecol, linecol+1)
+    return linecol, getString(file)
 end
 
 local function getSourceRange(cxcur)
@@ -248,16 +256,35 @@ local Cursor_mt = {
             end
 
             local cxfilear = CXFileAr()
-            local linecolB = getLineCol(cxsrcrange, cxfilear, "clang_getRangeStart")
+            local offset = TwoUnsignedAr()
+            local linecolB = getLineCol(cxsrcrange, cxfilear, "clang_getRangeStart", offset)
             local filename = getString(clang.clang_getFileName(cxfilear[0]))
-            local linecolE = getLineCol(cxsrcrange, cxfilear, "clang_getRangeEnd")
+            local linecolE = getLineCol(cxsrcrange, cxfilear, "clang_getRangeEnd", offset + 1)
 
-            if (linesfirst) then
+            if linesfirst == 'offset' then
+                return filename, offset[0], offset[1]
+            elseif (linesfirst) then
                 -- LJClang order -- IMO you're usually more interested in the
                 -- line number
-                return filename, linecolB[0], linecolE[0], linecolB[1], linecolE[1]
+                return filename, linecolB[0], linecolE[0], linecolB[1], linecolE[1], offset[0], offset[1]
             else
                 -- luaclang-parser order
+                return filename, linecolB[0], linecolB[1], linecolE[0], linecolE[1], offset[0], offset[1]
+            end
+        end,
+
+        presumedLocation = function(self, linesfirst)
+            local cxsrcrange = getSourceRange(self._cur)
+            if (cxsrcrange == nil) then
+                return nil
+            end
+
+            local linecolB, filename = getPresumedLineCol(cxsrcrange, "clang_getRangeStart")
+            local linecolE = getPresumedLineCol(cxsrcrange, "clang_getRangeEnd")
+            
+            if (linesfirst) then
+                return filename, linecolB[0], linecolE[0], linecolB[1], linecolE[1]
+            else
                 return filename, linecolB[0], linecolB[1], linecolE[0], linecolE[1]
             end
         end,
@@ -318,6 +345,7 @@ local Cursor_mt = {
             local tu = self:translationUnit()
             local cxtu = tu._tu
 
+            local _, b, e = self:location('offset')
             local cxsrcrange = getSourceRange(self._cur)
             if (cxsrcrange == nil) then
                 return nil
@@ -330,16 +358,42 @@ local Cursor_mt = {
             local tokens = tokensar[0]
 
             local tab = {}
+            local tabextra = {}
 
+            local kinds = {
+                [tonumber(ffi.C.CXToken_Punctuation)] = 'Punctuation',
+                [tonumber(ffi.C.CXToken_Keyword)] = 'Keyword',
+                [tonumber(ffi.C.CXToken_Identifier)] = 'Identifier',
+                [tonumber(ffi.C.CXToken_Literal)] = 'Literal',
+                [tonumber(ffi.C.CXToken_Comment)] = 'Comment',
+            }
             for i=0,numtoks-1 do
+                local sourcerange = clang.clang_getTokenExtent(cxtu, tokens[i])
+                local cxfilear = CXFileAr()
+                local offset = TwoUnsignedAr()
+                local linecolB = getLineCol(sourcerange, cxfilear, "clang_getRangeStart", offset)
+                local filename = getString(clang.clang_getFileName(cxfilear[0]))
+                local linecolE = getLineCol(sourcerange, cxfilear, "clang_getRangeEnd", offset + 1)
+                local tb, te = offset[0], offset[1]
+
+                local kind = clang.clang_getTokenKind(tokens[i])
                 if (clang.clang_getTokenKind(tokens[i]) ~= 'CXToken_Comment') then
-                    tab[#tab+1] = getString(clang.clang_getTokenSpelling(cxtu, tokens[i]))
+                    if tb >= b and te <= e then
+                        local extent = getString(clang.clang_getTokenSpelling(cxtu, tokens[i]))
+                        tab[#tab+1] = extent
+                        tabextra[#tabextra+1] = {
+                            extent = extent,
+                            kind = kinds[tonumber(kind)],
+                            b = b, e = e,
+                            tb = tb, te = te
+                        }
+                    end
                 end
             end
 
             clang.clang_disposeTokens(cxtu, tokens, numtoks)
 
-            return tab
+            return tab, tabextra
         end,
 
         lexicalParent = function(self)
@@ -432,6 +486,22 @@ local Type_mt = {
             return getType(clang.clang_getPointeeType(self._typ))
         end,
 
+        isConstQualified = function(self)
+            return not not clang.clang_isConstQualifiedType(self._typ)
+        end,
+
+        resultType = function(self)
+            return getType(clang.clang_getResultType(self._typ))
+        end,
+
+        arrayElementType = function(self)
+            return getType(clang.clang_getArrayElementType(self._typ))
+        end,
+
+        arraySize = function(self)
+            return tonumber(clang.clang_getArraySize(self._typ))
+        end,
+
         isConst = function(self)
             return (clang.clang_isConstQualifiedType(self._typ) ~= 0);
         end,
@@ -445,7 +515,6 @@ local Type_mt = {
         end,
 
         --== LJClang-specific ==--
---[=[
         -- Returns an enumeration constant.
         kindnum = function(self)
             return self._typ.kind
@@ -458,6 +527,7 @@ local Type_mt = {
                 return self:kindnum() == kind
             end
         end,
+--[=[
 ]=]
     },
 }
