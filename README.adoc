@@ -275,6 +275,8 @@ and a `time_t` last modification time
 :clang_getCursorExtent: http://clang.llvm.org/doxygen/group__CINDEX__CURSOR__SOURCE.html#ga79f6544534ab73c78a8494c4c0bc2840
 :clang_getCursorReferenced: http://clang.llvm.org/doxygen/group__CINDEX__CURSOR__XREF.html#gabf059155921552e19fc2abed5b4ff73a
 :clang_getCursorDefinition: http://clang.llvm.org/doxygen/group__CINDEX__CURSOR__XREF.html#gafcfbec461e561bf13f1e8540bbbd655b
+:clang_getSpellingLocation: http://clang.llvm.org/doxygen/group__CINDEX__LOCATIONS.html#ga01f1a342f7807ea742aedd2c61c46fa0
+:clang_getPresumedLocation: http://clang.llvm.org/doxygen/group__CINDEX__LOCATIONS.html#ga03508d9c944feeb3877515a1b08d36f9
 
 :clang_getEnumConstantDeclValue: http://clang.llvm.org/doxygen/group__CINDEX__TYPES.html#ga6b8585818420e7512feb4c9d209b4f4d
 :clang_getEnumConstantUnsignedDeclValue: http://clang.llvm.org/doxygen/group__CINDEX__TYPES.html#gaf7cbd4f2d371dd93e8bc997c951a1aef
@@ -382,13 +384,21 @@ Otherwise, returns *nil*.
 
 	Returns the `Type` of a given element or *nil* if not available.
 
-`Cursor:location([linesfirst : boolean])` -> `string, number, number, number, number`::
+`Cursor:location([linesfirst : boolean])` -> `string, number, number, number, number [, number, number]`::
 
-	Binding for {clang_getCursorExtent}[clang_getCursorExtent]. Returns the
-	file name, starting line, starting column, ending line and ending column of
-	the given cursor. If the optional argument `linesfirst` is true, the numbers
-	are ordered like starting line, ending line, starting column and ending
-	column instead.
+	Binding for {clang_getCursorExtent}[clang_getCursorExtent] and
+	{clang_getSpellingLocation}[clang_getSpellingLocation]. Returns the _file
+	name_, _starting line_, _starting column_, _ending line_ and _ending
+	column_ of the given cursor. If the optional argument `linesfirst` is true,
+	the numbers are ordered like _starting line_, _ending line_, _starting
+	column_, _ending column_, _starting offset_, _ending offset_ instead. If
+	`linesfirst` has the string value `'offset'`, only _starting offset_,
+	_ending offset_ are returned.
+
+`Cursor:presumedLocation([linesfirst : boolean])` -> `string, number, number, number, number
+
+Binding for {clang_getCursorExtent}[clang_getCursorExtent] and
+{clang_getPresumedLocation}[clang_getPresumedLocation].
 
 //////////
 XXX: Better provide an API around CXSourceRange.
@@ -451,7 +461,11 @@ constraint.
 :clang_isPODType: http://clang.llvm.org/doxygen/group__CINDEX__TYPES.html#ga3e7fdbe3d246ed03298bd074c5b3703e
 :clang_isConstQualifiedType: http://clang.llvm.org/doxygen/group__CINDEX__TYPES.html#ga8c3f8029254d5862bcd595d6c8778e5b
 :clang_getTypeDeclaration: http://clang.llvm.org/doxygen/group__CINDEX__TYPES.html#ga0aad74ea93a2f5dea58fd6fc0db8aad4
+:clang_getArrayElementType: http://clang.llvm.org/doxygen/group__CINDEX__TYPES.html#ga718591f4b07d9d4861557a3ed8b29713
+:clang_getArraySize: http://clang.llvm.org/doxygen/group__CINDEX__TYPES.html#ga91521260817054f153b5f1295056192d
+
 :CXTypeKind: http://clang.llvm.org/doxygen/group__CINDEX__TYPES.html#gaad39de597b13a18882c21860f92b095a
+
 
 You can compare whether two ++Type++s represent the same type using the standard
 `==` Lua operator. Comparisons with any other type yield *false*.
@@ -485,6 +499,7 @@ XXX: What was the intention of that? Test out stuff...
 	a ``Plain Old Data'' type.
 
 `Type:isConst()` -> `boolean`::
+`Type:isConstQualified()` -> `boolean`::
 
 	Binding of
 	{clang_isConstQualifiedType}[clang_isConstQualifiedType]. Returns true if
@@ -494,6 +509,15 @@ XXX: What was the intention of that? Test out stuff...
 
 	Binding of {clang_getTypeDeclaration}[clang_getTypeDeclaration]. Returns a
 	`Cursor` to the declaration of a given type, or *nil*.
+
+`Type:arrayElementType()` -> `Type`::
+
+	Binding of {clang_getArrayElementType}[clang_getArrayElementType].
+
+`Type:arraySize()` -> `Type`::
+
+	Binding of {clang_getArraySize}[clang_getArraySize].
+
 
 
 License

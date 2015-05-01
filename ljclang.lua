@@ -10,22 +10,24 @@ local print = print
 local require = require
 local setmetatable = setmetatable
 local tonumber = tonumber
+local tostring = tostring
 local type = type
 local unpack = unpack
 
 local ffi = require("ffi")
+local C = ffi.C
 
 local bit = require("bit")
 local io = require("io")
 
-function lib(basename)
+local function lib(basename)
     return (ffi.os=="Windows" and "lib" or "")..basename
 end
 
 local clang = ffi.load(lib"clang")
 require("ljclang_Index_h")
 local support = ffi.load(lib"ljclang_support")
-local ckind_name = require("ljclang_cursor_kind").name
+local g_CursorKindName = require("ljclang_cursor_kind").name
 
 
 --==========##########==========--
@@ -189,20 +191,43 @@ local function getType(cxtyp)
 end
 
 local CXFileAr = ffi.typeof("CXFile [1]")
-local TwoUnsignedAr = ffi.typeof("unsigned [2]")
 
-local function getLineCol(cxsrcrange, cxfile, clang_rangefunc, offset)
+local LineCol = ffi.typeof[[
+union {
+    struct { unsigned line, col; };
+    unsigned ar[2];
+}
+]]
+
+local LineColOfs = ffi.typeof[[
+union {
+    struct { unsigned line, col, offset; };
+    unsigned ar[3];
+}
+]]
+
+-- Get line number, column number and offset for a given CXSourceRange
+local function getLineColOfs(cxsrcrange, cxfile, clang_rangefunc)
     local cxsrcloc = clang[clang_rangefunc](cxsrcrange)
-    local linecol = TwoUnsignedAr()
-    clang.clang_getSpellingLocation(cxsrcloc, cxfile, linecol, linecol+1, offset)
-    return linecol
+    local lco = LineColOfs()
+    clang.clang_getSpellingLocation(cxsrcloc, cxfile, lco.ar, lco.ar+1, lco.ar+2)
+    return lco
+end
+
+-- Returns a LineColOfs for the beginning and end of a range. Also, the file name.
+local function getBegEndFilename(cxsrcrange)
+    local cxfilear = CXFileAr()
+    local Beg = getLineColOfs(cxsrcrange, cxfilear, "clang_getRangeStart")
+    local filename = getString(clang.clang_getFileName(cxfilear[0]))
+    local End = getLineColOfs(cxsrcrange, cxfilear, "clang_getRangeEnd")
+    return Beg, End, filename
 end
 
 local function getPresumedLineCol(cxsrcrange, clang_rangefunc)
     local cxsrcloc = clang[clang_rangefunc](cxsrcrange)
-    local linecol = TwoUnsignedAr()
+    local linecol = LineCol()
     local file = CXString()
-    clang.clang_getPresumedLocation(cxsrcloc, file, linecol, linecol+1)
+    clang.clang_getPresumedLocation(cxsrcloc, file, linecol.ar, linecol.ar+1)
     return linecol, getString(file)
 end
 
@@ -236,7 +261,7 @@ local Cursor_mt = {
 
         kind = function(self)
             local kindnum = tonumber(self:kindnum())
-            local kindstr = ckind_name[kindnum]
+            local kindstr = g_CursorKindName[kindnum]
             return kindstr or "Unknown"
         end,
 
@@ -255,21 +280,17 @@ local Cursor_mt = {
                 return nil
             end
 
-            local cxfilear = CXFileAr()
-            local offset = TwoUnsignedAr()
-            local linecolB = getLineCol(cxsrcrange, cxfilear, "clang_getRangeStart", offset)
-            local filename = getString(clang.clang_getFileName(cxfilear[0]))
-            local linecolE = getLineCol(cxsrcrange, cxfilear, "clang_getRangeEnd", offset + 1)
+            local Beg, End, filename = getBegEndFilename(cxsrcrange)
 
-            if linesfirst == 'offset' then
-                return filename, offset[0], offset[1]
+            if (linesfirst == 'offset') then
+                return filename, Beg.offset, End.offset
             elseif (linesfirst) then
                 -- LJClang order -- IMO you're usually more interested in the
                 -- line number
-                return filename, linecolB[0], linecolE[0], linecolB[1], linecolE[1], offset[0], offset[1]
+                return filename, Beg.line, End.line, Beg.col, End.col, Beg.offset, End.offset
             else
-                -- luaclang-parser order
-                return filename, linecolB[0], linecolB[1], linecolE[0], linecolE[1], offset[0], offset[1]
+                -- luaclang-parser order (offset: XXX)
+                return filename, Beg.line, Beg.col, End.line, End.col, Beg.offset, End.offset
             end
         end,
 
@@ -279,13 +300,13 @@ local Cursor_mt = {
                 return nil
             end
 
-            local linecolB, filename = getPresumedLineCol(cxsrcrange, "clang_getRangeStart")
-            local linecolE = getPresumedLineCol(cxsrcrange, "clang_getRangeEnd")
-            
+            local Beg, filename = getPresumedLineCol(cxsrcrange, "clang_getRangeStart")
+            local End = getPresumedLineCol(cxsrcrange, "clang_getRangeEnd")
+
             if (linesfirst) then
-                return filename, linecolB[0], linecolE[0], linecolB[1], linecolE[1]
+                return filename, Beg.line, End.line, Beg.col, End.col
             else
-                return filename, linecolB[0], linecolB[1], linecolE[0], linecolE[1]
+                return filename, Beg.line, Beg.col, End.line, End.col
             end
         end,
 
@@ -361,24 +382,21 @@ local Cursor_mt = {
             local tabextra = {}
 
             local kinds = {
-                [tonumber(ffi.C.CXToken_Punctuation)] = 'Punctuation',
-                [tonumber(ffi.C.CXToken_Keyword)] = 'Keyword',
-                [tonumber(ffi.C.CXToken_Identifier)] = 'Identifier',
-                [tonumber(ffi.C.CXToken_Literal)] = 'Literal',
-                [tonumber(ffi.C.CXToken_Comment)] = 'Comment',
+                [tonumber(C.CXToken_Punctuation)] = 'Punctuation',
+                [tonumber(C.CXToken_Keyword)] = 'Keyword',
+                [tonumber(C.CXToken_Identifier)] = 'Identifier',
+                [tonumber(C.CXToken_Literal)] = 'Literal',
+                [tonumber(C.CXToken_Comment)] = 'Comment',
             }
-            for i=0,numtoks-1 do
-                local sourcerange = clang.clang_getTokenExtent(cxtu, tokens[i])
-                local cxfilear = CXFileAr()
-                local offset = TwoUnsignedAr()
-                local linecolB = getLineCol(sourcerange, cxfilear, "clang_getRangeStart", offset)
-                local filename = getString(clang.clang_getFileName(cxfilear[0]))
-                local linecolE = getLineCol(sourcerange, cxfilear, "clang_getRangeEnd", offset + 1)
-                local tb, te = offset[0], offset[1]
 
-                local kind = clang.clang_getTokenKind(tokens[i])
+            for i=0,numtoks-1 do
                 if (clang.clang_getTokenKind(tokens[i]) ~= 'CXToken_Comment') then
-                    if tb >= b and te <= e then
+                    local sourcerange = clang.clang_getTokenExtent(cxtu, tokens[i])
+                    local Beg, End, filename = getBegEndFilename(sourcerange)
+                    local tb, te = Beg.offset, End.offset
+
+                    if (tb >= b and te <= e) then
+                        local kind = clang.clang_getTokenKind(tokens[i])
                         local extent = getString(clang.clang_getTokenSpelling(cxtu, tokens[i]))
                         tab[#tab+1] = extent
                         tabextra[#tabextra+1] = {
@@ -486,10 +504,6 @@ local Type_mt = {
             return getType(clang.clang_getPointeeType(self._typ))
         end,
 
-        isConstQualified = function(self)
-            return not not clang.clang_isConstQualifiedType(self._typ)
-        end,
-
         resultType = function(self)
             return getType(clang.clang_getResultType(self._typ))
         end,
@@ -527,12 +541,14 @@ local Type_mt = {
                 return self:kindnum() == kind
             end
         end,
---[=[
-]=]
     },
 }
 
-Type_mt.__tostring = Type_mt.__index.name
+-- Aliases
+local Type__index = Type_mt.__index
+Type__index.isConstQualified = Type__index.isConst
+
+Type_mt.__tostring = Type__index.name
 
 
 --| index = clang.createIndex([excludeDeclarationsFromPCH [, displayDiagnostics]])
