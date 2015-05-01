@@ -28,10 +28,12 @@ local function loadandstrip(filename)
               :gsub("CINDEX_LINKAGE","")
               :gsub("CINDEX_DEPRECATED","")
               :gsub("time_t", "// time_t")  -- clang_getFileTime declaration
+              :gsub(" *\n+", "\n")
 end
 
 local cxstring_h = loadandstrip("CXString.h")
+local cxcompdb_h = loadandstrip("CXCompilationDatabase.h")
 local index_h = loadandstrip("Index.h")
 
 print("require('ffi').cdef[==========[\n",
-      cxstring_h, index_h, "]==========]")
+      cxstring_h, cxcompdb_h, index_h, "]==========]")
