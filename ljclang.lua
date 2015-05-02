@@ -29,8 +29,7 @@ require("ljclang_Index_h")
 local support = ffi.load(lib"ljclang_support")
 local g_CursorKindName = require("ljclang_cursor_kind").name
 
-
---==========##########==========--
+-------------------------------------------------------------------------
 
 -- The table of externally exposed elements, returned at the end.
 local api = {}
@@ -45,7 +44,7 @@ local function debugf() end
 
 -- Wrap 'error' in assert-like call to write type checks in one line instead of
 -- three.
-local function errassert(pred, msg, level)
+local function check(pred, msg, level)
     if (not pred) then
         error(msg, level+1)
     end
@@ -452,7 +451,6 @@ local Cursor_mt = {
         isDefinition = function(self)
             return (clang.clang_isCursorDefinition(self._cur) ~= 0)
         end,
-
 --[=[
         --| tab = cur:argtypes([alsoret])
         argtypes = function(self, alsoret)
@@ -569,6 +567,7 @@ local function iscellstr(tab)
             return false
         end
     end
+
     -- We require this because in ARGS_FROM_TAB below, an index 0 would be
     -- interpreted as the starting index.
     return (tab[0] == nil)
@@ -577,37 +576,25 @@ end
 local function check_iftab_iscellstr(tab, name)
     if (type(tab)=="table") then
         if (not iscellstr(tab)) then
-            error(name.." must be a string sequence when a table", 3)
+            error(name.." must be a string sequence when a table with no element at [0]", 3)
         end
     end
 end
 
---| tunit = index:parse([srcfile, ] args [, opts])
+--| tunit = index:parse(srcfile, args [, opts])
 --|
 --| <args>: string or sequence of strings
 --| <opts>: number or sequence of strings (CXTranslationUnit_* enum members,
 --|  without the prefix)
 function Index_mt.__index.parse(self, srcfile, args, opts)
-    if (type(srcfile) ~= "string" or
-        type(args) ~= "string" and type(args) ~= "table")
-    then
-        -- Called us like index:parse(args [, opts]), shift input arguments
-        opts = args
-        args = srcfile
-        srcfile = nil
-    end
-
-    -- Input argument type checking.
-
-    errassert(srcfile==nil or type(srcfile)=="string", "<srcfile> must be a string", 2)
-
-    errassert(type(args)=="string" or type(args)=="table", "<args> must be a string or table", 2)
+    check(type(srcfile)=="string", "<srcfile> must be a string", 2)
+    check(type(args)=="string" or type(args)=="table", "<args> must be a string or table", 2)
     check_iftab_iscellstr(args, "<args>")
 
     if (opts == nil) then
         opts = 0
     else
-        errassert(type(opts)=="number" or type(opts)=="table", 2)
+        check(type(opts)=="number" or type(opts)=="table", 2)
         check_iftab_iscellstr(args, "<opts>")
     end
 
@@ -658,7 +645,7 @@ api.ChildVisitResult = ffi.new[[struct{
 }]]
 
 function api.regCursorVisitor(visitorfunc)
-    errassert(type(visitorfunc)=="function", "<visitorfunc> must be a Lua function", 2)
+    check(type(visitorfunc)=="function", "<visitorfunc> must be a Lua function", 2)
 
     local ret = support.ljclang_regCursorVisitor(visitorfunc, nil, 0)
     if (ret < 0) then
@@ -671,7 +658,7 @@ end
 local Cursor_ptr_t = ffi.typeof("$ *", Cursor_t)
 
 function api.Cursor(cur)
-    errassert(ffi.istype(Cursor_ptr_t, cur), "<cur> must be a cursor as passed to the visitor callback", 2)
+    check(ffi.istype(Cursor_ptr_t, cur), "<cur> must be a cursor as passed to the visitor callback", 2)
     return Cursor_t(cur[0])
 end
 

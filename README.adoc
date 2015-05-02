@@ -181,13 +181,15 @@ callback.
 
 :TUFlags: http://clang.llvm.org/doxygen/group__CINDEX__TRANSLATION__UNIT.html#enum-members
 
-`Index:parse([sourceFile : string,] args : table [, opts : table])` -> `TranslationUnit`::
+`Index:parse(sourceFile : string, args : table [, opts : table])` -> `TranslationUnit`::
 
 Binding for {clang_parseTranslationUnit}[clang_parseTranslationUnit]. This will
 parse a given source file `sourceFile` with the command line arguments `args`,
 which would be given to the compiler for compilation, containing e.g. include
-paths or defines. If `sourceFile` is omitted (i.e. the arguments shifted left
-by one), the source file is expected to be named in `args`.
+paths or defines.
+// XXX
+// If `sourceFile` is omitted (i.e. the arguments shifted left
+// by one), the source file is expected to be named in `args`.
 +
 The last optional argument `opts` is expected to be a sequence containing
 {TUFlags}[`CXTranslationUnit_*`] enum names without the `"CXTranslationUnit_"`
