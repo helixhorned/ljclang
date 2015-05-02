@@ -25,13 +25,21 @@ local function usage(hline)
         print("ERROR: "..hline)
         print("")
     end
-    print("Usage: "..arg[0].." -t <typedefName> -m <memberName> -O '<clang_options...>' [options...] <file.{c,h}> ...")
-    print("       "..arg[0].." -t <typedefName> -m <memberName> /path/to/compile_commands.json")
+    local progname = arg[0]:match("([^/]+)$")
+    print("Usage: "..progname.." -t <typedefName> -m <memberName> -O '<clang_options...>' [options...] <file.{c,h}> ...")
+    print("       "..progname.." -t <typedefName> -m <memberName> [-O '<clang_option>'] [options...] /path/to/compile_commands.json")
+    print("")
+    print("  For the compilation DB invocation, -O can be used for e.g. -I./clang-include (-> /usr/local/lib/clang/3.7.0/include)")
+    print("  (Workaround for -isystem and -I/usr/local/lib/clang/3.7.0/include not working)")
+    print("\nOptions:")
     print("  -n: only parse and potentially print diagnostics")
     print("  -q: be quiet (don't print diagnostics)")
     os.exit(1)
 end
 
+if (arg[1] == nil) then
+    usage()
+end
 
 local parsecmdline = require("parsecmdline_pk")
 local opt_meta = { t=true, m=true, O=true, q=false, n=false, }
@@ -157,12 +165,8 @@ local compDbPos = files[#files]:find("[\\/]compile_commands.json$")
 local useCompDb = (compDbPos ~= nil)
 local compArgs = {}  -- if using compDB, will have #compArgs == #files, each a table
 
-if (useCompDb == (clangOpts ~= nil)) then
-    if (useCompDb) then
-        usage("When using compilation database, must not pass -O")
-    else
-        usage("When not using compilation database, must pass -O")
-    end
+if (not useCompDb and clangOpts == nil) then
+    usage("When not using compilation database, must pass -O")
 end
 
 if (useCompDb) then
@@ -194,10 +198,30 @@ if (useCompDb) then
         -- NOTE: Only use the first CompileCommand for a given file name:
         local cmd = cmds[1]
 
-        -- NOTE: Strip "-c" and "-o" options from args.
+        -- NOTE: Strip "-c" and "-o" options from args. (else: "crash detected" for me)
         local args = cl.stripArgs(cmd:getArgs(false), "^-[co]$", 2)
-        args[#args+1] = "-I/home/pk/dl/esrc_git/eduke32/clang-include"  -- XXX
-        compArgs[fi] = absifyIncOpts(args, cmd:getDirectory())
+        absifyIncOpts(args, cmd:getDirectory())
+
+        -- Regarding "fatal error: 'stddef.h' file not found": for me,
+        --  * -isystem didn't work ("crash detected").
+        --  * -I/usr/local/lib/clang/3.7.0/include didn't work either
+        --    (no effect)
+        --  * -I<symlink to /usr/local/lib/clang/3.7.0/include> did work...
+
+        if (clangOpts ~= nil) then
+            -- NOTE: Assuming that -O got passed only one option.
+            args[#args+1] = clangOpts
+        end
+        compArgs[fi] = args
+--[[
+        if (fi == 1) then
+            print('----------')
+            for i=1,#args do
+                print(args[i])
+            end
+            print('----------')
+        end
+--]]
     end
 end
 
