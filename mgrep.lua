@@ -3,11 +3,15 @@
 
 local io = require("io")
 local os = require("os")
+local math = require("math")
 local string = require("string")
 local table = require("table")
 
 local cl = require("ljclang")
 
+local abs = math.abs
+
+local assert = assert
 local print = print
 
 ----------
@@ -63,7 +67,7 @@ local g_curFileName
 local g_structDecl
 
 -- Visitor for finding the named structure declaration.
-local visitorGetType = cl.regCursorVisitor(
+local GetTypeVisitor = cl.regCursorVisitor(
 function(cur, parent)
     if (cur:haskind("TypedefDecl")) then
         local typ = cur:typedefType()
@@ -80,42 +84,113 @@ function(cur, parent)
     return V.Continue
 end)
 
--- Get a line from a source file.
--- XXX: we could coalesce all queries for one file into one io.open() and file
--- traversal, but it seems that parsing is the bottleneck anyway.
-local function getline(fn, line)
-    local f = io.open(fn)
-    if (f == nil) then
-        return
+--------------------
+
+local function FileOpen(fn)
+    local fh, msg = io.open(fn)
+    if (fh == nil) then
+        errprintf('Could not open file "%s": %s', fn, msg)
+        os.exit(1)
     end
+
+    return { fh=fh, line=0 }
+end
+
+local function FileGetLine(f, line)
+    assert(f.line < line)
 
     local str
-    while (line > 0) do
-        str = f:read("*l")
-        line = line-1
+    while (f.line < line) do
+        f.line = f.line+1
+        str = f.fh:read("*l")
     end
 
-    f:close()
     return str
 end
 
+local function FileClose(f)
+    f.fh:close()
+end
+
+local g_fileIdx = {}  -- [fileName] = fileIdx
+local g_fileName = {}  -- [fileIdx] = fileName
+local g_fileLines = {}  -- [fileIdx] = { linenum1, linenum2, ... }, negated if spans >1 line
+local g_fileColumnPairs = {}  -- [fileIdx] = { {colBeg1, colEnd1, colBeg2, colEnd2}, ... }
+
+local function clearResults()
+    g_fileIdx = {}
+    g_fileName = {}
+    g_fileLines = {}
+    g_fileColumnPairs = {}
+end
+
 -- Visitor for looking for the wanted member accesses.
-local visitor = cl.regCursorVisitor(
+local SearchVisitor = cl.regCursorVisitor(
 function(cur, parent)
     if (cur:haskind("MemberRefExpr")) then
         local membname = cur:name()
         if (membname==memberName) then
             local def = cur:definition():parent()
             if (def:haskind("StructDecl") and def == g_structDecl) then
-                local fn, line = cur:location()
---                local str = table.concat(cur:_tokens(tu), "")
-                printf("%s:%d: %s", g_curFileName, line, getline(fn,line))
+                local fn, line, col, lineEnd, colEnd = cur:location()
+                local oneline = (line == lineEnd)
+
+                local idx = g_fileIdx[fn] or #g_fileLines+1
+                if (g_fileLines[idx] == nil) then
+                    -- encountering file name for the first time
+                    g_fileIdx[fn] = idx
+                    g_fileName[idx] = fn
+                    g_fileLines[idx] = {}
+                    g_fileColumnPairs[idx] = {}
+                end
+
+                local lines = g_fileLines[idx]
+                local haveLine =
+                    lines[#lines] ~= nil
+                    and (abs(lines[#lines]) == line)
+
+                local lidx = haveLine and #lines or #lines+1
+
+                if (not haveLine) then
+                    lines[lidx] = oneline and line or -line
+                end
+
+                local colNumPairs = g_fileColumnPairs[idx]
+                if (colNumPairs[lidx] == nil) then
+                    colNumPairs[lidx] = {}
+                end
+
+                local pairs = colNumPairs[lidx]
+                if (oneline) then
+                    pairs[#pairs+1] = col
+                    pairs[#pairs+1] = colEnd
+                end
             end
         end
     end
 
     return V.Recurse
 end)
+
+local function printResults()
+    for fi = 1,#g_fileName do
+        local fn = g_fileName[fi]
+
+        local lines = g_fileLines[fi]
+        local pairs = g_fileColumnPairs[fi]
+
+        local f = FileOpen(fn)
+
+        for li=1,#lines do
+--            local oneline = (lines[li] > 0)
+            local line = abs(lines[li])
+            local str = FileGetLine(f, line)
+            printf("%s:%d: %s", fn, line, str)
+        end
+
+        FileClose(f)
+    end
+end
 
 local function getAllSourceFiles(db)
     local cmds = db:getAllCompileCommands()
@@ -213,15 +288,10 @@ if (useCompDb) then
             args[#args+1] = clangOpts
         end
         compArgs[fi] = args
---[[
+
         if (fi == 1) then
-            print('----------')
-            for i=1,#args do
-                print(args[i])
-            end
-            print('----------')
+--            print("Args: "..table.concat(args, ', ').."\n")
         end
---]]
     end
 end
 
@@ -247,7 +317,7 @@ for fi=1,#files do
 
     if (not dryrun) then
         local tuCursor = tu:cursor()
-        tuCursor:children(visitorGetType)
+        tuCursor:children(GetTypeVisitor)
 
         if (g_structDecl == nil) then
             if (not quiet and not useCompDb) then
@@ -257,7 +327,9 @@ for fi=1,#files do
                 errprintf("%s: Didn't find declaration for '%s'", fn, typedefName)
             end
         else
-            tuCursor:children(visitor)
+            tuCursor:children(SearchVisitor)
+            printResults()
+            clearResults()
             g_structDecl = nil
         end
     end
