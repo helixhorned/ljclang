@@ -7,12 +7,36 @@ local math = require("math")
 local string = require("string")
 local table = require("table")
 
+local jit = require("jit")
+local ffi = require("ffi")
+local C = ffi.C
+
 local cl = require("ljclang")
 
 local abs = math.abs
 
 local assert = assert
 local print = print
+
+ffi.cdef[[
+char *getcwd(char *buf, size_t size);
+void free(void *ptr);
+]]
+
+local function getcwd()
+    if (jit.os ~= "Linux") then
+        return nil
+    end
+
+    local cwd = C.getcwd(nil, 0)
+    if (cwd == nil) then
+        return nil
+    end
+
+    local str = ffi.string(cwd)
+    C.free(cwd)
+    return str
+end
 
 ----------
 
@@ -36,6 +60,7 @@ local function usage(hline)
     print("  For the compilation DB invocation, -O can be used for e.g. -I./clang-include (-> /usr/local/lib/clang/3.7.0/include)")
     print("  (Workaround for -isystem and -I/usr/local/lib/clang/3.7.0/include not working)")
     print("\nOptions:")
+    print("  --no-color: Turn off match and diagnostic highlighting")
     print("  -n: only parse and potentially print diagnostics")
     print("  -q: be quiet (don't print diagnostics)")
     os.exit(1)
@@ -46,7 +71,8 @@ if (arg[1] == nil) then
 end
 
 local parsecmdline = require("parsecmdline_pk")
-local opt_meta = { t=true, m=true, O=true, q=false, n=false, }
+local opt_meta = { t=true, m=true, O=true, q=false, n=false,
+                   ["-no-color"]=false }
 
 local opts, files = parsecmdline.getopts(opt_meta, arg, usage)
 
@@ -55,6 +81,7 @@ local memberName = opts.m
 local clangOpts = opts.O
 local quiet = opts.q
 local dryrun = opts.n
+local useColors = not opts["-no-color"]
 
 if (not typedefName or not memberName) then
     usage("Must provide -t and -m options")
@@ -83,6 +110,28 @@ function(cur, parent)
 
     return V.Continue
 end)
+
+--------------------
+
+-- For reference:
+-- https://wiki.archlinux.org/index.php/Color_Bash_Prompt#List_of_colors_for_prompt_and_Bash
+
+--local Normal = "0;"
+local Bold = "1;"
+--local Uline = "4;"
+
+--local Black = "30m"
+local Red = "31m"
+--local Green = "32m"
+--local Yellow = "33m"
+--local Blue = "34m"
+local Purple = "35m"
+--local Cyan = "36m"
+local White = "37m"
+
+local function colorize(str, modcolor)
+    return "\027["..modcolor..str.."\027[m"
+end
 
 --------------------
 
@@ -162,8 +211,13 @@ function(cur, parent)
 
                 local pairs = colNumPairs[lidx]
                 if (oneline) then
-                    pairs[#pairs+1] = col
-                    pairs[#pairs+1] = colEnd
+                    -- The following 'if' check is to prevent adding the same
+                    -- column pair twice, e.g. when a macro contains multiple
+                    -- references to the searched-for member.
+                    if (pairs[#pairs-1] ~= col) then
+                        pairs[#pairs+1] = col
+                        pairs[#pairs+1] = colEnd
+                    end
                 end
             end
         end
@@ -172,9 +226,32 @@ function(cur, parent)
     return V.Recurse
 end)
 
+local function colorizeResult(str, colBegEnds)
+    local a=1
+    local strtab = {}
+
+    for i=1,#colBegEnds,2 do
+        local b = colBegEnds[i]
+        local e = colBegEnds[i+1]
+
+        strtab[#strtab+1] = str:sub(a,b-1)
+        strtab[#strtab+1] = colorize(str:sub(b,e-1), Bold..Red)
+        a = e
+    end
+    strtab[#strtab+1] = str:sub(a)
+
+    return table.concat(strtab)
+end
+
+local curDir = getcwd()
+
 local function printResults()
     for fi = 1,#g_fileName do
         local fn = g_fileName[fi]
+
+        if (curDir ~= nil and fn:sub(1,#curDir)==curDir) then
+            fn = "./"..fn:sub(#curDir+2)
+        end
 
         local lines = g_fileLines[fi]
         local pairs = g_fileColumnPairs[fi]
@@ -185,6 +262,9 @@ local function printResults()
 --            local oneline = (lines[li] > 0)
             local line = abs(lines[li])
             local str = FileGetLine(f, line)
+            if (useColors) then
+                str = colorizeResult(str, pairs[li])
+            end
             printf("%s:%d: %s", fn, line, str)
         end
 
@@ -295,6 +375,18 @@ if (useCompDb) then
     end
 end
 
+local function GetColorizeTripleFunc(color)
+    return function(pre, tag, post)
+        return
+            colorize(pre, Bold..White)..
+            colorize(tag, Bold..color)..
+            colorize(post, Bold..White)
+    end
+end
+
+local ColorizeErrorFunc = GetColorizeTripleFunc(Red)
+local ColorizeWarningFunc = GetColorizeTripleFunc(Purple)
+
 for fi=1,#files do
     local fn = files[fi]
     g_curFileName = fn
@@ -310,8 +402,12 @@ for fi=1,#files do
     if (not quiet) then
         local diags = tu:diagnostics()
         for i=1,#diags do
-            local d = diags[i]
-            errprintf("%s", d.text)
+            local text = diags[i].text
+            if (useColors) then
+                text = text:gsub("(.*)(error: )(.*)", ColorizeErrorFunc)
+                text = text:gsub("(.*)(warning: )(.*)", ColorizeWarningFunc)
+            end
+            errprintf("%s", text)
         end
     end
 
