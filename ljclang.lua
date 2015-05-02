@@ -9,6 +9,7 @@ local error = error
 local print = print
 local require = require
 local setmetatable = setmetatable
+local table = table
 local tonumber = tonumber
 local tostring = tostring
 local type = type
@@ -58,6 +59,16 @@ local TranslationUnit_t_ = ffi.typeof "struct { CXTranslationUnit _tu; }"
 local Cursor_t = ffi.typeof "struct { CXCursor _cur; }"
 local Type_t = ffi.typeof "struct { CXType _typ; }"
 
+-- CompilationDatabase types
+local CompilationDatabase_t = ffi.typeof "struct { CXCompilationDatabase _ptr; }"
+local CompileCommands_t = ffi.typeof "struct { CXCompileCommands _ptr; const double numCommands; }"
+local CompileCommand_t = ffi.typeof[[
+struct {
+    CXCompileCommand _ptr;
+    const double numArgs, numSources;
+}
+]]
+
 -- [<address of CXTranslationUnit as string>] = count
 local TUCount = {}
 
@@ -84,6 +95,163 @@ int ljclang_regCursorVisitor(LJCX_CursorVisitor visitor, enum CXCursorKind *kind
 int ljclang_visitChildren(CXCursor parent, int visitoridx);
 ]]
 
+-------------------------------------------------------------------------
+-------------------------------- CXString -------------------------------
+-------------------------------------------------------------------------
+
+local CXString = ffi.typeof("CXString")
+
+-- Convert from a libclang's encapsulated CXString to a plain Lua string and
+-- dispose of the CXString afterwards.
+local function getString(cxstr)
+    assert(ffi.istype(CXString, cxstr))
+    local cstr = clang.clang_getCString(cxstr)
+    assert(cstr ~= nil)
+    local str = ffi.string(cstr)
+    clang.clang_disposeString(cxstr)
+    return str
+end
+
+-------------------------------------------------------------------------
+-------------------------- CompilationDatabase --------------------------
+-------------------------------------------------------------------------
+
+-- newargs = api.stripArgs(args, pattern, num)
+function api.stripArgs(args, pattern, num)
+    assert(args[0] == nil)
+    local numArgs = #args
+
+    for i=1,numArgs do
+        if (args[i] and args[i]:find(pattern)) then
+            for j=0,num-1 do
+                args[i+j] = nil
+            end
+        end
+    end
+
+    local newargs = {}
+    for i=1,numArgs do
+        newargs[#newargs+1] = args[i]
+    end
+    return newargs
+end
+
+local CompDB_Error_Ar = ffi.typeof[[
+CXCompilationDatabase_Error [1]
+]]
+
+local CompileCommand_mt = {
+    __index = {
+        -- args = cmd:getArgs([alsoCompilerExe])
+        -- args: sequence table. If <alsoCompilerExe> is true, args[0] is the
+        --  compiler executable.
+        getArgs = function(self, alsoCompilerExe)
+            local args = {}
+            for i = (alsoCompilerExe and 0 or 1), self.numArgs-1 do
+                local cxstr = clang.clang_CompileCommand_getArg(self._ptr, i)
+                args[i] = getString(cxstr)
+            end
+
+            return args
+        end,
+
+        -- dir = cmd:getDirectory()
+        getDirectory = function(self)
+            local cxstr = clang.clang_CompileCommand_getDirectory(self._ptr)
+            return getString(cxstr)
+        end,
+
+        -- paths = cmd:getSourcePaths()
+        -- paths: sequence table.
+        getSourcePaths = function(self)
+            -- XXX: This is a workaround implementation due to a missing
+            -- clang_CompileCommand_getMappedSourcePath symbol in libclang.so,
+            -- see commented out code below.
+            local args = self:getArgs()
+            for i=1,#args do
+                if (args[i] == '-c' and args[i+1]) then
+                    local sourceFile = args[i+1]
+                    if (sourceFile:sub(1,1) ~= "/") then  -- XXX: Windows
+                        sourceFile = self:getDirectory() .. "/" .. sourceFile
+                    end
+                    return { sourceFile }
+                end
+            end
+
+            print(table.concat(args, ' '))
+            check(false, "Did not find -c option (workaround for missing "..
+                      "clang_CompileCommand_getMappedSourcePath symbol)")
+--[[
+            local paths = {}
+            for i=0,self.numSources-1 do
+                -- XXX: for me, the symbol is missing in libclang.so:
+                local cxstr = clang.clang_CompileCommand_getMappedSourcePath(self._ptr, i)
+                paths[i] = getString(cxstr)
+            end
+            return paths
+--]]
+        end,
+    },
+}
+
+local CompileCommands_mt = {
+    -- #commands: number of commands
+    __len = function(self)
+        return self.numCommands
+    end,
+
+    -- commands[i]: get the i'th CompileCommand object (i is 1-based)
+    __index = function(self, i)
+        check(type(i) == "number", "<i> must be a number", 2)
+        check(i >= 1 and i <= self.numCommands, "<i> must be in [1, numCommands]", 2)
+        local cmdPtr = clang.clang_CompileCommands_getCommand(self._ptr, i-1)
+        local numArgs = clang.clang_CompileCommand_getNumArgs(cmdPtr)
+        local numSources = 0 --clang.clang_CompileCommand_getNumMappedSources(cmdPtr)
+        return CompileCommand_t(cmdPtr, numArgs, numSources)
+    end,
+
+    __gc = function(self)
+        clang.clang_CompileCommands_dispose(self._ptr)
+    end,
+}
+
+local CompilationDatabase_mt = {
+    __index = {
+        getCompileCommands = function(self, completeFileName)
+            check(type(completeFileName) == "string", "<completeFileName> must be a string", 2)
+            local cmdsPtr = clang.clang_CompilationDatabase_getCompileCommands(
+                self._ptr, completeFileName)
+            local numCommands = clang.clang_CompileCommands_getSize(cmdsPtr)
+            return CompileCommands_t(cmdsPtr, numCommands)
+        end,
+
+        getAllCompileCommands = function(self)
+            local cmdsPtr = clang.clang_CompilationDatabase_getAllCompileCommands(self._ptr)
+            local numCommands = clang.clang_CompileCommands_getSize(cmdsPtr)
+            return CompileCommands_t(cmdsPtr, numCommands)
+        end,
+    },
+
+    __gc = function(self)
+        clang.clang_CompilationDatabase_dispose(self._ptr)
+    end,
+}
+
+-- compDB = api.CompilationDatabase(buildDir)
+function api.CompilationDatabase(buildDir)
+    check(type(buildDir) == "string", "<buildDir> must be a string", 2)
+
+    local errAr = CompDB_Error_Ar()
+    local ptr = clang.clang_CompilationDatabase_fromDirectory(buildDir, errAr)
+    assert(ptr ~= nil or errAr[0] ~= 'CXCompilationDatabase_NoError')
+
+    return ptr ~= nil and CompilationDatabase_t(ptr) or nil
+end
+
+-------------------------------------------------------------------------
+--------------------------------- Index ---------------------------------
+-------------------------------------------------------------------------
+
 -- Metatable for our Index_t.
 local Index_mt = {
     __index = {},
@@ -105,25 +273,14 @@ local function NewIndex(cxidx)
     return setmetatable(index, Index_mt)
 end
 
+-------------------------------------------------------------------------
+---------------------------- TranslationUnit ----------------------------
+-------------------------------------------------------------------------
+
 local function check_tu_valid(self)
     if (self._tu == nil) then
         error("Attempt to access freed TranslationUnit", 3)
     end
-end
-
-local CXString = ffi.typeof("CXString")
-
--- Convert from a libclang's encapsulated CXString to a plain Lua string and
--- dispose of the CXString afterwards.
-local function getString(cxstr)
-    assert(ffi.istype(CXString, cxstr))
-    local cstr = clang.clang_getCString(cxstr)
-    if (cstr == nil) then
-        return "???"
-    end
-    local str = ffi.string(cstr)
-    clang.clang_disposeString(cxstr)
-    return str
 end
 
 -- Construct a Cursor_t from a libclang's CXCursor <cxcur>. If <cxcur> is the
@@ -184,6 +341,10 @@ local TranslationUnit_mt = {
 }
 
 TranslationUnit_mt.__gc = TranslationUnit_mt.__index._cleanup
+
+-------------------------------------------------------------------------
+--------------------------------- Cursor --------------------------------
+-------------------------------------------------------------------------
 
 local function getType(cxtyp)
     return cxtyp.kind ~= 'CXType_Invalid' and Type_t(cxtyp) or nil
@@ -477,6 +638,10 @@ local Cursor_mt = {
 
 Cursor_mt.__tostring = Cursor_mt.__index.name
 
+-------------------------------------------------------------------------
+---------------------------------- Type ---------------------------------
+-------------------------------------------------------------------------
+
 -- Metatable for our Type_t.
 local Type_mt = {
     __eq = function(typ1, typ2)
@@ -548,6 +713,7 @@ Type__index.isConstQualified = Type__index.isConst
 
 Type_mt.__tostring = Type__index.name
 
+-------------------------------------------------------------------------
 
 --| index = clang.createIndex([excludeDeclarationsFromPCH [, displayDiagnostics]])
 function api.createIndex(excludeDeclarationsFromPCH, displayDiagnostics)
@@ -701,6 +867,10 @@ ffi.metatype(Index_t, Index_mt)
 ffi.metatype(TranslationUnit_t_, TranslationUnit_mt)
 ffi.metatype(Cursor_t, Cursor_mt)
 ffi.metatype(Type_t, Type_mt)
+
+ffi.metatype(CompileCommand_t, CompileCommand_mt)
+ffi.metatype(CompileCommands_t, CompileCommands_mt)
+ffi.metatype(CompilationDatabase_t, CompilationDatabase_mt)
 
 -- Done!
 return api

@@ -3,6 +3,7 @@
 
 local io = require("io")
 local os = require("os")
+local string = require("string")
 local table = require("table")
 
 local cl = require("ljclang")
@@ -21,9 +22,11 @@ end
 
 local function usage(hline)
     if (hline) then
-        print(hline)
+        print("ERROR: "..hline)
+        print("")
     end
     print("Usage: "..arg[0].." -t <typedefName> -m <memberName> -O '<clang_options...>' [options...] <file.{c,h}> ...")
+    print("       "..arg[0].." -t <typedefName> -m <memberName> /path/to/compile_commands.json")
     print("  -n: only parse and potentially print diagnostics")
     print("  -q: be quiet (don't print diagnostics)")
     os.exit(1)
@@ -51,6 +54,7 @@ local g_curFileName
 -- The StructDecl of the type we're searching for.
 local g_structDecl
 
+-- Visitor for finding the named structure declaration.
 local visitorGetType = cl.regCursorVisitor(
 function(cur, parent)
     if (cur:haskind("TypedefDecl")) then
@@ -87,6 +91,7 @@ local function getline(fn, line)
     return str
 end
 
+-- Visitor for looking for the wanted member accesses.
 local visitor = cl.regCursorVisitor(
 function(cur, parent)
     if (cur:haskind("MemberRefExpr")) then
@@ -95,8 +100,8 @@ function(cur, parent)
             local def = cur:definition():parent()
             if (def:haskind("StructDecl") and def == g_structDecl) then
                 local fn, line = cur:location()
-                local str = table.concat(cur:_tokens(tu), "")
-                printf("%s:%d: %s", g_curFileName, line, getline(fn,line) or str)
+--                local str = table.concat(cur:_tokens(tu), "")
+                printf("%s:%d: %s", g_curFileName, line, getline(fn,line))
             end
         end
     end
@@ -104,14 +109,107 @@ function(cur, parent)
     return V.Recurse
 end)
 
+local function getAllSourceFiles(db)
+    local cmds = db:getAllCompileCommands()
+
+    local haveSrc = {}
+    local srcFiles = {}
+
+    for ci=1,#cmds do
+        local fns = cmds[ci]:getSourcePaths()
+        for j=1,#fns do
+            local fn = fns[j]
+            if (not haveSrc[fn]) then
+                haveSrc[fn] = true
+                srcFiles[#srcFiles+1] = fn
+            end
+        end
+    end
+
+    return srcFiles
+end
+
+-- Make "-Irelative/subdir" -> "-I/path/to/relative/subdir",
+-- <opts> is modified in-place.
+local function absifyIncOpts(opts, prefixDir)
+    if (prefixDir:sub(1,1) ~= "/") then
+        -- XXX: Windows.
+        errprintf('mgrep.lua: prefixDir "%s" does not start with "/".', prefixDir)
+        os.exit(1)
+    end
+
+    for i=1,#opts do
+        local opt = opts[i]
+        if (opt:sub(1,2)=="-I" and opt:sub(3,3)~="/") then
+            opts[i] = "-I" .. prefixDir .. "/" .. opt:sub(3)
+        end
+    end
+
+    return opts
+end
+
+if (#files == 0) then
+    os.exit(0)
+end
+
+-- Use a compilation database?
+local compDbPos = files[#files]:find("[\\/]compile_commands.json$")
+local useCompDb = (compDbPos ~= nil)
+local compArgs = {}  -- if using compDB, will have #compArgs == #files, each a table
+
+if (useCompDb == (clangOpts ~= nil)) then
+    if (useCompDb) then
+        usage("When using compilation database, must not pass -O")
+    else
+        usage("When not using compilation database, must pass -O")
+    end
+end
+
+if (useCompDb) then
+    if (#files ~= 1) then
+        usage("When using compilation database, must pass no additional file names")
+    end
+
+    local compDbDir = files[1]:sub(1, compDbPos)
+    local db = cl.CompilationDatabase(compDbDir)
+
+    if (db == nil) then
+        errprintf('Fatal: Could not load compilation database')
+        os.exit(1)
+    end
+
+    -- Get all source files, uniq'd.
+    files = getAllSourceFiles(db)
+
+    if (#files == 0) then
+        -- NOTE: We may get a CompilationDatabase even if
+        -- clang_CompilationDatabase_fromDirectory() failed (as evidenced by
+        -- error output from "LIBCLANG TOOLING").
+        errprintf('Fatal: Compilation database contains no entries, or an error occurred')
+        os.exit(1)
+    end
+
+    for fi=1,#files do
+        local cmds = db:getCompileCommands(files[fi])
+        -- NOTE: Only use the first CompileCommand for a given file name:
+        local cmd = cmds[1]
+
+        -- NOTE: Strip "-c" and "-o" options from args.
+        local args = cl.stripArgs(cmd:getArgs(false), "^-[co]$", 2)
+        args[#args+1] = "-I/home/pk/dl/esrc_git/eduke32/clang-include"  -- XXX
+        compArgs[fi] = absifyIncOpts(args, cmd:getDirectory())
+    end
+end
+
 for fi=1,#files do
     local fn = files[fi]
     g_curFileName = fn
 
     local index = cl.createIndex(true, false)
-    local tu = index:parse(fn, clangOpts)
+    local opts = useCompDb and compArgs[fi] or clangOpts
+    local tu = index:parse(fn, opts)
     if (tu == nil) then
-        errprintf("Failed parsing '%s'", fn)
+        errprintf("Fatal: Failed parsing '%s'", fn)
         os.exit(1)
     end
 
@@ -128,7 +226,10 @@ for fi=1,#files do
         tuCursor:children(visitorGetType)
 
         if (g_structDecl == nil) then
-            if (not quiet) then
+            if (not quiet and not useCompDb) then
+                -- XXX: This is kind of noisy even in non-DB
+                -- mode. E.g. "mgrep.lua *.c": some C files may not include a
+                -- particular header.
                 errprintf("%s: Didn't find declaration for '%s'", fn, typedefName)
             end
         else
