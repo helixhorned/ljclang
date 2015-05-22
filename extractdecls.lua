@@ -9,12 +9,17 @@ local table = require("table")
 
 local cl = require("ljclang")
 
+local format = string.format
 local print = print
 
 ----------
 
 local function printf(fmt, ...)
-    print(string.format(fmt, ...))
+    print(format(fmt, ...))
+end
+
+local function errprintf(fmt, ...)
+    io.stderr:write(format(fmt, ...).."\n")
 end
 
 local function usage(hline)
@@ -98,10 +103,20 @@ end
 
 local opts = extractMacro and {"DetailedPreprocessingRecord"} or nil
 
+local filename = args[1]
+do
+    local f, msg = io.open(filename)
+    if (f == nil) then
+        errprintf("ERROR: Failed opening %s", msg)
+        os.exit(1)
+    end
+    f:close()
+end
+
 local index = cl.createIndex(true, false)
 local tu = index:parse("", args, opts)
 if (tu == nil) then
-    print('Parsing failed')
+    errprintf("ERROR: Failed parsing %s", filename)
     os.exit(1)
 end
 

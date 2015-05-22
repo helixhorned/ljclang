@@ -370,9 +370,7 @@ if (useCompDb) then
         end
         compArgs[fi] = args
 
-        if (fi == 1) then
---            print("Args: "..table.concat(args, ', ').."\n")
-        end
+--        if (fi == 1) then print("Args: "..table.concat(args, ', ').."\n") end
     end
 end
 
