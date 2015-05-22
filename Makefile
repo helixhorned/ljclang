@@ -7,14 +7,19 @@ THIS_DIR := $(abspath $(dir $(lastword $(MAKEFILE_LIST))))
 ########## PATHS ##########
 
 ifeq ($(OS),Linux)
-    inc := /usr/include
-    libdir := /usr/lib
+    ifneq (,$(wildcard /usr/local/bin/clang))
+        prefix := /usr/local
+    else
+        prefix := /usr
+    endif
+    incdir := $(prefix)/include
+    libdir := $(prefix)/lib
     lib := -L$(libdir) -lclang
     so := .so
 else
  ifeq ($(MINGW),MINGW)
     rdir := /f/g/mod/clang3.3_march2013
-    inc := $(rdir)/include
+    incdir := $(rdir)/include
     lib := $(rdir)/lib/libclang.lib $(rdir)/libclang.dll
     so := .dll
  else
@@ -43,10 +48,10 @@ ifneq ($(DEBUG),0)
 endif
 
 ifeq ($(OS),Linux)
-    CFLAGS += -I$(inc) -fPIC
+    CFLAGS += -I$(incdir) -fPIC
 else
  ifeq ($(MINGW),MINGW)
-    CFLAGS += -I$(inc) $(lib)
+    CFLAGS += -I$(incdir) $(lib)
  endif
 endif
 
@@ -69,7 +74,7 @@ EXTRACT_OPTS := -R -p '^CXCursor_' -x '_First' -x '_Last' -x '_GCCAsmStmt' -x '_
 # Generate list of CXCursorKind names
 bootstrap:
 	@echo 'return {}' > $(CKIND_LUA)
-	@LD_LIBRARY_PATH=$(THIS_DIR) $(luajit) ./extractdecls.lua $(EXTRACT_OPTS) $(inc)/clang-c/Index.h > $(CKIND_LUA).tmp
+	LD_LIBRARY_PATH=$(THIS_DIR) $(luajit) ./extractdecls.lua $(EXTRACT_OPTS) $(incdir)/clang-c/Index.h > $(CKIND_LUA).tmp
 	@mv $(CKIND_LUA).tmp $(CKIND_LUA)
 	@printf "\033[1mGenerated $(CKIND_LUA)\033[0m\n"
 
