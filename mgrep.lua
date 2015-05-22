@@ -14,6 +14,7 @@ local C = ffi.C
 local cl = require("ljclang")
 
 local abs = math.abs
+local format = string.format
 
 local assert = assert
 local print = print
@@ -41,11 +42,11 @@ end
 ----------
 
 local function printf(fmt, ...)
-    print(string.format(fmt, ...))
+    print(format(fmt, ...))
 end
 
 local function errprintf(fmt, ...)
-    io.stderr:write(string.format(fmt, ...).."\n")
+    io.stderr:write(format(fmt, ...).."\n")
 end
 
 local function usage(hline)
@@ -395,38 +396,37 @@ for fi=1,#files do
     local opts = useCompDb and compArgs[fi] or clangOpts
     local tu = index:parse(fn, opts)
     if (tu == nil) then
-        errprintf("Fatal: Failed parsing '%s'", fn)
-        os.exit(1)
-    end
-
-    if (not quiet) then
-        local diags = tu:diagnostics()
-        for i=1,#diags do
-            local text = diags[i].text
-            if (useColors) then
-                text = text:gsub("(.*)(error: )(.*)", ColorizeErrorFunc)
-                text = text:gsub("(.*)(warning: )(.*)", ColorizeWarningFunc)
+        errprintf("ERROR: Failed parsing '%s', skipping", fn)
+    else
+        if (not quiet) then
+            local diags = tu:diagnostics()
+            for i=1,#diags do
+                local text = diags[i].text
+                if (useColors) then
+                    text = text:gsub("(.*)(error: )(.*)", ColorizeErrorFunc)
+                    text = text:gsub("(.*)(warning: )(.*)", ColorizeWarningFunc)
+                end
+                errprintf("%s", text)
             end
-            errprintf("%s", text)
         end
-    end
 
-    if (not dryrun) then
-        local tuCursor = tu:cursor()
-        tuCursor:children(GetTypeVisitor)
+        if (not dryrun) then
+            local tuCursor = tu:cursor()
+            tuCursor:children(GetTypeVisitor)
 
-        if (g_structDecl == nil) then
-            if (not quiet and not useCompDb) then
-                -- XXX: This is kind of noisy even in non-DB
-                -- mode. E.g. "mgrep.lua *.c": some C files may not include a
-                -- particular header.
-                errprintf("%s: Didn't find declaration for '%s'", fn, typedefName)
+            if (g_structDecl == nil) then
+                if (not quiet and not useCompDb) then
+                    -- XXX: This is kind of noisy even in non-DB
+                    -- mode. E.g. "mgrep.lua *.c": some C files may not include a
+                    -- particular header.
+                    errprintf("%s: Didn't find declaration for '%s'", fn, typedefName)
+                end
+            else
+                tuCursor:children(SearchVisitor)
+                printResults()
+                clearResults()
+                g_structDecl = nil
             end
-        else
-            tuCursor:children(SearchVisitor)
-            printResults()
-            clearResults()
-            g_structDecl = nil
         end
     end
 end
