@@ -8,6 +8,7 @@ local assert = assert
 local error = error
 local print = print
 local require = require
+local select = select
 local setmetatable = setmetatable
 local table = table
 local tonumber = tonumber
@@ -756,6 +757,10 @@ function Index_mt.__index.parse(self, srcfile, args, opts)
     check(type(srcfile)=="string", "<srcfile> must be a string", 2)
     check(type(args)=="string" or type(args)=="table", "<args> must be a string or table", 2)
     check_iftab_iscellstr(args, "<args>")
+
+    if (srcfile == "") then
+        srcfile = nil
+    end
 
     if (opts == nil) then
         opts = 0

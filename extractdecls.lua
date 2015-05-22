@@ -99,7 +99,7 @@ end
 local opts = extractMacro and {"DetailedPreprocessingRecord"} or nil
 
 local index = cl.createIndex(true, false)
-local tu = index:parse(args, opts)
+local tu = index:parse("", args, opts)
 if (tu == nil) then
     print('Parsing failed')
     os.exit(1)
