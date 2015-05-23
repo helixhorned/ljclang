@@ -118,25 +118,30 @@ end
 local typeName, memberName = parseQueryString(queryStr)
 
 local g_curFileName
--- The StructDecl of the type we're searching for.
+-- The ClassDecl or StructDecl of the type we're searching for:
 local g_structDecl
+local g_cursorKind
 
 local V = cl.ChildVisitResult
 -- Visitor for finding the named structure declaration.
 local GetTypeVisitor = cl.regCursorVisitor(
 function(cur, parent)
-    if (cur:haskind("StructDecl")) then
+    local curKind = cur:kind()
+
+    if (curKind == "ClassDecl" or curKind == "StructDecl") then
         if (cur:name() == typeName) then
             g_structDecl = cl.Cursor(cur)
+            g_cursorKind = curKind
             return V.Break
         end
-    elseif (cur:haskind("TypedefDecl")) then
+    elseif (curKind == "TypedefDecl") then
         local typ = cur:typedefType()
         local structDecl = typ:declaration()
         if (structDecl:haskind("StructDecl")) then
 --            printf("typedef struct %s %s", structDecl:name(), cur:name())
             if (cur:name() == typeName) then
                 g_structDecl = structDecl
+                g_cursorKind = "StructDecl"
                 return V.Break
             end
         end
@@ -215,9 +220,9 @@ local SearchVisitor = cl.regCursorVisitor(
 function(cur, parent)
     if (cur:haskind("MemberRefExpr")) then
         local membname = cur:name()
-        if (membname==memberName) then
+        if (membname == memberName) then
             local def = cur:definition():parent()
-            if (def:haskind("StructDecl") and def == g_structDecl) then
+            if (def:haskind(g_cursorKind) and def == g_structDecl) then
                 local fn, line, col, lineEnd, colEnd = cur:location()
                 local oneline = (line == lineEnd)
 
@@ -471,6 +476,7 @@ for fi=1,#files do
             printResults()
             clearResults()
             g_structDecl = nil
+            g_cursorKind = nil
         end
     end
 
