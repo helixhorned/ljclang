@@ -727,6 +727,17 @@ function api.createIndex(excludeDeclarationsFromPCH, displayDiagnostics)
     return NewIndex(cxidx)
 end
 
+-- argstab = clang.splitAtWhitespace(args)
+function api.splitAtWhitespace(args)
+    assert(type(args) == "string")
+    local argstab = {}
+    -- Split delimited by whitespace.
+    for str in args:gmatch("[^%s]+") do
+        argstab[#argstab+1] = str
+    end
+    return argstab
+end
+
 -- Is <tab> a sequence of strings?
 local function iscellstr(tab)
     for i=1,#tab do
@@ -772,12 +783,7 @@ function Index_mt.__index.parse(self, srcfile, args, opts)
     -- Input argument handling.
 
     if (type(args)=="string") then
-        local argstab = {}
-        -- Split delimited by whitespace.
-        for str in args:gmatch("[^%s]+") do
-            argstab[#argstab+1] = str
-        end
-        args = argstab
+        args = api.splitAtWhitespace(args)
     end
 
     if (type(opts)=="table") then

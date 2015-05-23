@@ -57,7 +57,7 @@ local function usage(hline)
     end
     local progname = arg[0]:match("([^/]+)$")
     print("Usage: "..progname.." -t <typedefName> -m <memberName> -O '<clang_options...>' [options...] <file.{c,h}> ...")
-    print("       "..progname.." -t <typedefName> -m <memberName> [-O '<clang_option>'] [options...] /path/to/compile_commands.json")
+    print("       "..progname.." -t <typedefName> -m <memberName> [-O '<clang_options...>'] [options...] /path/to/compile_commands.json")
     print("")
     print("  For the compilation DB invocation, -O can be used for e.g. -I./clang-include (-> /usr/local/lib/clang/3.7.0/include)")
     print("  (Workaround for -isystem and -I/usr/local/lib/clang/3.7.0/include not working)")
@@ -367,8 +367,10 @@ if (useCompDb) then
         --  * -I<symlink to /usr/local/lib/clang/3.7.0/include> did work...
 
         if (clangOpts ~= nil) then
-            -- NOTE: Assuming that -O got passed only one option.
-            args[#args+1] = clangOpts
+            local suffixArgs = cl.splitAtWhitespace(clangOpts)
+            for ai=1,#suffixArgs do
+                args[#args+1] = suffixArgs[ai]
+            end
         end
         compArgs[fi] = args
 
