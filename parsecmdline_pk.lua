@@ -12,6 +12,8 @@ local pairs = pairs
 --  false: doesn't have argument (i.e. is switch)
 --  true: has argument, collect once
 --  1: has argument, collect all
+-- opt_meta[0] is an offset for the indices of the returned <args> table. For
+-- example, if it's -1, the args[0] will be the first positional argument.
 --
 -- <arg>: The arguments provided to the program
 -- <usage_func>: Function to print usage and terminate. Should accept optional
@@ -27,6 +29,7 @@ local function getopts(opt_meta, arg, usage)
 
     -- The extracted positional arguments:
     local args = {}
+    local apos = 1 + (opt_meta[0] or 0)
 
     local skipnext = false
     for i=1,#arg do
@@ -53,12 +56,8 @@ local function getopts(opt_meta, arg, usage)
                 opts[opt] = true
             end
         else
-            local ii=1
-            for j=i,#arg do
-                args[ii] = arg[j]
-                ii = ii+1
-            end
-            break
+            args[apos] = arg[i]
+            apos = apos+1
         end
 ::next::
     end
