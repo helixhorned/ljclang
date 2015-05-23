@@ -57,8 +57,8 @@ local function usage(hline)
     end
     local progname = arg[0]:match("([^/]+)$")
     print("Usage: "..progname.." -t <typedefName> -m <memberName> [options...] <file.{c,h}> ...")
-    print("       "..progname.." -t <typedefName> -m <memberName> [options...] /path/to/compile_commands.json")
     print("\nOptions:")
+    print("  -d /path/to/compile_commands.json: use compilation database")
     print("  -O '<clang_options...>': pass options to Clang, split at whitespace")
     print("  --no-color: Turn off match and diagnostic highlighting")
     print("  -n: only parse and potentially print diagnostics")
@@ -74,11 +74,12 @@ if (arg[1] == nil) then
 end
 
 local parsecmdline = require("parsecmdline_pk")
-local opt_meta = { t=true, m=true, O=true, q=false, n=false,
+local opt_meta = { d=true, t=true, m=true, O=true, q=false, n=false,
                    ["-no-color"]=false }
 
 local opts, files = parsecmdline.getopts(opt_meta, arg, usage)
 
+local compDbName = opts.d
 local typedefName = opts.t
 local memberName = opts.m
 local clangOpts = opts.O
@@ -315,21 +316,25 @@ local function absifyIncOpts(opts, prefixDir)
     return opts
 end
 
-if (#files == 0) then
+-- Use a compilation database?
+local useCompDb = (compDbName ~= nil)
+local compArgs = {}  -- if using compDB, will have #compArgs == #files, each a table
+
+if (not useCompDb and #files == 0) then
     os.exit(0)
 end
 
--- Use a compilation database?
-local compDbPos = files[#files]:find("[\\/]compile_commands.json$")
-local useCompDb = (compDbPos ~= nil)
-local compArgs = {}  -- if using compDB, will have #compArgs == #files, each a table
-
 if (useCompDb) then
-    if (#files ~= 1) then
-        usage("When using compilation database, must pass no additional file names")
+    if (#files > 0) then
+        usage("When using compilation database, must pass no file names")
     end
 
-    local compDbDir = files[1]:sub(1, compDbPos)
+    local compDbPos = compDbName:find("[\\/]compile_commands.json$")
+    if (compDbPos == nil) then
+        usage("File name of compilation database must be compile_commands.json")
+    end
+
+    local compDbDir = compDbName:sub(1, compDbPos)
     local db = cl.CompilationDatabase(compDbDir)
 
     if (db == nil) then

@@ -1,0 +1,3 @@
+#!/bin/sh
+d=LJCLANG_DEV_DIR
+LUA_PATH=";;$d/?.lua" LD_LIBRARY_PATH="$d" luajit "$d/mgrep.lua" "$@"

@@ -80,3 +80,12 @@ bootstrap:
 
 doc:
 	$(asciidoc) README.adoc
+
+# Usage example:
+# BINDIR=~/bin make install
+install:
+ifeq ($(BINDIR),)
+    $(error "Must pass $$BINDIR with the environment")
+endif
+	sed "s|LJCLANG_DEV_DIR|$(THIS_DIR)|g" ./mgrep.sh.in > $(BINDIR)/mgrep
+	chmod +x $(BINDIR)/mgrep
