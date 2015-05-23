@@ -392,39 +392,53 @@ for fi=1,#files do
 
     local index = cl.createIndex(true, false)
     local opts = useCompDb and compArgs[fi] or clangOpts
-    local tu = index:parse(fn, opts)
-    if (tu == nil) then
-        errprintf("ERROR: Failed parsing '%s', skipping", fn)
-    else
-        if (not quiet) then
-            local diags = tu:diagnostics()
-            for i=1,#diags do
-                local text = diags[i].text
-                if (useColors) then
-                    text = text:gsub("(.*)(error: )(.*)", ColorizeErrorFunc)
-                    text = text:gsub("(.*)(warning: )(.*)", ColorizeWarningFunc)
-                end
-                errprintf("%s", text)
-            end
+
+    do
+        local f, msg = io.open(fn)
+        if (f == nil) then
+            errprintf("ERROR: Failed opening %s", msg)
+            goto nextfile
         end
+        f:close()
+    end
 
-        if (not dryrun) then
-            local tuCursor = tu:cursor()
-            tuCursor:children(GetTypeVisitor)
+    local tu = index:parse(fn, opts)
 
-            if (g_structDecl == nil) then
-                if (not quiet and not useCompDb) then
-                    -- XXX: This is kind of noisy even in non-DB
-                    -- mode. E.g. "mgrep.lua *.c": some C files may not include a
-                    -- particular header.
-                    errprintf("%s: Didn't find declaration for '%s'", fn, typedefName)
-                end
-            else
-                tuCursor:children(SearchVisitor)
-                printResults()
-                clearResults()
-                g_structDecl = nil
+    if (tu == nil) then
+        errprintf("ERROR: Failed parsing %s", fn)
+        goto nextfile
+    end
+
+    if (not quiet) then
+        local diags = tu:diagnostics()
+        for i=1,#diags do
+            local text = diags[i].text
+            if (useColors) then
+                text = text:gsub("(.*)(error: )(.*)", ColorizeErrorFunc)
+                text = text:gsub("(.*)(warning: )(.*)", ColorizeWarningFunc)
             end
+            errprintf("%s", text)
         end
     end
+
+    if (not dryrun) then
+        local tuCursor = tu:cursor()
+        tuCursor:children(GetTypeVisitor)
+
+        if (g_structDecl == nil) then
+            if (not quiet and not useCompDb) then
+                -- XXX: This is kind of noisy even in non-DB
+                -- mode. E.g. "mgrep.lua *.c": some C files may not include a
+                -- particular header.
+                errprintf("%s: Didn't find declaration for '%s'", fn, typedefName)
+            end
+        else
+            tuCursor:children(SearchVisitor)
+            printResults()
+            clearResults()
+            g_structDecl = nil
+        end
+    end
+
+    ::nextfile::
 end
