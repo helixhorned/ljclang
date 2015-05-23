@@ -46,26 +46,37 @@ local function printf(fmt, ...)
     print(format(fmt, ...))
 end
 
+local function errprint(str)
+    io.stderr:write(str.."\n")
+end
+
 local function errprintf(fmt, ...)
-    io.stderr:write(format(fmt, ...).."\n")
+    errprint(format(fmt, ...))
+end
+
+local function abort(str)
+    errprint(str.."\n")
+    os.exit(1)
 end
 
 local function usage(hline)
     if (hline) then
-        print("ERROR: "..hline)
-        print("")
+        errprint("ERROR: "..hline.."\n")
     end
     local progname = arg[0]:match("([^/]+)$")
-    print("Usage: "..progname.." -t <typedefName> -m <memberName> [options...] <file.{c,h}> ...")
-    print("\nOptions:")
-    print("  -d /path/to/compile_commands.json: use compilation database")
-    print("  -O '<clang_options...>': pass options to Clang, split at whitespace")
-    print("  --no-color: Turn off match and diagnostic highlighting")
-    print("  -n: only parse and potentially print diagnostics")
-    print("  -q: be quiet (don't print diagnostics)")
-    print("")
-    print("  For the compilation DB invocation, -O can be used for e.g. -I./clang-include (-> /usr/local/lib/clang/3.7.0/include)")
-    print("  (Workaround for -isystem and -I/usr/local/lib/clang/3.7.0/include not working)")
+    errprint("Usage:\n  "..progname.." <typeName>::<memberName> [options...] [filenames...]\n")
+    errprint
+[[
+Options:
+  -d /path/to/compile_commands.json: use compilation database
+  -O '<clang_options...>': pass options to Clang, split at whitespace
+  --no-color: Turn off match and diagnostic highlighting
+  -n: only parse and potentially print diagnostics
+  -q: be quiet (don't print diagnostics)
+
+  For the compilation DB invocation, -O can be used for e.g. -I./clang-include (-> /usr/local/lib/clang/3.7.0/include)
+  (Workaround for -isystem and -I/usr/local/lib/clang/3.7.0/include not working)
+]]
     os.exit(1)
 end
 
@@ -74,29 +85,43 @@ if (arg[1] == nil) then
 end
 
 local parsecmdline = require("parsecmdline_pk")
-local opt_meta = { d=true, t=true, m=true, O=true, q=false, n=false,
-                   ["-no-color"]=false }
+local opt_meta = {
+    [0] = -1,
+    d=true, O=true, q=false, n=false,
+    ["-no-color"]=false
+}
 
 local opts, files = parsecmdline.getopts(opt_meta, arg, usage)
 
 local compDbName = opts.d
-local typedefName = opts.t
-local memberName = opts.m
 local clangOpts = opts.O
 local quiet = opts.q
 local dryrun = opts.n
 local useColors = not opts["-no-color"]
 
-if (not typedefName or not memberName) then
-    usage("Must provide -t and -m options")
+local queryStr = files[0]
+files[0] = nil
+
+if (queryStr == nil) then
+    usage("Must provide <typeName>::<memberName> to search for as first argument")
 end
 
-local V = cl.ChildVisitResult
+local function parseQueryString(qstr)
+    local pos = qstr:find("::")
+    if (pos == nil) then
+        abort("ERROR: member to search for must be specified as <typeName>::<memberName>")
+    end
+
+    return qstr:sub(1,pos-1), qstr:sub(pos+2)
+end
+
+local typeName, memberName = parseQueryString(queryStr)
 
 local g_curFileName
 -- The StructDecl of the type we're searching for.
 local g_structDecl
 
+local V = cl.ChildVisitResult
 -- Visitor for finding the named structure declaration.
 local GetTypeVisitor = cl.regCursorVisitor(
 function(cur, parent)
@@ -105,7 +130,7 @@ function(cur, parent)
         local structDecl = typ:declaration()
         if (structDecl:haskind("StructDecl")) then
 --            printf("typedef %s %s", structDecl:name(), cur:name())
-            if (cur:name() == typedefName) then
+            if (cur:name() == typeName) then
                 g_structDecl = structDecl
                 return V.Break
             end
@@ -144,7 +169,7 @@ local SourceFile = class
     function(fn)
         local fh, msg = io.open(fn)
         if (fh == nil) then
-            errprintf('Could not open file "%s": %s', fn, msg)
+            errprintf("Could not open %s", msg)
             os.exit(1)
         end
 
@@ -302,7 +327,7 @@ end
 local function absifyIncOpts(opts, prefixDir)
     if (prefixDir:sub(1,1) ~= "/") then
         -- XXX: Windows.
-        errprintf('mgrep.lua: prefixDir "%s" does not start with "/".', prefixDir)
+        errprintf("mgrep.lua: prefixDir '%s' does not start with '/'.", prefixDir)
         os.exit(1)
     end
 
@@ -338,8 +363,7 @@ if (useCompDb) then
     local db = cl.CompilationDatabase(compDbDir)
 
     if (db == nil) then
-        errprintf('Fatal: Could not load compilation database')
-        os.exit(1)
+        abort("Fatal: Could not load compilation database")
     end
 
     -- Get all source files, uniq'd.
@@ -349,8 +373,7 @@ if (useCompDb) then
         -- NOTE: We may get a CompilationDatabase even if
         -- clang_CompilationDatabase_fromDirectory() failed (as evidenced by
         -- error output from "LIBCLANG TOOLING").
-        errprintf('Fatal: Compilation database contains no entries, or an error occurred')
-        os.exit(1)
+        abort("Fatal: Compilation database contains no entries, or an error occurred")
     end
 
     for fi=1,#files do
@@ -436,7 +459,7 @@ for fi=1,#files do
                 -- XXX: This is kind of noisy even in non-DB
                 -- mode. E.g. "mgrep.lua *.c": some C files may not include a
                 -- particular header.
-                errprintf("%s: Didn't find declaration for '%s'", fn, typedefName)
+                errprintf("%s: Didn't find declaration for '%s'", fn, typeName)
             end
         else
             tuCursor:children(SearchVisitor)
