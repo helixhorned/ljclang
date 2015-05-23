@@ -12,6 +12,7 @@ local ffi = require("ffi")
 local C = ffi.C
 
 local cl = require("ljclang")
+local class = require("class").class
 
 local abs = math.abs
 local format = string.format
@@ -136,31 +137,34 @@ end
 
 --------------------
 
-local function FileOpen(fn)
-    local fh, msg = io.open(fn)
-    if (fh == nil) then
-        errprintf('Could not open file "%s": %s', fn, msg)
-        os.exit(1)
-    end
+local SourceFile = class
+{
+    function(fn)
+        local fh, msg = io.open(fn)
+        if (fh == nil) then
+            errprintf('Could not open file "%s": %s', fn, msg)
+            os.exit(1)
+        end
 
-    return { fh=fh, line=0 }
-end
+        return { fh=fh, line=0 }
+    end,
 
-local function FileGetLine(f, line)
-    assert(f.line < line)
+    __gc = function(f)
+        f.fh:close()
+    end,
 
-    local str
-    while (f.line < line) do
-        f.line = f.line+1
-        str = f.fh:read("*l")
-    end
+    getLine = function(f, line)
+        assert(f.line < line)
 
-    return str
-end
+        local str
+        while (f.line < line) do
+            f.line = f.line+1
+            str = f.fh:read("*l")
+        end
 
-local function FileClose(f)
-    f.fh:close()
-end
+        return str
+    end,
+}
 
 local g_fileIdx = {}  -- [fileName] = fileIdx
 local g_fileName = {}  -- [fileIdx] = fileName
@@ -257,19 +261,17 @@ local function printResults()
         local lines = g_fileLines[fi]
         local pairs = g_fileColumnPairs[fi]
 
-        local f = FileOpen(fn)
+        local f = SourceFile(fn)
 
         for li=1,#lines do
 --            local oneline = (lines[li] > 0)
             local line = abs(lines[li])
-            local str = FileGetLine(f, line)
+            local str = f:getLine(line)
             if (useColors) then
                 str = colorizeResult(str, pairs[li])
             end
             printf("%s:%d: %s", fn, line, str)
         end
-
-        FileClose(f)
     end
 end
 
