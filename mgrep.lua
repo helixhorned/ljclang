@@ -125,11 +125,16 @@ local V = cl.ChildVisitResult
 -- Visitor for finding the named structure declaration.
 local GetTypeVisitor = cl.regCursorVisitor(
 function(cur, parent)
-    if (cur:haskind("TypedefDecl")) then
+    if (cur:haskind("StructDecl")) then
+        if (cur:name() == typeName) then
+            g_structDecl = cl.Cursor(cur)
+            return V.Break
+        end
+    elseif (cur:haskind("TypedefDecl")) then
         local typ = cur:typedefType()
         local structDecl = typ:declaration()
         if (structDecl:haskind("StructDecl")) then
---            printf("typedef %s %s", structDecl:name(), cur:name())
+--            printf("typedef struct %s %s", structDecl:name(), cur:name())
             if (cur:name() == typeName) then
                 g_structDecl = structDecl
                 return V.Break

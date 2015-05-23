@@ -84,8 +84,11 @@ doc:
 # Usage example:
 # BINDIR=~/bin make install
 install:
+# XXX: MAKECMDGOALS is a list, i.e. will not be effective for e.g. "make install qwe"
+ifeq ($(MAKECMDGOALS),install)
 ifeq ($(BINDIR),)
     $(error "Must pass $$BINDIR with the environment")
+endif
 endif
 	sed "s|LJCLANG_DEV_DIR|$(THIS_DIR)|g" ./mgrep.sh.in > $(BINDIR)/mgrep
 	chmod +x $(BINDIR)/mgrep

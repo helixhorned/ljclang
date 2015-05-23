@@ -166,7 +166,7 @@ from the `ChildVisitResult` enumeration to indicate whether or how libclang
 should carry on AST visiting.
 +
 
-NOTE: The `cursor` passed to the visitor callback is only valid during one
+CAUTION: The `cursor` passed to the visitor callback is only valid during one
 particular callback invocation. If it is to be used after the function has
 returned, it *must* be copied using the `Cursor` constructor mentioned below.
 
