@@ -56,15 +56,16 @@ local function usage(hline)
         print("")
     end
     local progname = arg[0]:match("([^/]+)$")
-    print("Usage: "..progname.." -t <typedefName> -m <memberName> -O '<clang_options...>' [options...] <file.{c,h}> ...")
-    print("       "..progname.." -t <typedefName> -m <memberName> [-O '<clang_options...>'] [options...] /path/to/compile_commands.json")
-    print("")
-    print("  For the compilation DB invocation, -O can be used for e.g. -I./clang-include (-> /usr/local/lib/clang/3.7.0/include)")
-    print("  (Workaround for -isystem and -I/usr/local/lib/clang/3.7.0/include not working)")
+    print("Usage: "..progname.." -t <typedefName> -m <memberName> [options...] <file.{c,h}> ...")
+    print("       "..progname.." -t <typedefName> -m <memberName> [options...] /path/to/compile_commands.json")
     print("\nOptions:")
+    print("  -O '<clang_options...>': pass options to Clang, split at whitespace")
     print("  --no-color: Turn off match and diagnostic highlighting")
     print("  -n: only parse and potentially print diagnostics")
     print("  -q: be quiet (don't print diagnostics)")
+    print("")
+    print("  For the compilation DB invocation, -O can be used for e.g. -I./clang-include (-> /usr/local/lib/clang/3.7.0/include)")
+    print("  (Workaround for -isystem and -I/usr/local/lib/clang/3.7.0/include not working)")
     os.exit(1)
 end
 
@@ -323,10 +324,6 @@ local compDbPos = files[#files]:find("[\\/]compile_commands.json$")
 local useCompDb = (compDbPos ~= nil)
 local compArgs = {}  -- if using compDB, will have #compArgs == #files, each a table
 
-if (not useCompDb and clangOpts == nil) then
-    usage("When not using compilation database, must pass -O")
-end
-
 if (useCompDb) then
     if (#files ~= 1) then
         usage("When using compilation database, must pass no additional file names")
@@ -395,7 +392,7 @@ for fi=1,#files do
     g_curFileName = fn
 
     local index = cl.createIndex(true, false)
-    local opts = useCompDb and compArgs[fi] or clangOpts
+    local opts = useCompDb and compArgs[fi] or clangOpts or {}
 
     do
         local f, msg = io.open(fn)
