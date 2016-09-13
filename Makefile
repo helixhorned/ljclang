@@ -37,7 +37,7 @@ OPTLEV ?= 2
 DEBUG ?= 0
 SAN ?= 0
 WARN := -std=c99 -pedantic -Wall -Werror-implicit-function-declaration
-CFLAGS :=
+CFLAGS ?=
 
 ifneq ($(SAN),0)
     CFLAGS += -fsanitize=address,undefined
