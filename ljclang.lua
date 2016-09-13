@@ -331,7 +331,8 @@ local TranslationUnit_mt = {
                 tab[i+1] = {
                     category = getString(clang.clang_getDiagnosticCategoryText(diag)),
                     text = getString(clang.clang_formatDiagnostic(
-                                         diag, clang.clang_defaultDiagnosticDisplayOptions()))
+                                         diag, clang.clang_defaultDiagnosticDisplayOptions())),
+                    severity = clang.clang_getDiagnosticSeverity(diag),
                 }
                 clang.clang_disposeDiagnostic(diag)
             end
@@ -479,12 +480,36 @@ local Cursor_mt = {
             return getCursor(clang.clang_getCursorDefinition(self._cur))
         end,
 
+        isDeleted = function(self)
+            return clang.clang_CXX_isDeleted(self._cur) ~= 0
+        end,
+
+        isMutable = function(self)
+            return clang.clang_CXXField_isMutable(self._cur) ~= 0
+        end,
+
+        isDefaulted = function(self)
+            return clang.clang_CXXMethod_isDefaulted(self._cur) ~= 0
+        end,
+
+        isPureVirtual = function(self)
+            return clang.clang_CXXMethod_isPureVirtual(self._cur) ~= 0
+        end,
+
         isVirtual = function(self)
-            return clang.clang_CXXMethod_isVirtual(self._cur)
+            return clang.clang_CXXMethod_isVirtual(self._cur) ~= 0
+        end,
+
+        isOverride = function(self)
+            return clang.clang_CXXMethod_isOverride(self._cur) ~= 0
         end,
 
         isStatic = function(self)
-            return clang.clang_CXXMethod_isStatic(self._cur)
+            return clang.clang_CXXMethod_isStatic(self._cur) ~= 0
+        end,
+
+        isConst = function(self)
+            return clang.clang_CXXMethod_isConst(self._cur) ~= 0
         end,
 
         type = function(self)
@@ -688,6 +713,14 @@ local Type_mt = {
             return (clang.clang_isPODType(self._typ) ~= 0);
         end,
 
+        isFinal = function(self)
+            return (clang.clang_isFinalType(self._typ) ~= 0);
+        end,
+
+        isAbstract = function(self)
+            return (clang.clang_isAbstractType(self._typ) ~= 0);
+        end,
+
         declaration = function(self)
             return getCursor(clang.clang_getTypeDeclaration(self._typ))
         end,
@@ -715,6 +748,10 @@ Type__index.isConstQualified = Type__index.isConst
 Type_mt.__tostring = Type__index.name
 
 -------------------------------------------------------------------------
+
+function api.clangVersion()
+  return getString(clang.clang_getClangVersion())
+end
 
 --| index = clang.createIndex([excludeDeclarationsFromPCH [, displayDiagnostics]])
 function api.createIndex(excludeDeclarationsFromPCH, displayDiagnostics)
