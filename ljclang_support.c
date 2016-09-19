@@ -100,7 +100,7 @@ ourCursorVisitor(CXCursor cursor, CXCursor parent, CXClientData client_data)
     int k = cursor.kind;
 
     if ((unsigned)k >= NUM_KINDS)
-        return CXChildVisit_Break;
+        return CXChildVisit_Continue;
 #ifdef USE_KINDS_BITAR
     if (cvd->kinds[k>>3] & (1<<(k&7)))
 #endif
