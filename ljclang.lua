@@ -427,6 +427,12 @@ local Cursor_mt = {
             return kindstr or "Unknown"
         end,
 
+        templateKind = function(self)
+            local kindnum = tonumber(clang.clang_getTemplateCursorKind(self._cur))
+            local kindstr = g_CursorKindName[kindnum]
+            return kindstr or "Unknown"
+        end,
+
         arguments = function(self)
             local tab = {}
             local numargs = clang.clang_Cursor_getNumArguments(self._cur)
@@ -602,6 +608,10 @@ local Cursor_mt = {
 
         lexicalParent = function(self)
             return getCursor(clang.clang_getCursorLexicalParent(self._cur))
+        end,
+
+        baseTemplate = function(self)
+            return getCursor(clang.clang_getSpecializedCursorTemplate(self._cur))
         end,
 
         -- Returns an enumeration constant, which in LuaJIT can be compared
@@ -919,6 +929,11 @@ ffi.metatype(Type_t, Type_mt)
 ffi.metatype(CompileCommand_t, CompileCommand_mt)
 ffi.metatype(CompileCommands_t, CompileCommands_mt)
 ffi.metatype(CompilationDatabase_t, CompilationDatabase_mt)
+
+api.Index_t = Index_t
+api.TranslationUnit_t = TranslationUnit_t_
+api.Cursor_t = Cursor_t
+api.Type_t = Type_t
 
 -- Done!
 return api
