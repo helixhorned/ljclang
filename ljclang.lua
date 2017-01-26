@@ -748,6 +748,15 @@ local Type_mt = {
                 return self:kindnum() == kind
             end
         end,
+
+        templateArguments = function(self)
+            local tab = {}
+            local numargs = clang.clang_Type_getNumTemplateArguments(self._typ)
+            for i=1,numargs do
+                tab[i] = getType(clang.clang_Type_getTemplateArgumentAsType(self._typ, i-1))
+            end
+            return tab
+        end,
     },
 }
 
