@@ -331,7 +331,8 @@ local TranslationUnit_mt = {
                 tab[i+1] = {
                     category = getString(clang.clang_getDiagnosticCategoryText(diag)),
                     text = getString(clang.clang_formatDiagnostic(
-                                         diag, clang.clang_defaultDiagnosticDisplayOptions()))
+                                         diag, clang.clang_defaultDiagnosticDisplayOptions())),
+                    severity = clang.clang_getDiagnosticSeverity(diag),
                 }
                 clang.clang_disposeDiagnostic(diag)
             end
@@ -426,6 +427,12 @@ local Cursor_mt = {
             return kindstr or "Unknown"
         end,
 
+        templateKind = function(self)
+            local kindnum = tonumber(clang.clang_getTemplateCursorKind(self._cur))
+            local kindstr = g_CursorKindName[kindnum]
+            return kindstr or "Unknown"
+        end,
+
         arguments = function(self)
             local tab = {}
             local numargs = clang.clang_Cursor_getNumArguments(self._cur)
@@ -479,12 +486,36 @@ local Cursor_mt = {
             return getCursor(clang.clang_getCursorDefinition(self._cur))
         end,
 
+        isDeleted = function(self)
+            return clang.clang_CXX_isDeleted(self._cur) ~= 0
+        end,
+
+        isMutable = function(self)
+            return clang.clang_CXXField_isMutable(self._cur) ~= 0
+        end,
+
+        isDefaulted = function(self)
+            return clang.clang_CXXMethod_isDefaulted(self._cur) ~= 0
+        end,
+
+        isPureVirtual = function(self)
+            return clang.clang_CXXMethod_isPureVirtual(self._cur) ~= 0
+        end,
+
         isVirtual = function(self)
-            return clang.clang_CXXMethod_isVirtual(self._cur)
+            return clang.clang_CXXMethod_isVirtual(self._cur) ~= 0
+        end,
+
+        isOverride = function(self)
+            return clang.clang_CXXMethod_isOverride(self._cur) ~= 0
         end,
 
         isStatic = function(self)
-            return clang.clang_CXXMethod_isStatic(self._cur)
+            return clang.clang_CXXMethod_isStatic(self._cur) ~= 0
+        end,
+
+        isConst = function(self)
+            return clang.clang_CXXMethod_isConst(self._cur) ~= 0
         end,
 
         type = function(self)
@@ -577,6 +608,10 @@ local Cursor_mt = {
 
         lexicalParent = function(self)
             return getCursor(clang.clang_getCursorLexicalParent(self._cur))
+        end,
+
+        baseTemplate = function(self)
+            return getCursor(clang.clang_getSpecializedCursorTemplate(self._cur))
         end,
 
         -- Returns an enumeration constant, which in LuaJIT can be compared
@@ -688,6 +723,14 @@ local Type_mt = {
             return (clang.clang_isPODType(self._typ) ~= 0);
         end,
 
+        isFinal = function(self)
+            return (clang.clang_isFinalType(self._typ) ~= 0);
+        end,
+
+        isAbstract = function(self)
+            return (clang.clang_isAbstractType(self._typ) ~= 0);
+        end,
+
         declaration = function(self)
             return getCursor(clang.clang_getTypeDeclaration(self._typ))
         end,
@@ -705,6 +748,15 @@ local Type_mt = {
                 return self:kindnum() == kind
             end
         end,
+
+        templateArguments = function(self)
+            local tab = {}
+            local numargs = clang.clang_Type_getNumTemplateArguments(self._typ)
+            for i=1,numargs do
+                tab[i] = getType(clang.clang_Type_getTemplateArgumentAsType(self._typ, i-1))
+            end
+            return tab
+        end,
     },
 }
 
@@ -715,6 +767,10 @@ Type__index.isConstQualified = Type__index.isConst
 Type_mt.__tostring = Type__index.name
 
 -------------------------------------------------------------------------
+
+function api.clangVersion()
+  return getString(clang.clang_getClangVersion())
+end
 
 --| index = clang.createIndex([excludeDeclarationsFromPCH [, displayDiagnostics]])
 function api.createIndex(excludeDeclarationsFromPCH, displayDiagnostics)
@@ -882,6 +938,11 @@ ffi.metatype(Type_t, Type_mt)
 ffi.metatype(CompileCommand_t, CompileCommand_mt)
 ffi.metatype(CompileCommands_t, CompileCommands_mt)
 ffi.metatype(CompilationDatabase_t, CompilationDatabase_mt)
+
+api.Index_t = Index_t
+api.TranslationUnit_t = TranslationUnit_t_
+api.Cursor_t = Cursor_t
+api.Type_t = Type_t
 
 -- Done!
 return api
