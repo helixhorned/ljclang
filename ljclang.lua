@@ -442,6 +442,15 @@ local Cursor_mt = {
             return tab
         end,
 
+        overloadedDecls = function(self)
+            local tab = {}
+            local numdecls = clang.clang_getNumOverloadedDecls(self._cur)
+            for i=1,numdecls do
+                tab[i] = getCursor(clang.clang_getOverloadedDecl(self._cur, i-1))
+            end
+            return tab
+        end,
+
         location = function(self, linesfirst)
             local cxsrcrange = getSourceRange(self._cur)
             if (cxsrcrange == nil) then
