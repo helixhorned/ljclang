@@ -1,31 +1,23 @@
 
 OS := $(shell uname -s)
-MINGW := $(findstring MINGW,$(OS))
 THIS_DIR := $(abspath $(dir $(lastword $(MAKEFILE_LIST))))
 
 
 ########## PATHS ##########
 
-ifeq ($(OS),Linux)
-    ifneq (,$(wildcard /usr/local/bin/clang))
-        prefix := /usr/local
-    else
-        prefix := /usr
-    endif
-    incdir := $(prefix)/include
-    libdir := $(prefix)/lib
-    lib := -L$(libdir) -lclang
-    so := .so
-else
- ifeq ($(MINGW),MINGW)
-    rdir := /f/g/mod/clang3.3_march2013
-    incdir := $(rdir)/include
-    lib := $(rdir)/lib/libclang.lib $(rdir)/libclang.dll
-    so := .dll
- else
-    $(error unknown platform)
- endif
+ifneq ($(OS),Linux)
+    $(error "Unsupported OS")
 endif
+
+ifneq (,$(wildcard /usr/local/bin/clang))
+    prefix := /usr/local
+else
+    prefix := /usr
+endif
+incdir := $(prefix)/include
+libdir := $(prefix)/lib
+lib := -L$(libdir) -lclang
+so := .so
 
 luajit := luajit
 asciidoc := asciidoctor
@@ -47,13 +39,7 @@ ifneq ($(DEBUG),0)
     CFLAGS += -g
 endif
 
-ifeq ($(OS),Linux)
-    CFLAGS += -I$(incdir) -fPIC
-else
- ifeq ($(MINGW),MINGW)
-    CFLAGS += -I$(incdir) $(lib)
- endif
-endif
+CFLAGS += -I$(incdir) -fPIC
 
 
 ########## RULES ##########
