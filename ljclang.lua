@@ -31,6 +31,9 @@ require("ljclang_Index_h")
 local support = ffi.load(lib"ljclang_support")
 local g_CursorKindName = require("ljclang_cursor_kind").name
 
+ffi.cdef("const char *ljclang_getLLVMVersion();")
+local supportLLVMVersion = ffi.string(support.ljclang_getLLVMVersion())
+
 -------------------------------------------------------------------------
 
 -- The table of externally exposed elements, returned at the end.
@@ -111,6 +114,18 @@ local function getString(cxstr)
     local str = ffi.string(cstr)
     clang.clang_disposeString(cxstr)
     return str
+end
+
+function api.clangVersion()
+    return getString(clang.clang_getClangVersion())
+end
+
+do
+    local libclangLLVMVersion = api.clangVersion()
+    if (not libclangLLVMVersion:find(supportLLVMVersion, 1, true)) then
+        error("Mismatching LLVM versions of 'libljclang_support' ("..libclangLLVMVersion..
+                  ") and 'libclang' ("..supportLLVMVersion..")")
+    end
 end
 
 -------------------------------------------------------------------------
@@ -767,10 +782,6 @@ Type__index.isConstQualified = Type__index.isConst
 Type_mt.__tostring = Type__index.name
 
 -------------------------------------------------------------------------
-
-function api.clangVersion()
-  return getString(clang.clang_getClangVersion())
-end
 
 --| index = clang.createIndex([excludeDeclarationsFromPCH [, displayDiagnostics]])
 function api.createIndex(excludeDeclarationsFromPCH, displayDiagnostics)

@@ -9,6 +9,8 @@ ifeq ($(llvm-config),)
     $(error "$(LLVM_CONFIG) not found, use LLVM_CONFIG=<path/to/llvm-config> make")
 endif
 
+llvm_version := $(shell $(llvm-config) --version)
+
 ########## PATHS ##########
 
 ifneq ($(OS),Linux)
@@ -41,9 +43,11 @@ ifneq ($(DEBUG),0)
 endif
 
 CFLAGS += -I$(incdir) -fPIC
-
+CFLAGS += -DLJCLANG_LLVM_VERSION='"$(llvm_version)"'
 
 ########## RULES ##########
+
+all: libljclang_support$(so) ljclang_Index_h.lua bootstrap
 
 libljclang_support$(so): ljclang_support.c Makefile
 	$(CC) $(CFLAGS) $(WARN) -O$(OPTLEV) -shared $< $(lib) -o $@
@@ -62,7 +66,7 @@ EXTRACT_OPTS := -R -p '^CXCursor_' -x '_First' -x '_Last' -x '_GCCAsmStmt' -x '_
     -1 'return { name={' -2 '}, }' -Q
 
 # Generate list of CXCursorKind names
-bootstrap:
+bootstrap: libljclang_support$(so)
 	@echo 'return {}' > $(CKIND_LUA)
 	LD_LIBRARY_PATH="$(libdir):$(THIS_DIR)" $(luajit) ./extractdecls.lua $(EXTRACT_OPTS) $(incdir)/clang-c/Index.h > $(CKIND_LUA).tmp
 	@mv $(CKIND_LUA).tmp $(CKIND_LUA)

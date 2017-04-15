@@ -6,6 +6,12 @@
 
 #include <clang-c/Index.h>
 
+// Returns the LLVM version obtained with "<llvm-config> --version" when
+// building us.
+const char *ljclang_getLLVMVersion()
+{
+    return LJCLANG_LLVM_VERSION;
+}
 
 /* Our cursor visitor takes the CXCursor objects by pointer. */
 typedef enum CXChildVisitResult (*LJCX_CursorVisitor)(
