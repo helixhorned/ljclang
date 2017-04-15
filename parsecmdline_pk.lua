@@ -1,7 +1,9 @@
 
 local pairs = pairs
 
--- Get options from command line.
+-- Get options and positional arguments from command line. A '--' stops option
+-- processing and collects it and the following arguments into 'args'
+-- (positional arguments), irrespective of whether they start with a dash.
 --
 -- opts, args = getopts(opt_meta, arg, usage_func)
 --
@@ -32,15 +34,19 @@ local function getopts(opt_meta, arg, usage)
     local apos = 1 + (opt_meta[0] or 0)
 
     local skipnext = false
-    local proc = true
+    local processOpts = true
+
     for i=1,#arg do
         if (skipnext) then
             skipnext = false
             goto next
         end
 
-        if arg[i] == "--" then proc = false end
-        if (proc and arg[i]:sub(1,1)=="-") then
+        if (arg[i] == "--") then
+            processOpts = false
+        end
+
+        if (processOpts and arg[i]:sub(1,1)=="-") then
             local opt = arg[i]:sub(2)
             skipnext = opt_meta[opt]
             if (skipnext == nil) then
@@ -58,7 +64,7 @@ local function getopts(opt_meta, arg, usage)
                 opts[opt] = true
             end
         else
-            proc = false
+            processOpts = false
             args[apos] = arg[i]
             apos = apos+1
         end
