@@ -6,14 +6,14 @@ local os = require("os")
 local dir = arg[1]
 
 if (dir == nil) then
-    print("Usage: ", arg[0], " /usr/path/to/clang-c/ > ljclang_Index_h.lua")
+    print("Usage: "..arg[0].." /usr/path/to/clang-c/ > ljclang_Index_h.lua")
     os.exit(1)
 end
 
 local function loadandstrip(filename)
     local f, errmsg = io.open(dir.."/"..filename)
     if (f==nil) then
-        print("Error opening file: ", errmsg)
+        print("Error opening file: "..errmsg)
         os.exit(2)
     end
 
