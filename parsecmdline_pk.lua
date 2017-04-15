@@ -64,7 +64,11 @@ local function getopts(opt_meta, arg, usage)
                 opts[opt] = true
             end
         else
-            processOpts = false
+            -- Uncommenting this makes option processing stop at the first
+            -- non-option argument. When it is commented, options and
+            -- positional arguments can be in any order, and only '--' stops
+            -- option processing.
+--            processOpts = false
             args[apos] = arg[i]
             apos = apos+1
         end
