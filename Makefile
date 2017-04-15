@@ -2,6 +2,12 @@
 OS := $(shell uname -s)
 THIS_DIR := $(abspath $(dir $(lastword $(MAKEFILE_LIST))))
 
+LLVM_CONFIG ?= llvm-config
+llvm-config := $(shell which $(LLVM_CONFIG))
+
+ifeq ($(llvm-config),)
+    $(error "$(LLVM_CONFIG) not found, use LLVM_CONFIG=<path/to/llvm-config> make")
+endif
 
 ########## PATHS ##########
 
@@ -9,13 +15,8 @@ ifneq ($(OS),Linux)
     $(error "Unsupported OS")
 endif
 
-ifneq (,$(wildcard /usr/local/bin/clang))
-    prefix := /usr/local
-else
-    prefix := /usr
-endif
-incdir := $(prefix)/include
-libdir := $(prefix)/lib
+incdir := $(shell $(llvm-config) --includedir)
+libdir := $(shell $(llvm-config) --libdir)
 lib := -L$(libdir) -lclang
 so := .so
 
