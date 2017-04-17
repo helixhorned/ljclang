@@ -74,8 +74,11 @@ Options:
   -n: only parse and potentially print diagnostics
   -q: be quiet (don't print diagnostics)
 
-  For the compilation DB invocation, -O can be used for e.g. -I./clang-include (-> /usr/local/lib/clang/3.7.0/include)
-  (Workaround for -isystem and -I/usr/local/lib/clang/3.7.0/include not working)
+  For the compilation DB invocation, -O can be used for e.g.
+    -I./clang-include (-> /usr/local/lib/clang/3.7.0/include)
+  (Attempt to use either -isystem or -I/usr/local/lib/clang/3.7.0/include
+  to prevent messages like "fatal error: 'stddef.h' file not found".)
+  This issue seems to be fixed with LLVM 4.0 though.
 ]]
     os.exit(1)
 end
@@ -307,7 +310,6 @@ local function printResults()
         local f = SourceFile(fn)
 
         for li=1,#lines do
---            local oneline = (lines[li] > 0)
             local line = abs(lines[li])
             local str = f:getLine(line)
             if (useColors) then
@@ -400,12 +402,6 @@ if (useCompDb) then
         -- NOTE: Strip "-c" and "-o" options from args. (else: "crash detected" for me)
         local args = cl.stripArgs(cmd:getArgs(false), "^-[co]$", 2)
         absifyIncOpts(args, cmd:getDirectory())
-
-        -- Regarding "fatal error: 'stddef.h' file not found": for me,
-        --  * -isystem didn't work ("crash detected").
-        --  * -I/usr/local/lib/clang/3.7.0/include didn't work either
-        --    (no effect)
-        --  * -I<symlink to /usr/local/lib/clang/3.7.0/include> did work...
 
         if (clangOpts ~= nil) then
             local suffixArgs = cl.splitAtWhitespace(clangOpts)
