@@ -431,6 +431,8 @@ end
 local ColorizeErrorFunc = GetColorizeTripleFunc(Red)
 local ColorizeWarningFunc = GetColorizeTripleFunc(Purple)
 
+local foundStruct = false
+
 for fi=1,#files do
     local fn = files[fi]
     g_curFileName = fn
@@ -470,21 +472,22 @@ for fi=1,#files do
         local tuCursor = tu:cursor()
         tuCursor:children(GetTypeVisitor)
 
-        if (g_structDecl == nil) then
-            if (not quiet and not useCompDb) then
-                -- XXX: This is kind of noisy even in non-DB
-                -- mode. E.g. "mgrep.lua *.c": some C files may not include a
-                -- particular header.
-                errprintf("%s: Didn't find declaration for '%s'", fn, typeName)
-            end
-        else
+        if (g_structDecl ~= nil) then
             tuCursor:children(SearchVisitor)
             printResults()
             clearResults()
             g_structDecl = nil
             g_cursorKind = nil
+            foundStruct = true
         end
     end
 
     ::nextfile::
+end
+
+if (not foundStruct) then
+    if (not quiet) then
+        errprintf("Did not find declaration for '%s'.", typeName)
+    end
+    os.exit(1)
 end
