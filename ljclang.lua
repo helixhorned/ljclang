@@ -901,13 +901,12 @@ end
 -- cursor: this will be the table where they go.
 local collectTab
 
-local function collectDirectChildren(cur)
+local CollectDirectChildren = api.regCursorVisitor(
+function(cur)
     debugf("collectDirectChildren: %s, child cursor kind: %s", tostring(collectTab), cur:kind())
     collectTab[#collectTab+1] = Cursor_t(cur[0])
     return 1  -- Continue
-end
-
-local cdc_visitoridx = api.regCursorVisitor(collectDirectChildren)
+end)
 
 function Cursor_mt.__index.children(self, visitoridx)
     if (visitoridx ~= nil) then
@@ -923,7 +922,7 @@ function Cursor_mt.__index.children(self, visitoridx)
 
         collectTab = {}
         -- XXX: We'll be blocked if the visitor callback errors.
-        support.ljclang_visitChildren(self._cur, cdc_visitoridx)
+        support.ljclang_visitChildren(self._cur, CollectDirectChildren)
         local tab = collectTab
         collectTab = nil
         return tab
