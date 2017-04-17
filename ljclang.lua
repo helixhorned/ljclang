@@ -95,7 +95,7 @@ typedef enum CXChildVisitResult (*LJCX_CursorVisitor)(
 ]], Cursor_t, Cursor_t)
 
 ffi.cdef[[
-int ljclang_regCursorVisitor(LJCX_CursorVisitor visitor, enum CXCursorKind *kinds, int numkinds);
+int ljclang_regCursorVisitor(LJCX_CursorVisitor visitor);
 int ljclang_visitChildren(CXCursor parent, int visitoridx);
 ]]
 
@@ -882,7 +882,7 @@ api.ChildVisitResult = ffi.new[[struct{
 function api.regCursorVisitor(visitorfunc)
     check(type(visitorfunc)=="function", "<visitorfunc> must be a Lua function", 2)
 
-    local ret = support.ljclang_regCursorVisitor(visitorfunc, nil, 0)
+    local ret = support.ljclang_regCursorVisitor(visitorfunc)
     if (ret < 0) then
         error("failed registering visitor function, code "..ret, 2)
     end
