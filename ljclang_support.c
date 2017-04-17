@@ -34,19 +34,14 @@ static unsigned g_numVisitors;
  */
 int ljclang_regCursorVisitor(LJCX_CursorVisitor visitor)
 {
-    const int szCVD = (int)sizeof(LJCX_CursorVisitorData);
-    LJCX_CursorVisitorData cvd;
-
-    memset(&cvd, 0, szCVD);
-    cvd.visitor = visitor;
-
-    void *newVisitors = realloc(g_cursorVisitors, (g_numVisitors+1)*szCVD);
+    void *newVisitors = realloc(
+        g_cursorVisitors, (g_numVisitors+1)*sizeof(LJCX_CursorVisitorData));
 
     if (newVisitors == NULL)
         return -1;
 
     g_cursorVisitors = (LJCX_CursorVisitorData *)newVisitors;
-    memcpy(&g_cursorVisitors[g_numVisitors], &cvd, szCVD);
+    g_cursorVisitors[g_numVisitors].visitor = visitor;
 
     return g_numVisitors++;
 }
