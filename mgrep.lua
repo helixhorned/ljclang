@@ -147,7 +147,13 @@ function(cur, parent)
         end
     end
 
-    return V.Continue
+    -- The structure declaration might not be found on the top level for C++
+    -- code, 'Recurse' instead of 'Continue'.
+    --
+    -- NOTE: Of course, mgrep does not have any notable C++ naming support, but
+    -- one might use it to search code originally written as C which then had
+    -- C++ "added in".
+    return V.Recurse
 end)
 
 --------------------
