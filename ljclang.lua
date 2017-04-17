@@ -181,7 +181,7 @@ local CompileCommand_mt = {
         -- paths: sequence table.
         getSourcePaths = function(self)
             -- XXX: This is a workaround implementation due to a missing
-            -- clang_CompileCommand_getMappedSourcePath symbol in libclang.so,
+            -- clang_CompileCommand_getNumMappedSources symbol in libclang.so,
             -- see commented out code below.
             local args = self:getArgs()
             for i=1,#args do
