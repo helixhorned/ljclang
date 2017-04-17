@@ -2,6 +2,9 @@
 OS := $(shell uname -s)
 THIS_DIR := $(abspath $(dir $(lastword $(MAKEFILE_LIST))))
 
+# Directory to install scripts (referencing THIS_DIR, i.e. the development directory).
+BINDIR ?= /usr/local
+
 LLVM_CONFIG ?= llvm-config
 llvm-config := $(shell which $(LLVM_CONFIG))
 
@@ -75,14 +78,6 @@ bootstrap: libljclang_support$(so)
 doc:
 	$(asciidoc) README.adoc
 
-# Usage example:
-# BINDIR=~/bin make install
 install:
-# XXX: MAKECMDGOALS is a list, i.e. will not be effective for e.g. "make install qwe"
-ifeq ($(MAKECMDGOALS),install)
-ifeq ($(BINDIR),)
-    $(error "Must pass $$BINDIR with the environment")
-endif
-endif
-	sed "s|LJCLANG_DEV_DIR|$(THIS_DIR)|g" ./mgrep.sh.in > $(BINDIR)/mgrep
+	sed "s|LJCLANG_DEV_DIR|$(THIS_DIR)|g; s|LLVM_LIBDIR|$(libdir)|g;" ./mgrep.sh.in > $(BINDIR)/mgrep
 	chmod +x $(BINDIR)/mgrep
