@@ -54,10 +54,10 @@ local opt_meta = { p=true, x=1, s=true, C=false, R=false, Q=false,
 
 local opts, args = parsecmdline.getopts(opt_meta, arg, usage)
 
-local pat = opts.p
-local xpats = opts.x
-local spat = opts.s
-local constint = opts.C
+local filterPattern = opts.p
+local excludePatterns = opts.x
+local stripPattern = opts.s
+local printConstInt = opts.C
 local reverse = opts.R
 local quiet = opts.Q
 local what = opts.w or "EnumConstantDecl"
@@ -66,14 +66,14 @@ local fmtfuncCode = opts.f
 local extractEnum = (what == "EnumConstantDecl")
 local extractMacro = (what:find("^Macro"))
 
-local printbefore = opts['1']
-local printafter = opts['2']
+local prefixString = opts['1']
+local suffixString = opts['2']
 
 if (#args == 0) then
     usage()
 end
 
-if (not (extractEnum or extractMacro) and (constint or reverse)) then
+if (not (extractEnum or extractMacro) and (printConstInt or reverse)) then
     usage("Options -C and -R only available for enum or macro extraction")
 end
 
@@ -83,7 +83,7 @@ if (fmtfuncCode) then
         usage("Option -f only available for enum or macro extraction")
     end
 
-    if (constint or reverse) then
+    if (printConstInt or reverse) then
         usage("Option -f is incompatible with -C or -R")
     end
 
@@ -136,8 +136,8 @@ local enumseq = {}
 local V = cl.ChildVisitResult
 
 local function checkexclude(name)
-    for i=1,#xpats do
-        if (name:find(xpats[i])) then
+    for i=1,#excludePatterns do
+        if (name:find(excludePatterns[i])) then
             return true
         end
     end
@@ -165,11 +165,11 @@ function(cur, parent)
     if (cur:haskind(what)) then
         local name = cur:displayName()
 
-        if (pat == nil or name:find(pat)) then
+        if (filterPattern == nil or name:find(filterPattern)) then
             local exclude = false
 
             if (not checkexclude(name)) then
-                local ourname = spat and name:gsub(spat, "") or name
+                local ourname = stripPattern and name:gsub(stripPattern, "") or name
 
                 if (extractEnum or extractMacro) then
                     -- Enumeration constants
@@ -188,7 +188,7 @@ function(cur, parent)
                             end
                             enumname[val] = ourname
                             enumseq[#enumseq+1] = val
-                        elseif (constint) then
+                        elseif (printConstInt) then
                             printf("static const int %s = %s;", ourname, val)
                         else
                             printf("%s = %s,", ourname, val)
@@ -225,8 +225,8 @@ function(cur, parent)
     return V.Continue
 end)
 
-if (printbefore) then
-    print(printbefore)
+if (prefixString) then
+    print(prefixString)
 end
 
 tu:cursor():children(visitor)
@@ -239,6 +239,6 @@ if (reverse) then
     end
 end
 
-if (printafter) then
-    print(printafter)
+if (suffixString) then
+    print(suffixString)
 end
