@@ -120,6 +120,7 @@ typedef struct CXVersion {
 
   int Subminor;
 } CXVersion;
+
  CXIndex clang_createIndex(int excludeDeclarationsFromPCH,
                                          int displayDiagnostics);
  void clang_disposeIndex(CXIndex index);
@@ -210,6 +211,7 @@ typedef struct {
 } CXSourceRangeList;
  CXSourceRangeList *clang_getSkippedRanges(CXTranslationUnit tu,
                                                          CXFile file);
+ CXSourceRangeList *clang_getAllSkippedRanges(CXTranslationUnit tu);
  void clang_disposeSourceRangeList(CXSourceRangeList *ranges);
 enum CXDiagnosticSeverity {
 
@@ -225,6 +227,7 @@ enum CXDiagnosticSeverity {
 };
 typedef void *CXDiagnostic;
 typedef void *CXDiagnosticSet;
+
  unsigned clang_getNumDiagnosticsInSet(CXDiagnosticSet Diags);
  CXDiagnostic clang_getDiagnosticInSet(CXDiagnosticSet Diags,
                                                      unsigned Index);
@@ -232,12 +235,16 @@ enum CXLoadDiag_Error {
 
   CXLoadDiag_None = 0,
 
+
   CXLoadDiag_Unknown = 1,
+
 
   CXLoadDiag_CannotLoad = 2,
 
+
   CXLoadDiag_InvalidFile = 3
 };
+
  CXDiagnosticSet clang_loadDiagnostics(const char *file,
                                                   enum CXLoadDiag_Error *error,
                                                   CXString *errorString);
@@ -257,7 +264,9 @@ enum CXDiagnosticDisplayOptions {
 
   CXDiagnostic_DisplaySourceRanges = 0x04,
 
+
   CXDiagnostic_DisplayOption = 0x08,
+
 
   CXDiagnostic_DisplayCategoryId = 0x10,
 
@@ -276,6 +285,7 @@ clang_getDiagnosticSeverity(CXDiagnostic);
 
 CXString clang_getDiagnosticCategoryName(unsigned Category);
  CXString clang_getDiagnosticCategoryText(CXDiagnostic);
+
  unsigned clang_getDiagnosticNumRanges(CXDiagnostic);
  CXSourceRange clang_getDiagnosticRange(CXDiagnostic Diagnostic,
                                                       unsigned Range);
@@ -307,7 +317,9 @@ enum CXTranslationUnit_Flags {
 
   CXTranslationUnit_Incomplete = 0x02,
 
+
   CXTranslationUnit_PrecompiledPreamble = 0x04,
+
 
   CXTranslationUnit_CacheCompletionResults = 0x08,
 
@@ -355,12 +367,16 @@ enum CXSaveError {
 
   CXSaveError_None = 0,
 
+
   CXSaveError_Unknown = 1,
+
 
   CXSaveError_TranslationErrors = 2,
 
+
   CXSaveError_InvalidTU = 3
 };
+
  int clang_saveTranslationUnit(CXTranslationUnit TU,
                                              const char *FileName,
                                              unsigned options);
@@ -369,6 +385,7 @@ enum CXReparse_Flags {
 
   CXReparse_None = 0x0
 };
+
  unsigned clang_defaultReparseOptions(CXTranslationUnit TU);
  int clang_reparseTranslationUnit(CXTranslationUnit TU,
                                                 unsigned num_unsaved_files,
@@ -513,9 +530,12 @@ enum CXCursorKind {
 
   CXCursor_LabelRef                      = 48,
 
+
   CXCursor_OverloadedDeclRef             = 49,
 
+
   CXCursor_VariableRef                   = 50,
+
   CXCursor_LastRef                       = CXCursor_VariableRef,
   /* Error conditions */
   CXCursor_FirstInvalid                  = 70,
@@ -628,6 +648,7 @@ enum CXCursorKind {
    */
   CXCursor_LambdaExpr                    = 144,
 
+
   CXCursor_ObjCBoolLiteralExpr           = 145,
 
   CXCursor_ObjCSelfExpr                  = 146,
@@ -640,6 +661,7 @@ enum CXCursorKind {
   CXCursor_FirstStmt                     = 200,
 
   CXCursor_UnexposedStmt                 = 200,
+
 
   CXCursor_LabelStmt                     = 201,
 
@@ -779,7 +801,27 @@ enum CXCursorKind {
   CXCursor_OMPDistributeSimdDirective = 268,
 
   CXCursor_OMPTargetParallelForSimdDirective = 269,
-  CXCursor_LastStmt = CXCursor_OMPTargetParallelForSimdDirective,
+
+  CXCursor_OMPTargetSimdDirective = 270,
+
+  CXCursor_OMPTeamsDistributeDirective = 271,
+
+  CXCursor_OMPTeamsDistributeSimdDirective = 272,
+
+  CXCursor_OMPTeamsDistributeParallelForSimdDirective = 273,
+
+  CXCursor_OMPTeamsDistributeParallelForDirective = 274,
+
+  CXCursor_OMPTargetTeamsDirective = 275,
+
+  CXCursor_OMPTargetTeamsDistributeDirective = 276,
+
+  CXCursor_OMPTargetTeamsDistributeParallelForDirective = 277,
+
+  CXCursor_OMPTargetTeamsDistributeParallelForSimdDirective = 278,
+
+  CXCursor_OMPTargetTeamsDistributeSimdDirective = 279,
+  CXCursor_LastStmt = CXCursor_OMPTargetTeamsDistributeSimdDirective,
 
   CXCursor_TranslationUnit               = 300,
   /* Attributes */
@@ -820,8 +862,10 @@ enum CXCursorKind {
   CXCursor_TypeAliasTemplateDecl         = 601,
 
   CXCursor_StaticAssert                  = 602,
+
+  CXCursor_FriendDecl                    = 603,
   CXCursor_FirstExtraDecl                = CXCursor_ModuleImportDecl,
-  CXCursor_LastExtraDecl                 = CXCursor_StaticAssert,
+  CXCursor_LastExtraDecl                 = CXCursor_FriendDecl,
 
   CXCursor_OverloadCandidate             = 700
 };
@@ -835,6 +879,7 @@ typedef struct {
  unsigned clang_equalCursors(CXCursor, CXCursor);
  int clang_Cursor_isNull(CXCursor cursor);
  unsigned clang_hashCursor(CXCursor);
+
  enum CXCursorKind clang_getCursorKind(CXCursor);
  unsigned clang_isDeclaration(enum CXCursorKind);
  unsigned clang_isReference(enum CXCursorKind);
@@ -845,6 +890,7 @@ typedef struct {
  unsigned clang_isInvalid(enum CXCursorKind);
  unsigned clang_isTranslationUnit(enum CXCursorKind);
  unsigned clang_isPreprocessing(enum CXCursorKind);
+
  unsigned clang_isUnexposed(enum CXCursorKind);
 enum CXLinkageKind {
 
@@ -896,6 +942,7 @@ clang_getCursorPlatformAvailability(CXCursor cursor,
                                     int availability_size);
  void
 clang_disposeCXPlatformAvailability(CXPlatformAvailability *availability);
+
 enum CXLanguageKind {
   CXLanguage_Invalid = 0,
   CXLanguage_C,
@@ -918,9 +965,11 @@ typedef struct CXCursorSetImpl *CXCursorSet;
                                                unsigned *num_overridden);
  void clang_disposeOverriddenCursors(CXCursor *overridden);
  CXFile clang_getIncludedFile(CXCursor cursor);
+
  CXCursor clang_getCursor(CXTranslationUnit, CXSourceLocation);
  CXSourceLocation clang_getCursorLocation(CXCursor);
  CXSourceRange clang_getCursorExtent(CXCursor);
+
 enum CXTypeKind {
 
   CXType_Invalid = 0,
@@ -989,7 +1038,7 @@ enum CXCallingConv {
   CXCallingConv_X86Pascal = 5,
   CXCallingConv_AAPCS = 6,
   CXCallingConv_AAPCS_VFP = 7,
-  /* Value 8 was PnaclCall, but it was never used, so it could safely be re-used. */
+  CXCallingConv_X86RegCall = 8,
   CXCallingConv_IntelOclBicc = 9,
   CXCallingConv_X86_64Win64 = 10,
   CXCallingConv_X86_64SysV = 11,
@@ -1055,8 +1104,6 @@ enum CXTemplateArgumentKind {
  unsigned clang_isFunctionTypeVariadic(CXType T);
  CXType clang_getCursorResultType(CXCursor C);
  unsigned clang_isPODType(CXType T);
- unsigned clang_isFinalType(CXType T);
- unsigned clang_isAbstractType(CXType T);
  CXType clang_getElementType(CXType T);
  long long clang_getNumElements(CXType T);
  CXType clang_getArrayElementType(CXType T);
@@ -1093,6 +1140,7 @@ enum CXRefQualifierKind {
  enum CXRefQualifierKind clang_Type_getCXXRefQualifier(CXType T);
  unsigned clang_Cursor_isBitField(CXCursor C);
  unsigned clang_isVirtualBase(CXCursor);
+
 enum CX_CXXAccessSpecifier {
   CX_CXXInvalidAccessSpecifier,
   CX_CXXPublic,
@@ -1114,6 +1162,8 @@ enum CX_StorageClass {
  unsigned clang_getNumOverloadedDecls(CXCursor cursor);
  CXCursor clang_getOverloadedDecl(CXCursor cursor,
                                                 unsigned index);
+
+
  CXType clang_getIBOutletCollectionType(CXCursor);
 enum CXChildVisitResult {
 
@@ -1148,6 +1198,7 @@ typedef enum CXChildVisitResult (*CXCursorVisitor)(CXCursor cursor,
                                                           unsigned pieceIndex,
                                                           unsigned options);
  CXString clang_getCursorDisplayName(CXCursor);
+
  CXCursor clang_getCursorReferenced(CXCursor);
  CXCursor clang_getCursorDefinition(CXCursor);
  unsigned clang_isCursorDefinition(CXCursor);
@@ -1202,7 +1253,6 @@ typedef void *CXModule;
                                                            CXModule Module);
 CXFile clang_Module_getTopLevelHeader(CXTranslationUnit,
                                       CXModule Module, unsigned Index);
- unsigned clang_CXX_isDeleted(CXCursor C);
  unsigned clang_CXXConstructor_isConvertingConstructor(CXCursor C);
  unsigned clang_CXXConstructor_isCopyConstructor(CXCursor C);
  unsigned clang_CXXConstructor_isDefaultConstructor(CXCursor C);
@@ -1212,9 +1262,9 @@ CXFile clang_Module_getTopLevelHeader(CXTranslationUnit,
  unsigned clang_CXXMethod_isPureVirtual(CXCursor C);
  unsigned clang_CXXMethod_isStatic(CXCursor C);
  unsigned clang_CXXMethod_isVirtual(CXCursor C);
- unsigned clang_CXXMethod_isOverride(CXCursor C);
  unsigned clang_CXXMethod_isConst(CXCursor C);
  enum CXCursorKind clang_getTemplateCursorKind(CXCursor C);
+
  CXCursor clang_getSpecializedCursorTemplate(CXCursor C);
  CXSourceRange clang_getCursorReferenceNameRange(CXCursor C,
                                                 unsigned NameFlags,
@@ -1223,10 +1273,12 @@ enum CXNameRefFlags {
 
   CXNameRange_WantQualifier = 0x1,
 
+
   CXNameRange_WantTemplateArgs = 0x2,
 
   CXNameRange_WantSinglePiece = 0x4
 };
+
 typedef enum CXTokenKind {
 
   CXToken_Punctuation,
@@ -1331,6 +1383,7 @@ clang_getCompletionChunkCompletionString(CXCompletionString completion_string,
 clang_getNumCompletionChunks(CXCompletionString completion_string);
  unsigned
 clang_getCompletionPriority(CXCompletionString completion_string);
+
  enum CXAvailabilityKind
 clang_getCompletionAvailability(CXCompletionString completion_string);
  unsigned
@@ -1345,6 +1398,7 @@ clang_getCompletionParent(CXCompletionString completion_string,
 clang_getCompletionBriefComment(CXCompletionString completion_string);
  CXCompletionString
 clang_getCursorCompletionString(CXCursor cursor);
+
 typedef struct {
 
   CXCompletionResult *Results;
@@ -1363,7 +1417,9 @@ enum CXCompletionContext {
 
   CXCompletionContext_Unexposed = 0,
 
+
   CXCompletionContext_AnyType = 1 << 0,
+
 
   CXCompletionContext_AnyValue = 1 << 1,
 
@@ -1373,11 +1429,13 @@ enum CXCompletionContext {
 
   CXCompletionContext_CXXClassTypeValue = 1 << 4,
 
+
   CXCompletionContext_DotMemberAccess = 1 << 5,
 
   CXCompletionContext_ArrowMemberAccess = 1 << 6,
 
   CXCompletionContext_ObjCPropertyAccess = 1 << 7,
+
 
   CXCompletionContext_EnumTag = 1 << 8,
 
@@ -1385,11 +1443,13 @@ enum CXCompletionContext {
 
   CXCompletionContext_StructTag = 1 << 10,
 
+
   CXCompletionContext_ClassTag = 1 << 11,
 
   CXCompletionContext_Namespace = 1 << 12,
 
   CXCompletionContext_NestedNameSpecifier = 1 << 13,
+
 
   CXCompletionContext_ObjCInterface = 1 << 14,
 
@@ -1403,12 +1463,16 @@ enum CXCompletionContext {
 
   CXCompletionContext_ObjCSelectorName = 1 << 19,
 
+
   CXCompletionContext_MacroName = 1 << 20,
+
 
   CXCompletionContext_NaturalLanguage = 1 << 21,
 
+
   CXCompletionContext_Unknown = ((1 << 22) - 1)
 };
+
  unsigned clang_defaultCodeCompleteOptions(void);
 CXCodeCompleteResults *clang_codeCompleteAt(CXTranslationUnit TU,
                                             const char *complete_filename,
@@ -1419,7 +1483,9 @@ CXCodeCompleteResults *clang_codeCompleteAt(CXTranslationUnit TU,
                                             unsigned options);
 void clang_sortCodeCompletionResults(CXCompletionResult *Results,
                                      unsigned NumResults);
+
 void clang_disposeCodeCompleteResults(CXCodeCompleteResults *Results);
+
 unsigned clang_codeCompleteGetNumDiagnostics(CXCodeCompleteResults *Results);
 CXDiagnostic clang_codeCompleteGetDiagnostic(CXCodeCompleteResults *Results,
                                              unsigned Index);
@@ -1430,8 +1496,10 @@ enum CXCursorKind clang_codeCompleteGetContainerKind(
                                                      unsigned *IsIncomplete);
 CXString clang_codeCompleteGetContainerUSR(CXCodeCompleteResults *Results);
 CXString clang_codeCompleteGetObjCSelector(CXCodeCompleteResults *Results);
+
  CXString clang_getClangVersion(void);
  void clang_toggleCrashRecovery(unsigned isEnabled);
+
 
 typedef void (*CXInclusionVisitor)(CXFile included_file,
                                    CXSourceLocation* inclusion_stack,
@@ -1453,6 +1521,9 @@ typedef void * CXEvalResult;
  CXEvalResult clang_Cursor_Evaluate(CXCursor C);
  CXEvalResultKind clang_EvalResult_getKind(CXEvalResult E);
  int clang_EvalResult_getAsInt(CXEvalResult E);
+ long long clang_EvalResult_getAsLongLong(CXEvalResult E);
+ unsigned clang_EvalResult_isUnsignedInt(CXEvalResult E);
+ unsigned long long clang_EvalResult_getAsUnsigned(CXEvalResult E);
  double clang_EvalResult_getAsDouble(CXEvalResult E);
  const char* clang_EvalResult_getAsStr(CXEvalResult E);
  void clang_EvalResult_dispose(CXEvalResult E);
@@ -1678,8 +1749,10 @@ typedef struct {
   CXIdxClientFile (*enteredMainFile)(CXClientData client_data,
                                      CXFile mainFile, void *reserved);
 
+
   CXIdxClientFile (*ppIncludedFile)(CXClientData client_data,
                                     const CXIdxIncludedFileInfo *);
+
 
   CXIdxClientASTFile (*importedASTFile)(CXClientData client_data,
                                         const CXIdxImportedASTFileInfo *);
@@ -1721,6 +1794,7 @@ typedef void *CXIndexAction;
 typedef enum {
 
   CXIndexOpt_None = 0x0,
+
 
   CXIndexOpt_SuppressRedundantRefs = 0x1,
 
