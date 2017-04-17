@@ -640,7 +640,6 @@ local Cursor_mt = {
 
         -- Returns an enumeration constant, which in LuaJIT can be compared
         -- against a *string*, too.
-        -- XXX: Should we split into 'kindenum' (giving the enum) and 'kindnum'?
         kindnum = function(self)
             return clang.clang_getCursorKind(self._cur)
         end,
@@ -672,24 +671,7 @@ local Cursor_mt = {
         isDefinition = function(self)
             return (clang.clang_isCursorDefinition(self._cur) ~= 0)
         end,
---[=[
-        --| tab = cur:argtypes([alsoret])
-        argtypes = function(self, alsoret)
-            if (clang.clang_Cursor_getNumArguments(self._cur) == -1) then
-                return nil
-            end
 
-            local tab = self:arguments()
-
-            if (alsoret) then
-                tab[0] = self:resultType()
-            end
-
-            for i=1,#tab do
-                tab[i] = tab[i]:type()
-            end
-        end,
---]=]
         typedefType = function(self)
             return getType(clang.clang_getTypedefDeclUnderlyingType(self._cur))
         end,
