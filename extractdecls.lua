@@ -94,7 +94,7 @@ return function(k, v)
 end
 ]])
     if (func == nil) then
-        io.stderr:write("Error loading string: "..errmsg.."\n")
+        io.stderr:write("Error loading '-f' string: "..errmsg.."\n")
         os.exit(1)
     end
 
@@ -166,8 +166,6 @@ function(cur, parent)
         local name = cur:displayName()
 
         if (filterPattern == nil or name:find(filterPattern)) then
-            local exclude = false
-
             if (not checkexclude(name)) then
                 local ourname = stripPattern and name:gsub(stripPattern, "") or name
 
