@@ -30,11 +30,14 @@ function api.class(tab)
         if (k == 1) then
             -- constructor: a function that returns a table, or string
             -- containing struct definition.
-            check(type(v) == "function" or type(v) == "string",
-                  "tab[1] must be a function or a string", 2)
+            local isCType = (type(v) == "cdata" and tostring(v):match("^ctype<"))
+            check(type(v) == "function" or type(v) == "string" or isCType,
+                  "tab[1] must be a function, string or ctype", 2)
             ctor = v
         elseif (type(k) == "string") then
             check(#k > 0, "tab.<string> must not be empty", 2)
+            check(type(v) == "function" or type(v) == "string",
+                  "tab[<string>] must be a function or a string", 2)
             if (k:sub(1,2) == "__") then
                 if (k == "__index" and mt.__index ~= nil) then
                     error("tab has both __index and convenience __index entries", 2)
@@ -49,16 +52,21 @@ function api.class(tab)
         end
     end
 
-    check(ctor ~= nil, "tab[1] must be a constructor or a cdecl")
+    check(ctor ~= nil, "tab[1] must be a constructor function or a cdecl")
+    tab[1] = nil
 
     -- Create the metatable by taking over the contents of the one passed to us.
     for k,v in pairs(tab) do
-        if (type(k) == "string") then
-            if (k:sub(1,2) == "__") then
-                mt[k] = v
-            else
-                mt.__index[k] = v
-            end
+        assert(type(k) == "string")
+
+        if (type(v) == "string") then  -- alias
+            v = tab[v]
+        end
+
+        if (k:sub(1,2) == "__") then
+            mt[k] = v
+        else
+            mt.__index[k] = v
         end
     end
 
@@ -71,7 +79,8 @@ function api.class(tab)
 
         return factory
     else
-        return ffi.metatype("struct {"..ctor.."}", mt)
+        local ct = (type(ctor) == "string") and "struct {"..ctor.."}" or ctor
+        return ffi.metatype(ct, mt)
     end
 end
 
