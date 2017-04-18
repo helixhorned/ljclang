@@ -683,8 +683,10 @@ Cursor_mt.__tostring = Cursor_mt.__index.name
 ---------------------------------- Type ---------------------------------
 -------------------------------------------------------------------------
 
--- Metatable for our Type_t.
-local Type_mt = {
+class
+{
+    Type_t,
+
     __eq = function(typ1, typ2)
         if (ffi.istype(Type_t, typ1) and ffi.istype(Type_t, typ2)) then
             return (clang.clang_equalTypes(typ1._typ, typ2._typ) ~= 0)
@@ -693,83 +695,80 @@ local Type_mt = {
         end
     end,
 
-    __index = {
-        name = function(self)
-            return getString(clang.clang_getTypeSpelling(self._typ))
-        end,
+    __tostring = "name",
 
-        canonical = function(self)
-            -- NOTE: no dispatching to getPointeeType() for pointer types like
-            -- luaclang-parser.
-            return getType(clang.clang_getCanonicalType(self._typ))
-        end,
+    name = function(self)
+        return getString(clang.clang_getTypeSpelling(self._typ))
+    end,
 
-        pointee = function(self)
-            return getType(clang.clang_getPointeeType(self._typ))
-        end,
+    canonical = function(self)
+        -- NOTE: no dispatching to getPointeeType() for pointer types like
+        -- luaclang-parser.
+        return getType(clang.clang_getCanonicalType(self._typ))
+    end,
 
-        resultType = function(self)
-            return getType(clang.clang_getResultType(self._typ))
-        end,
+    pointee = function(self)
+        return getType(clang.clang_getPointeeType(self._typ))
+    end,
 
-        arrayElementType = function(self)
-            return getType(clang.clang_getArrayElementType(self._typ))
-        end,
+    resultType = function(self)
+        return getType(clang.clang_getResultType(self._typ))
+    end,
 
-        arraySize = function(self)
-            return tonumber(clang.clang_getArraySize(self._typ))
-        end,
+    arrayElementType = function(self)
+        return getType(clang.clang_getArrayElementType(self._typ))
+    end,
 
-        isConst = function(self)
-            return (clang.clang_isConstQualifiedType(self._typ) ~= 0);
-        end,
+    arraySize = function(self)
+        return tonumber(clang.clang_getArraySize(self._typ))
+    end,
 
-        isPod = function(self)
-            return (clang.clang_isPODType(self._typ) ~= 0);
-        end,
+    isConst = function(self)
+        return (clang.clang_isConstQualifiedType(self._typ) ~= 0);
+    end,
 
-        isFinal = function(self)
-            return (clang.clang_isFinalType(self._typ) ~= 0);
-        end,
+    isConstQualified = "isConst",
 
-        isAbstract = function(self)
-            return (clang.clang_isAbstractType(self._typ) ~= 0);
-        end,
+    isPod = function(self)
+        return (clang.clang_isPODType(self._typ) ~= 0);
+    end,
 
-        declaration = function(self)
-            return getCursor(clang.clang_getTypeDeclaration(self._typ))
-        end,
+    isFinal = function(self)
+        return (clang.clang_isFinalType(self._typ) ~= 0);
+    end,
 
-        --== LJClang-specific ==--
-        -- Returns an enumeration constant.
-        kindnum = function(self)
-            return self._typ.kind
-        end,
+    isAbstract = function(self)
+        return (clang.clang_isAbstractType(self._typ) ~= 0);
+    end,
 
-        haskind = function(self, kind)
-            if (type(kind) == "string") then
-                return self:kindnum() == "CXType_"..kind
-            else
-                return self:kindnum() == kind
-            end
-        end,
+    declaration = function(self)
+        return getCursor(clang.clang_getTypeDeclaration(self._typ))
+    end,
 
-        templateArguments = function(self)
-            local tab = {}
-            local numargs = clang.clang_Type_getNumTemplateArguments(self._typ)
-            for i=1,numargs do
-                tab[i] = getType(clang.clang_Type_getTemplateArgumentAsType(self._typ, i-1))
-            end
-            return tab
-        end,
-    },
+    --== LJClang-specific ==--
+
+    -- Returns an enumeration constant.
+    kindnum = function(self)
+        return self._typ.kind
+    end,
+
+    haskind = function(self, kind)
+        if (type(kind) == "string") then
+            return self:kindnum() == "CXType_"..kind
+        else
+            return self:kindnum() == kind
+        end
+    end,
+
+    templateArguments = function(self)
+        local tab = {}
+        local numargs = clang.clang_Type_getNumTemplateArguments(self._typ)
+        for i=1,numargs do
+            tab[i] = getType(clang.clang_Type_getTemplateArgumentAsType(self._typ, i-1))
+        end
+        return tab
+    end,
 }
-
--- Aliases
-local Type__index = Type_mt.__index
-Type__index.isConstQualified = Type__index.isConst
-
-Type_mt.__tostring = Type__index.name
 
 -------------------------------------------------------------------------
 
@@ -933,7 +932,6 @@ end
 ffi.metatype(Index_t, Index_mt)
 ffi.metatype(TranslationUnit_t_, TranslationUnit_mt)
 ffi.metatype(Cursor_t, Cursor_mt)
-ffi.metatype(Type_t, Type_mt)
 
 api.Index_t = Index_t
 api.TranslationUnit_t = TranslationUnit_t_
