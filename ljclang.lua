@@ -26,6 +26,8 @@ local function lib(basename)
     return (ffi.os=="Windows" and "lib" or "")..basename
 end
 
+local class = require("class").class
+
 local clang = ffi.load(lib"clang")
 require("ljclang_Index_h")
 local support = ffi.load(lib"ljclang_support")
@@ -62,16 +64,6 @@ local TranslationUnit_t_ = ffi.typeof "struct { CXTranslationUnit _tu; }"
 -- kind() *method* (CXCursor contains a member of the same name).
 local Cursor_t = ffi.typeof "struct { CXCursor _cur; }"
 local Type_t = ffi.typeof "struct { CXType _typ; }"
-
--- CompilationDatabase types
-local CompilationDatabase_t = ffi.typeof "struct { CXCompilationDatabase _ptr; }"
-local CompileCommands_t = ffi.typeof "struct { CXCompileCommands _ptr; const double numCommands; }"
-local CompileCommand_t = ffi.typeof[[
-struct {
-    CXCompileCommand _ptr;
-    const double numArgs, numSources;
-}
-]]
 
 -- [<address of CXTranslationUnit as string>] = count
 local TUCount = {}
@@ -156,61 +148,71 @@ local CompDB_Error_Ar = ffi.typeof[[
 CXCompilationDatabase_Error [1]
 ]]
 
-local CompileCommand_mt = {
-    __index = {
-        -- args = cmd:getArgs([alsoCompilerExe])
-        -- args: sequence table. If <alsoCompilerExe> is true, args[0] is the
-        --  compiler executable.
-        getArgs = function(self, alsoCompilerExe)
-            local args = {}
-            for i = (alsoCompilerExe and 0 or 1), self.numArgs-1 do
-                local cxstr = clang.clang_CompileCommand_getArg(self._ptr, i)
-                args[i] = getString(cxstr)
-            end
+local CompileCommand_t = class
+{
+    "CXCompileCommand _ptr;"..
+    "const double numArgs, numSources;",
 
-            return args
-        end,
+    -- args = cmd:getArgs([alsoCompilerExe])
+    -- args: sequence table. If <alsoCompilerExe> is true, args[0] is the
+    --  compiler executable.
+    getArgs = function(self, alsoCompilerExe)
+        local args = {}
+        for i = (alsoCompilerExe and 0 or 1), self.numArgs-1 do
+            local cxstr = clang.clang_CompileCommand_getArg(self._ptr, i)
+            args[i] = getString(cxstr)
+        end
 
-        -- dir = cmd:getDirectory()
-        getDirectory = function(self)
-            local cxstr = clang.clang_CompileCommand_getDirectory(self._ptr)
-            return getString(cxstr)
-        end,
+        return args
+    end,
 
-        -- paths = cmd:getSourcePaths()
-        -- paths: sequence table.
-        getSourcePaths = function(self)
-            -- XXX: This is a workaround implementation due to a missing
-            -- clang_CompileCommand_getNumMappedSources symbol in libclang.so,
-            -- see commented out code below.
-            local args = self:getArgs()
-            for i=1,#args do
-                if (args[i] == '-c' and args[i+1]) then
-                    local sourceFile = args[i+1]
-                    if (sourceFile:sub(1,1) ~= "/") then  -- XXX: Windows
-                        sourceFile = self:getDirectory() .. "/" .. sourceFile
-                    end
-                    return { sourceFile }
+    -- dir = cmd:getDirectory()
+    getDirectory = function(self)
+        local cxstr = clang.clang_CompileCommand_getDirectory(self._ptr)
+        return getString(cxstr)
+    end,
+
+    -- paths = cmd:getSourcePaths()
+    -- paths: sequence table.
+    getSourcePaths = function(self)
+        -- XXX: This is a workaround implementation due to a missing
+        -- clang_CompileCommand_getNumMappedSources symbol in libclang.so,
+        -- see commented out code below.
+        local args = self:getArgs()
+        for i=1,#args do
+            if (args[i] == '-c' and args[i+1]) then
+                local sourceFile = args[i+1]
+                if (sourceFile:sub(1,1) ~= "/") then  -- XXX: Windows
+                    sourceFile = self:getDirectory() .. "/" .. sourceFile
                 end
+                return { sourceFile }
             end
+        end
 
-            print(table.concat(args, ' '))
-            check(false, "Did not find -c option (workaround for missing "..
-                      "clang_CompileCommand_getMappedSourcePath symbol)")
+        print(table.concat(args, ' '))
+        check(false, "Did not find -c option (workaround for missing "..
+                  "clang_CompileCommand_getMappedSourcePath symbol)")
 --[[
-            local paths = {}
-            for i=0,self.numSources-1 do
-                -- XXX: for me, the symbol is missing in libclang.so:
-                local cxstr = clang.clang_CompileCommand_getMappedSourcePath(self._ptr, i)
-                paths[i] = getString(cxstr)
-            end
-            return paths
+        local paths = {}
+        for i=0,self.numSources-1 do
+            -- XXX: for me, the symbol is missing in libclang.so:
+            local cxstr = clang.clang_CompileCommand_getMappedSourcePath(self._ptr, i)
+            paths[i] = getString(cxstr)
+        end
+        return paths
 --]]
-        end,
-    },
+    end,
 }
 
-local CompileCommands_mt = {
+local CompileCommands_t = class
+{
+    "CXCompileCommands _ptr;"..
+    "const double numCommands;",
+
+    __gc = function(self)
+        clang.clang_CompileCommands_dispose(self._ptr)
+    end,
+
     -- #commands: number of commands
     __len = function(self)
         return self.numCommands
@@ -225,31 +227,28 @@ local CompileCommands_mt = {
         local numSources = 0 --clang.clang_CompileCommand_getNumMappedSources(cmdPtr)
         return CompileCommand_t(cmdPtr, numArgs, numSources)
     end,
-
-    __gc = function(self)
-        clang.clang_CompileCommands_dispose(self._ptr)
-    end,
 }
 
-local CompilationDatabase_mt = {
-    __index = {
-        getCompileCommands = function(self, completeFileName)
-            check(type(completeFileName) == "string", "<completeFileName> must be a string", 2)
-            local cmdsPtr = clang.clang_CompilationDatabase_getCompileCommands(
-                self._ptr, completeFileName)
-            local numCommands = clang.clang_CompileCommands_getSize(cmdsPtr)
-            return CompileCommands_t(cmdsPtr, numCommands)
-        end,
-
-        getAllCompileCommands = function(self)
-            local cmdsPtr = clang.clang_CompilationDatabase_getAllCompileCommands(self._ptr)
-            local numCommands = clang.clang_CompileCommands_getSize(cmdsPtr)
-            return CompileCommands_t(cmdsPtr, numCommands)
-        end,
-    },
+local CompilationDatabase_t = class
+{
+    "CXCompilationDatabase _ptr;",
 
     __gc = function(self)
         clang.clang_CompilationDatabase_dispose(self._ptr)
+    end,
+
+    getCompileCommands = function(self, completeFileName)
+        check(type(completeFileName) == "string", "<completeFileName> must be a string", 2)
+        local cmdsPtr = clang.clang_CompilationDatabase_getCompileCommands(
+            self._ptr, completeFileName)
+        local numCommands = clang.clang_CompileCommands_getSize(cmdsPtr)
+        return CompileCommands_t(cmdsPtr, numCommands)
+    end,
+
+    getAllCompileCommands = function(self)
+        local cmdsPtr = clang.clang_CompilationDatabase_getAllCompileCommands(self._ptr)
+        local numCommands = clang.clang_CompileCommands_getSize(cmdsPtr)
+        return CompileCommands_t(cmdsPtr, numCommands)
     end,
 }
 
@@ -935,10 +934,6 @@ ffi.metatype(Index_t, Index_mt)
 ffi.metatype(TranslationUnit_t_, TranslationUnit_mt)
 ffi.metatype(Cursor_t, Cursor_mt)
 ffi.metatype(Type_t, Type_mt)
-
-ffi.metatype(CompileCommand_t, CompileCommand_mt)
-ffi.metatype(CompileCommands_t, CompileCommands_mt)
-ffi.metatype(CompilationDatabase_t, CompilationDatabase_mt)
 
 api.Index_t = Index_t
 api.TranslationUnit_t = TranslationUnit_t_
