@@ -869,12 +869,22 @@ function Index_mt.__index.parse(self, srcfile, args, opts)
     return tunit
 end
 
+-- enum CXDiagnosticSeverity constants
+api.DiagnosticSeverity = ffi.new[[
+struct{
+    static const int Ignored = CXDiagnostic_Ignored;
+    static const int Note = CXDiagnostic_Note;
+    static const int Warning = CXDiagnostic_Warning;
+    static const int Error = CXDiagnostic_Error;
+    static const int Fatal = CXDiagnostic_Fatal;
+}]]
 
 -- enum CXChildVisitResult constants
-api.ChildVisitResult = ffi.new[[struct{
-    static const int Break = 0;
-    static const int Continue = 1;
-    static const int Recurse = 2;
+api.ChildVisitResult = ffi.new[[
+struct{
+    static const int Break = CXChildVisit_Break;
+    static const int Continue = CXChildVisit_Continue;
+    static const int Recurse = CXChildVisit_Recurse;
 }]]
 
 function api.regCursorVisitor(visitorfunc)
