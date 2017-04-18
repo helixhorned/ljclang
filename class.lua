@@ -1,4 +1,6 @@
 
+local ffi = require("ffi")
+
 local error = error
 local pairs = pairs
 local setmetatable = setmetatable
@@ -26,8 +28,10 @@ function api.class(tab)
     -- check tab contents
     for k,v in pairs(tab) do
         if (k == 1) then
-            -- constructor: a function that returns a table
-            check(type(v) == "function", "tab[1] must be a function", 2)
+            -- constructor: a function that returns a table, or string
+            -- containing struct definition.
+            check(type(v) == "function" or type(v) == "string",
+                  "tab[1] must be a function or a string", 2)
             ctor = v
         elseif (type(k) == "string") then
             check(#k > 0, "tab.<string> must not be empty", 2)
@@ -45,9 +49,9 @@ function api.class(tab)
         end
     end
 
-    check(ctor ~= nil, "tab[1] must provide a constructor")
+    check(ctor ~= nil, "tab[1] must be a constructor or a cdecl")
 
-    -- apply tab contents
+    -- Create the metatable by taking over the contents of the one passed to us.
     for k,v in pairs(tab) do
         if (type(k) == "string") then
             if (k:sub(1,2) == "__") then
@@ -58,13 +62,17 @@ function api.class(tab)
         end
     end
 
-    local factory = function(...)
-        local t = ctor(...)
-        check(type(t) == "table", "constructor must return a table", 2)
-        return setmetatable(t, mt)
-    end
+    if (type(ctor) == "function") then
+        local factory = function(...)
+            local t = ctor(...)
+            check(type(t) == "table", "constructor must return a table", 2)
+            return setmetatable(t, mt)
+        end
 
-    return factory
+        return factory
+    else
+        return ffi.metatype("struct {"..ctor.."}", mt)
+    end
 end
 
 -- Done!
