@@ -78,9 +78,9 @@ bootstrap: libljclang_support$(so)
 doc:
 	$(asciidoc) README.adoc
 
-test:
+test: libljclang_support$(so)
 	LLVM_LIBDIR="$(libdir)" $(SHELL) $(THIS_DIR)/run_tests.sh
 
-install:
+install: libljclang_support$(so)
 	sed "s|LJCLANG_DEV_DIR|$(THIS_DIR)|g; s|LLVM_LIBDIR|$(libdir)|g;" ./mgrep.sh.in > $(BINDIR)/mgrep
 	chmod +x $(BINDIR)/mgrep
