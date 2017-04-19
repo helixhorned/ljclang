@@ -2,6 +2,14 @@
 
 require 'busted.runner'()
 
+local assert = assert
+local describe = describe
+local it = it
+
+local ipairs = ipairs
+local type = type
+local tostring = tostring
+
 local cl = require("ljclang")
 
 local ffi = require("ffi")
@@ -13,7 +21,7 @@ time_t time(time_t *);
 describe("Loading a single cpp file", function()
     local fileName = "test_data/simple.cpp"
 
-    local tu = cl.createIndex(true):parse(fileName, { "-std=c++11", "-Wall", "-pedantic" })
+    local tu = cl.createIndex(true):parse(fileName, { "-std=c++14", "-Wall", "-pedantic" })
     -- Test that we don't need to keep the index (from createIndex()) around:
     collectgarbage()
 
@@ -46,7 +54,10 @@ describe("Loading a single cpp file", function()
 
     describe("Collection of children", function()
         local tuCursor = tu:cursor()
-        local expectedKinds = { "StructDecl", "FunctionDecl", "FunctionDecl" }
+        local expectedKinds = {
+            "StructDecl", "FunctionDecl", "EnumDecl", "EnumDecl",
+            "StaticAssert", "FunctionDecl"
+        }
 
         it("tests the luaclang-parser convention", function()
             local cursors = tuCursor:children()
@@ -82,6 +93,46 @@ describe("Loading a single cpp file", function()
             end)
 
             tuCursor:children(visitor)
+        end)
+
+        it("tests the ljclang convention: Continue + Recurse; enums", function()
+            local s, u = "ctype<int64_t>", "ctype<uint64_t>"
+
+            local expectedEnums = {
+                -- From 'enum Fruits':
+                { "Apple", 0, s },
+                { "Pear", -4, s },
+                { "Orange", -3, s },
+
+                -- From 'enum BigNumbers':
+                { "Billion", 1000000000, u },
+                { "Trillion", 1000000000000, u },
+            }
+
+            local enums = {}
+
+            local visitor = cl.regCursorVisitor(
+            function(cur)
+                if (cur:haskind("EnumDecl")) then
+                    return V.Recurse
+                end
+
+                if (cur:haskind("EnumConstantDecl")) then
+                    local val = cur:enumval()
+                    local value = cur:enumValue()
+
+                    assert.is_number(val)
+                    assert.is_true(type(value) == "cdata")
+                    assert.are_equal(value, val)
+
+                    enums[#enums + 1] = { cur:name(), val, tostring(ffi.typeof(value)) }
+                end
+
+                return V.Continue
+            end)
+
+            tuCursor:children(visitor)
+            assert.are_same(expectedEnums, enums)
         end)
     end)
 end)

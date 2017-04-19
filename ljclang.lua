@@ -728,20 +728,26 @@ class
         end
     end,
 
-    enumValue = function(self, unsigned)
+    enumValue = function(self)
         if (not self:haskind("EnumConstantDecl")) then
             error("cursor must have kind EnumConstantDecl", 2)
         end
 
-        if (unsigned) then
+        local type = getType(clang.clang_getEnumDeclIntegerType(self:parent()._cur))
+        assert(type ~= nil)
+
+        local obtainAsUnsigned = type:haskind("ULongLong")
+            or (ffi.sizeof("long") == 8 and type:haskind("ULong"))
+
+        if (obtainAsUnsigned) then
             return clang.clang_getEnumConstantDeclUnsignedValue(self._cur)
         else
             return clang.clang_getEnumConstantDeclValue(self._cur)
         end
     end,
 
-    enumval = function(self, unsigned)
-        return tonumber(self:enumValue(unsigned))
+    enumval = function(self)
+        return tonumber(self:enumValue())
     end,
 
     isDefinition = function(self)
