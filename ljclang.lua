@@ -304,59 +304,59 @@ local function getCursor(cxcur)
     return (clang.clang_Cursor_isNull(cxcur) == 0) and Cursor_t(cxcur) or nil
 end
 
--- Metatable for our TranslationUnit_t.
-local TranslationUnit_mt = {
-    __index = {
-        _cleanup = function(self)
-            if (self._tu ~= nil) then
-                local addr = getCXTUaddr(self._tu)
-                TUCount[addr] = TUCount[addr]-1
-                if (TUCount[addr] == 0) then
-                    clang.clang_disposeTranslationUnit(self._tu)
-                    TUCount[addr] = nil
-                end
-                self._tu = nil
+class
+{
+    TranslationUnit_t_,
+
+    __gc = "_cleanup",
+
+    _cleanup = function(self)
+        if (self._tu ~= nil) then
+            local addr = getCXTUaddr(self._tu)
+            TUCount[addr] = TUCount[addr]-1
+            if (TUCount[addr] == 0) then
+                clang.clang_disposeTranslationUnit(self._tu)
+                TUCount[addr] = nil
             end
-        end,
+            self._tu = nil
+        end
+    end,
 
-        cursor = function(self)
-            check_tu_valid(self)
-            local cxcur = clang.clang_getTranslationUnitCursor(self._tu)
-            return getCursor(cxcur)
-        end,
+    cursor = function(self)
+        check_tu_valid(self)
+        local cxcur = clang.clang_getTranslationUnitCursor(self._tu)
+        return getCursor(cxcur)
+    end,
 
-        file = function(self, filename)
-            check_tu_valid(self)
-            if (type(filename) ~= "string") then
-                error("<filename> must be a string", 2)
-            end
-            local cxfile = clang.clang_getFile(self._tu, filename)
-            return getString(clang.clang_getFileName(cxfile))  -- NYI: modification time
-        end,
+    file = function(self, filename)
+        check_tu_valid(self)
+        if (type(filename) ~= "string") then
+            error("<filename> must be a string", 2)
+        end
+        local cxfile = clang.clang_getFile(self._tu, filename)
+        return getString(clang.clang_getFileName(cxfile))  -- NYI: modification time
+    end,
 
-        diagnostics = function(self)
-            check_tu_valid(self)
+    diagnostics = function(self)
+        check_tu_valid(self)
 
-            local numdiags = clang.clang_getNumDiagnostics(self._tu)
-            local tab = {}
+        local numdiags = clang.clang_getNumDiagnostics(self._tu)
+        local tab = {}
 
-            for i=0,numdiags-1 do
-                local diag = clang.clang_getDiagnostic(self._tu, i)
-                tab[i+1] = {
-                    category = getString(clang.clang_getDiagnosticCategoryText(diag)),
-                    text = getString(clang.clang_formatDiagnostic(
-                                         diag, clang.clang_defaultDiagnosticDisplayOptions())),
-                    severity = clang.clang_getDiagnosticSeverity(diag),
-                }
-                clang.clang_disposeDiagnostic(diag)
-            end
+        for i=0,numdiags-1 do
+            local diag = clang.clang_getDiagnostic(self._tu, i)
+            tab[i+1] = {
+                category = getString(clang.clang_getDiagnosticCategoryText(diag)),
+                text = getString(clang.clang_formatDiagnostic(
+                                     diag, clang.clang_defaultDiagnosticDisplayOptions())),
+                severity = clang.clang_getDiagnosticSeverity(diag),
+            }
+            clang.clang_disposeDiagnostic(diag)
+        end
 
-            return tab
-        end,
-    },
+        return tab
+    end,
 }
-
-TranslationUnit_mt.__gc = TranslationUnit_mt.__index._cleanup
 
 -------------------------------------------------------------------------
 --------------------------------- Cursor --------------------------------
@@ -936,7 +936,6 @@ end
 
 -- Register the metatables for the custom ctypes.
 ffi.metatype(Index_t, Index_mt)
-ffi.metatype(TranslationUnit_t_, TranslationUnit_mt)
 ffi.metatype(Cursor_t, Cursor_mt)
 
 api.Index_t = Index_t
