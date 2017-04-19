@@ -2,6 +2,7 @@
  * (Mostly C callbacks with pass-by-value compound arguments/results.) */
 
 #include <cstdlib>
+#include <vector>
 
 #include <clang-c/Index.h>
 
@@ -19,11 +20,12 @@ using LJCX_CursorVisitor = CXChildVisitResult (*)(
 
 struct LJCX_CursorVisitorData
 {
+    LJCX_CursorVisitorData(LJCX_CursorVisitor v) : visitor(v) {}
+
     LJCX_CursorVisitor visitor;
 };
 
-static LJCX_CursorVisitorData *g_cursorVisitors;
-static unsigned g_numVisitors;
+static std::vector<LJCX_CursorVisitorData> CursorVisitors;
 
 
 /* Registers a LJClang_CursorVisitor callback <visitor> and returns an index by
@@ -36,16 +38,9 @@ static unsigned g_numVisitors;
 extern "C"
 int ljclang_regCursorVisitor(LJCX_CursorVisitor visitor)
 {
-    void *newVisitors = std::realloc(
-        g_cursorVisitors, (g_numVisitors+1)*sizeof(LJCX_CursorVisitorData));
-
-    if (newVisitors == nullptr)
-        return -1;
-
-    g_cursorVisitors = static_cast<LJCX_CursorVisitorData *>(newVisitors);
-    g_cursorVisitors[g_numVisitors].visitor = visitor;
-
-    return g_numVisitors++;
+    const size_t idx = CursorVisitors.size();
+    CursorVisitors.emplace_back(visitor);
+    return idx;
 }
 
 static enum CXChildVisitResult
@@ -58,11 +53,11 @@ ourCursorVisitor(CXCursor cursor, CXCursor parent, CXClientData client_data)
 extern "C"
 int ljclang_visitChildren(CXCursor parent, int visitoridx)
 {
-    if (static_cast<unsigned>(visitoridx) >= g_numVisitors)
+    if (static_cast<unsigned>(visitoridx) >= CursorVisitors.size())
         return -1;
 
     const unsigned wasBroken = clang_visitChildren(
-        parent, ourCursorVisitor, &g_cursorVisitors[visitoridx]);
+        parent, ourCursorVisitor, CursorVisitors.data() + visitoridx);
 
     return (wasBroken ? 1 : 0);
 }
