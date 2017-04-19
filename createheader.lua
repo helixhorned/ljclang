@@ -27,7 +27,6 @@ local function loadandstrip(filename)
               :gsub("#[^\n]-\n", "")  -- single-line preprocessor directives
               :gsub("CINDEX_LINKAGE","")
               :gsub("CINDEX_DEPRECATED","")
-              :gsub("time_t", "// time_t")  -- clang_getFileTime declaration
               :gsub(" *\n+", "\n")
 end
 

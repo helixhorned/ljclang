@@ -140,7 +140,7 @@ typedef enum {
  unsigned clang_CXIndex_getGlobalOptions(CXIndex);
 typedef void *CXFile;
  CXString clang_getFileName(CXFile SFile);
- // time_t clang_getFileTime(CXFile SFile);
+ time_t clang_getFileTime(CXFile SFile);
 typedef struct {
   unsigned long long data[3];
 } CXFileUniqueID;

@@ -4,6 +4,12 @@ require 'busted.runner'()
 
 local cl = require("ljclang")
 
+local ffi = require("ffi")
+
+ffi.cdef[[
+time_t time(time_t *);
+]]
+
 describe("Loading a single cpp file", function()
     local fileName = "test_data/simple.cpp"
 
@@ -12,6 +18,12 @@ describe("Loading a single cpp file", function()
     collectgarbage()
 
     assert.is_not_nil(tu)
+
+    it("tests the translation unit", function()
+        local absFileName, modTime = tu:file(fileName)
+        assert.is_not_nil(absFileName:find(fileName, 1, true))
+        assert.is_true(ffi.C.time(nil) > modTime)
+    end)
 
     it("tests the translation unit cursor", function()
         local tuCursor = tu:cursor()

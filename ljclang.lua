@@ -29,12 +29,18 @@ end
 local class = require("class").class
 
 local clang = ffi.load(lib"clang")
-require("ljclang_Index_h")
 local support = ffi.load(lib"ljclang_support")
-local g_CursorKindName = require("ljclang_cursor_kind").name
 
-ffi.cdef("const char *ljclang_getLLVMVersion();")
+ffi.cdef[[
+const char *ljclang_getLLVMVersion();
+const char *ljclang_getTimeTypeString();
+]]
+
+ffi.cdef("typedef " .. ffi.string(support.ljclang_getTimeTypeString()) .. " time_t;")
 local supportLLVMVersion = ffi.string(support.ljclang_getLLVMVersion())
+
+require("ljclang_Index_h")
+local g_CursorKindName = require("ljclang_cursor_kind").name
 
 -------------------------------------------------------------------------
 
@@ -331,7 +337,8 @@ class
             error("<filename> must be a string", 2)
         end
         local cxfile = clang.clang_getFile(self._tu, filename)
-        return getString(clang.clang_getFileName(cxfile))  -- NYI: modification time
+        local mTime = tonumber(clang.clang_getFileTime(cxfile))
+        return getString(clang.clang_getFileName(cxfile)), mTime
     end,
 
     diagnostics = function(self)

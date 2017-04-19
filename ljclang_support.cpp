@@ -1,8 +1,13 @@
 /* Support library for LJClang, for cases the LuaJIT FFI doesn't handle.
  * (Mostly C callbacks with pass-by-value compound arguments/results.) */
 
+#include <cstdint>
 #include <cstdlib>
+
 #include <vector>
+#include <type_traits>
+
+#include <time.h>
 
 #include <clang-c/Index.h>
 
@@ -12,6 +17,25 @@ extern "C"
 const char *ljclang_getLLVMVersion()
 {
     return LJCLANG_LLVM_VERSION;
+}
+
+namespace
+{
+    static_assert(std::is_integral<time_t>::value, "");
+    static_assert(sizeof(time_t) == 4 || sizeof(time_t) == 8, "");
+
+    template <typename T> struct TimeType {};
+
+    template <> struct TimeType<int32_t> { static constexpr const char *String = "int32_t"; };
+    template <> struct TimeType<int64_t> { static constexpr const char *String = "int64_t"; };
+    template <> struct TimeType<uint32_t> { static constexpr const char *String = "uint32_t"; };
+    template <> struct TimeType<uint64_t> { static constexpr const char *String = "uint64_t"; };
+}
+
+extern "C"
+const char *ljclang_getTimeTypeString()
+{
+    return TimeType<time_t>::String;
 }
 
 /* Our cursor visitor takes the CXCursor objects by pointer. */
