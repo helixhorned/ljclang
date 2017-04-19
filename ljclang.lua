@@ -911,9 +911,9 @@ local collectTab
 
 local CollectDirectChildren = api.regCursorVisitor(
 function(cur)
-    debugf("collectDirectChildren: %s, child cursor kind: %s", tostring(collectTab), cur:kind())
+    debugf("CollectDirectChildren: %s, child cursor kind: %s", tostring(collectTab), cur:kind())
     collectTab[#collectTab+1] = Cursor_t(cur[0])
-    return 1  -- Continue
+    return api.ChildVisitResult.Continue
 end)
 
 function Cursor_mt.__index.children(self, visitoridx)
@@ -923,13 +923,9 @@ function Cursor_mt.__index.children(self, visitoridx)
         return (ret ~= 0)
     else
         -- luaclang-parser way
-        if (collectTab ~= nil) then
-            error("children() must not be called while another invocation is active", 2)
-            collectTab = nil
-        end
+        assert(collectTab == nil, "children() must not be called while another invocation is active")
 
         collectTab = {}
-        -- XXX: We'll be blocked if the visitor callback errors.
         support.ljclang_visitChildren(self._cur, CollectDirectChildren)
         local tab = collectTab
         collectTab = nil
