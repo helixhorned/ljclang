@@ -34,26 +34,26 @@ asciidoc := asciidoctor
 OPTLEV ?= 2
 DEBUG ?= 0
 SAN ?= 0
-WARN := -std=c99 -pedantic -Wall -Werror-implicit-function-declaration
-CFLAGS ?=
+WARN := -std=c++14 -Wall -Wextra -Wold-style-cast -pedantic
+CXXFLAGS ?=
 
 ifneq ($(SAN),0)
-    CFLAGS += -fsanitize=address,undefined
+    CXXFLAGS += -fsanitize=address,undefined
 endif
 
 ifneq ($(DEBUG),0)
-    CFLAGS += -g
+    CXXFLAGS += -g
 endif
 
-CFLAGS += -I$(incdir) -fPIC
-CFLAGS += -DLJCLANG_LLVM_VERSION='"$(llvm_version)"'
+CXXFLAGS += -I$(incdir) -fPIC
+CXXFLAGS += -DLJCLANG_LLVM_VERSION='"$(llvm_version)"'
 
 ########## RULES ##########
 
 all: libljclang_support$(so) ljclang_Index_h.lua bootstrap
 
-libljclang_support$(so): ljclang_support.c Makefile
-	$(CC) $(CFLAGS) $(WARN) -O$(OPTLEV) -shared $< $(lib) -o $@
+libljclang_support$(so): ljclang_support.cpp Makefile
+	$(CXX) $(CXXFLAGS) $(WARN) -O$(OPTLEV) -shared $< $(lib) -o $@
 
 
 .PHONY: clean ljclang_Index_h.lua bootstrap doc
