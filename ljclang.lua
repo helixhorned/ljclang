@@ -57,8 +57,6 @@ local function check(pred, msg, level)
     end
 end
 
--- CXIndex is a pointer type, wrap it to be able to define a metatable.
-local Index_t = ffi.typeof "struct { CXIndex _idx; }"
 local TranslationUnit_t_ = ffi.typeof "struct { CXTranslationUnit _tu; }"
 -- NOTE: CXCursor is a struct type by itself, but we wrap it to e.g. provide a
 -- kind() *method* (CXCursor contains a member of the same name).
@@ -267,7 +265,6 @@ end
 --------------------------------- Index ---------------------------------
 -------------------------------------------------------------------------
 
--- Metatable for our Index_t.
 local Index_mt = {
     __index = {},
 
@@ -283,7 +280,7 @@ local Index_mt = {
 
 local function NewIndex(cxidx)
     assert(ffi.istype("CXIndex", cxidx))
-    -- _tus is a list of the Index_t's TranslationUnit_t objects.
+    -- _tus is a list of the Index's TranslationUnit_t objects.
     local index = { _idx=cxidx, _tus={} }
     return setmetatable(index, Index_mt)
 end
@@ -810,7 +807,7 @@ end
 local function check_iftab_iscellstr(tab, name)
     if (type(tab)=="table") then
         if (not iscellstr(tab)) then
-            error(name.." must be a string sequence when a table with no element at [0]", 3)
+            error(name.." must be a string sequence when a table, with no element at [0]", 3)
         end
     end
 end
@@ -863,7 +860,7 @@ function Index_mt.__index.parse(self, srcfile, args, opts)
     -- Wrap it in a TranslationUnit_t.
     local tunit = TranslationUnit_t(tunitptr)
 
-    -- Add this TranslationUnit_t to the list of its Index_t's TUs.
+    -- Add this TranslationUnit_t to the list of its Index's TUs.
     self._tus[#self._tus+1] = tunit
 
     return tunit
@@ -935,10 +932,8 @@ end
 
 
 -- Register the metatables for the custom ctypes.
-ffi.metatype(Index_t, Index_mt)
 ffi.metatype(Cursor_t, Cursor_mt)
 
-api.Index_t = Index_t
 api.TranslationUnit_t = TranslationUnit_t_
 api.Cursor_t = Cursor_t
 api.Type_t = Type_t
