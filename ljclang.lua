@@ -968,20 +968,23 @@ function Index_mt.__index.parse(self, srcfile, args, opts)
     local argsptrs = ffi.new("const char * [?]", #args, args)  -- ARGS_FROM_TAB
 
     -- Create the CXTranslationUnit.
-    local tunitptr = clang.clang_parseTranslationUnit(
-        self._idx, srcfile, argsptrs, #args, nil, 0, opts)
+    local tuAr = ffi.new("CXTranslationUnit [1]")
+    local errorCode = clang.clang_parseTranslationUnit2(
+        self._idx, srcfile, argsptrs, #args, nil, 0, opts, tuAr)
 
-    if (tunitptr == nil) then
-        return nil
+    assert((tuAr[0] ~= nil) == (errorCode == 'CXError_Success'))
+
+    if (tuAr[0] == nil) then
+        return nil, errorCode
     end
 
     -- Wrap it in a TranslationUnit_t.
-    local tunit = TranslationUnit_t(tunitptr)
+    local tunit = TranslationUnit_t(tuAr[0])
 
     -- Add this TranslationUnit_t to the list of its Index's TUs.
     self._tus[#self._tus+1] = tunit
 
-    return tunit
+    return tunit, errorCode
 end
 
 -- NOTE: This is unsupported.

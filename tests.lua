@@ -21,12 +21,25 @@ time_t time(time_t *);
 describe("Loading a cpp file without includes", function()
     local fileName = "test_data/simple.cpp"
     local astFileName = "/tmp/ljclang_test_simple.cpp.ast"
+    local nonExistentFileName = "/non_exisitent_file"
 
-    local tu = cl.createIndex(true):parse(fileName, { "-std=c++14", "-Wall", "-pedantic" })
+    assert(io.open(nonExistentFileName) == nil)
+
+    it("tests attempting to parse a nonexistent file", function()
+        local index = cl.createIndex()
+        local tu, errorCode = index:parse(nonExistentFileName, { "-std=c99" })
+        assert.is_nil(tu)
+        assert.are.not_equal(errorCode, cl.ErrorCode.Success)
+    end)
+
+    local tu, errorCode = cl.createIndex(true):parse(
+        fileName, { "-std=c++14", "-Wall", "-pedantic" })
+
     -- Test that we don't need to keep the index (from createIndex()) around:
     collectgarbage()
 
     assert.is_not_nil(tu)
+    assert.are.equal(errorCode, cl.ErrorCode.Success)
 
     describe("Translation unit", function()
         it("tests tu:file()", function()
@@ -56,7 +69,7 @@ describe("Loading a cpp file without includes", function()
 
         it("tests loading a nonexistent translation unit", function()
             local newIndex = cl.createIndex()
-            local newTU, status = newIndex:loadTranslationUnit("/non_exisitent_file")
+            local newTU, status = newIndex:loadTranslationUnit(nonExistentFileName)
             assert.is_nil(newTU)
             assert.are.equal(status, cl.ErrorCode.Failure)
         end)
