@@ -99,6 +99,24 @@ int ljclang_visitChildren(CXCursor parent, int visitoridx);
 -------------------------------- Constants ------------------------------
 -------------------------------------------------------------------------
 
+-- enum CXErrorCode constants
+api.ErrorCode = ffi.new[[
+struct{
+    static const int Success = CXError_Success;
+    static const int Failure = CXError_Failure;
+    static const int Crashed = CXError_Crashed;
+    static const int InvalidArguments = CXError_InvalidArguments;
+    static const int ASTReadError = CXError_ASTReadError;
+}]]
+
+-- enum CXSaveError constants
+api.SaveError = ffi.new[[
+struct{
+    static const int None = CXSaveError_None;
+    static const int Unknown = CXSaveError_Unknown;
+    static const int TranslationErrors = CXSaveError_TranslationErrors;
+}]]
+
 -- enum CXDiagnosticSeverity constants
 api.DiagnosticSeverity = ffi.new[[
 struct{
@@ -169,10 +187,6 @@ function api.stripArgs(args, pattern, num)
     end
     return newargs
 end
-
-local CompDB_Error_Ar = ffi.typeof[[
-CXCompilationDatabase_Error [1]
-]]
 
 local CompileCommand_t = class
 {
@@ -282,7 +296,7 @@ local CompilationDatabase_t = class
 function api.CompilationDatabase(buildDir)
     check(type(buildDir) == "string", "<buildDir> must be a string", 2)
 
-    local errAr = CompDB_Error_Ar()
+    local errAr = ffi.new("CXCompilationDatabase_Error [1]")
     local ptr = clang.clang_CompilationDatabase_fromDirectory(buildDir, errAr)
     assert(ptr ~= nil or errAr[0] ~= 'CXCompilationDatabase_NoError')
 
@@ -294,7 +308,21 @@ end
 -------------------------------------------------------------------------
 
 local Index_mt = {
-    __index = {},
+    __index = {
+        loadTranslationUnit = function(self, filename)
+            check(type(filename) == "string", "<filename> must be a string", 2)
+
+            local cxtuAr = ffi.new("CXTranslationUnit [1]")
+            local cxErrorCode = clang.clang_createTranslationUnit2(
+                self._idx, filename, cxtuAr)
+
+            if (cxErrorCode == 'CXError_Success') then
+                return TranslationUnit_t(cxtuAr[0]), cxErrorCode
+            else
+                return nil, cxErrorCode
+            end
+        end,
+    },
 
     __gc = function(self)
         -- "The index must not be destroyed until all of the translation units created
@@ -347,6 +375,15 @@ class
         end
     end,
 
+    save = function(self, filename)
+        check_tu_valid(self)
+        check(type(filename) == "string", "<filename> must be a string", 2)
+        local intRes = clang.clang_saveTranslationUnit(self._tu, filename, 0)
+        local res = ffi.new("enum CXSaveError", intRes)
+        assert(res ~= 'CXSaveError_InvalidTU')
+        return res
+    end,
+
     cursor = function(self)
         check_tu_valid(self)
         local cxcur = clang.clang_getTranslationUnitCursor(self._tu)
@@ -355,9 +392,7 @@ class
 
     file = function(self, filename)
         check_tu_valid(self)
-        if (type(filename) ~= "string") then
-            error("<filename> must be a string", 2)
-        end
+        check(type(filename) == "string", "<filename> must be a string", 2)
         local cxfile = clang.clang_getFile(self._tu, filename)
         local mTime = tonumber(clang.clang_getFileTime(cxfile))
         return getString(clang.clang_getFileName(cxfile)), mTime

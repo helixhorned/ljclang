@@ -32,7 +32,8 @@ end
 
 local cxstring_h = loadandstrip("CXString.h")
 local cxcompdb_h = loadandstrip("CXCompilationDatabase.h")
+local cxerrorcode_h = loadandstrip("CXErrorCode.h")
 local index_h = loadandstrip("Index.h")
 
 print("require('ffi').cdef[==========[\n",
-      cxstring_h, cxcompdb_h, index_h, "]==========]")
+      cxstring_h, cxcompdb_h, cxerrorcode_h, index_h, "]==========]")

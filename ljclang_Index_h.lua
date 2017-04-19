@@ -77,6 +77,30 @@ clang_CompileCommand_getNumMappedSources(CXCompileCommand);
 clang_CompileCommand_getMappedSourcePath(CXCompileCommand, unsigned I);
  CXString
 clang_CompileCommand_getMappedSourceContent(CXCompileCommand, unsigned I);
+	/*===-- clang-c/CXErrorCode.h - C Index Error Codes  --------------*- C -*-===*\
+|*                                                                            *|
+|*                     The LLVM Compiler Infrastructure                       *|
+|*                                                                            *|
+|* This file is distributed under the University of Illinois Open Source      *|
+|* License. See LICENSE.TXT for details.                                      *|
+|*                                                                            *|
+|*===----------------------------------------------------------------------===*|
+|*                                                                            *|
+|* This header provides the CXErrorCode enumerators.                          *|
+|*                                                                            *|
+\*===----------------------------------------------------------------------===*/
+enum CXErrorCode {
+
+  CXError_Success = 0,
+
+  CXError_Failure = 1,
+
+  CXError_Crashed = 2,
+
+  CXError_InvalidArguments = 3,
+
+  CXError_ASTReadError = 4
+};
 	/*===-- clang-c/Index.h - Indexing Public C Interface -------------*- C -*-===*\
 |*                                                                            *|
 |*                     The LLVM Compiler Infrastructure                       *|

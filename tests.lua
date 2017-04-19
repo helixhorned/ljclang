@@ -18,8 +18,9 @@ ffi.cdef[[
 time_t time(time_t *);
 ]]
 
-describe("Loading a single cpp file", function()
+describe("Loading a cpp file without includes", function()
     local fileName = "test_data/simple.cpp"
+    local astFileName = "/tmp/ljclang_test_simple.cpp.ast"
 
     local tu = cl.createIndex(true):parse(fileName, { "-std=c++14", "-Wall", "-pedantic" })
     -- Test that we don't need to keep the index (from createIndex()) around:
@@ -27,29 +28,48 @@ describe("Loading a single cpp file", function()
 
     assert.is_not_nil(tu)
 
-    it("tests the translation unit", function()
-        local absFileName, modTime = tu:file(fileName)
-        assert.is_not_nil(absFileName:find(fileName, 1, true))
-        assert.is_true(ffi.C.time(nil) > modTime)
-    end)
+    describe("Translation unit", function()
+        it("tests tu:file()", function()
+            local absFileName, modTime = tu:file(fileName)
+            assert.is_not_nil(absFileName:find(fileName, 1, true))
+            assert.is_true(ffi.C.time(nil) > modTime)
+        end)
 
-    it("tests the translation unit cursor", function()
-        local tuCursor = tu:cursor()
-        assert.is_true(tuCursor:haskind("TranslationUnit"))
-        assert.are.equal(tuCursor, tuCursor)
-    end)
+        it("tests its cursor", function()
+            local tuCursor = tu:cursor()
+            assert.is_true(tuCursor:haskind("TranslationUnit"))
+            assert.are.equal(tuCursor, tuCursor)
+        end)
 
-    it("tests diagnostics", function()
-        local diags = tu:diagnostics()
-        assert.is_table(diags)
-        assert.are.equal(#diags, 1)
+        it("tests diagnostics from it", function()
+            local diags = tu:diagnostics()
+            assert.is_table(diags)
+            assert.are.equal(#diags, 1)
 
-        local diag = diags[1]
-        assert.is_table(diag)
+            local diag = diags[1]
+            assert.is_table(diag)
 
-        assert.are.equal(diag.severity, cl.DiagnosticSeverity.Warning)
-        assert.are.equal(diag.category, "Semantic Issue")
-        assert.is_string(diag.text)
+            assert.are.equal(diag.severity, cl.DiagnosticSeverity.Warning)
+            assert.are.equal(diag.category, "Semantic Issue")
+            assert.is_string(diag.text)
+        end)
+
+        it("tests loading a nonexistent translation unit", function()
+            local newIndex = cl.createIndex()
+            local newTU, status = newIndex:loadTranslationUnit("/non_exisitent_file")
+            assert.is_nil(newTU)
+            assert.are.equal(status, cl.ErrorCode.Failure)
+        end)
+
+        it("tests saving and loading it", function()
+            local saveError = tu:save(astFileName)
+            assert.are.equal(saveError, cl.SaveError.None)
+
+            local newIndex = cl.createIndex(true)
+            local loadedTU, status = newIndex:loadTranslationUnit(astFileName)
+            assert.is_not_nil(loadedTU)
+            assert.are.equal(status, cl.ErrorCode.Success)
+        end)
     end)
 
     describe("Collection of children", function()
