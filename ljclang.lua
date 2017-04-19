@@ -96,6 +96,28 @@ int ljclang_visitChildren(CXCursor parent, int visitoridx);
 ]]
 
 -------------------------------------------------------------------------
+-------------------------------- Constants ------------------------------
+-------------------------------------------------------------------------
+
+-- enum CXDiagnosticSeverity constants
+api.DiagnosticSeverity = ffi.new[[
+struct{
+    static const int Ignored = CXDiagnostic_Ignored;
+    static const int Note = CXDiagnostic_Note;
+    static const int Warning = CXDiagnostic_Warning;
+    static const int Error = CXDiagnostic_Error;
+    static const int Fatal = CXDiagnostic_Fatal;
+}]]
+
+-- enum CXChildVisitResult constants
+api.ChildVisitResult = ffi.new[[
+struct{
+    static const int Break = CXChildVisit_Break;
+    static const int Continue = CXChildVisit_Continue;
+    static const int Recurse = CXChildVisit_Recurse;
+}]]
+
+-------------------------------------------------------------------------
 -------------------------------- CXString -------------------------------
 -------------------------------------------------------------------------
 
@@ -367,10 +389,10 @@ class
 -------------------------------------------------------------------------
 
 local function getType(cxtyp)
-    return cxtyp.kind ~= 'CXType_Invalid' and Type_t(cxtyp) or nil
+    return (cxtyp.kind ~= 'CXType_Invalid') and Type_t(cxtyp) or nil
 end
 
-local CXFileAr = ffi.typeof("CXFile [1]")
+local SingleCXFileArray = ffi.typeof("CXFile [1]")
 
 local LineCol = ffi.typeof[[
 union {
@@ -396,7 +418,7 @@ end
 
 -- Returns a LineColOfs for the beginning and end of a range. Also, the file name.
 local function getBegEndFilename(cxsrcrange)
-    local cxfilear = CXFileAr()
+    local cxfilear = SingleCXFileArray()
     local Beg = getLineColOfs(cxsrcrange, cxfilear, "clang_getRangeStart")
     local filename = getString(clang.clang_getFileName(cxfilear[0]))
     local End = getLineColOfs(cxsrcrange, cxfilear, "clang_getRangeEnd")
@@ -416,8 +438,43 @@ local function getSourceRange(cxcur)
     return (clang.clang_Range_isNull(cxsrcrange) == 0) and cxsrcrange or nil
 end
 
--- Metatable for our Cursor_t.
-local Cursor_mt = {
+-------------------------------- Visitation --------------------------------
+
+local Cursor_ptr_t = ffi.typeof("$ *", Cursor_t)
+
+function api.Cursor(cur)
+    check(ffi.istype(Cursor_ptr_t, cur), "<cur> must be a cursor as passed to the visitor callback", 2)
+    return Cursor_t(cur[0])
+end
+
+function api.regCursorVisitor(visitorfunc)
+    check(type(visitorfunc)=="function", "<visitorfunc> must be a Lua function", 2)
+
+    local ret = support.ljclang_regCursorVisitor(visitorfunc)
+    if (ret < 0) then
+        error("failed registering visitor function, code "..ret, 2)
+    end
+
+    return ret
+end
+
+-- Support for legacy luaclang-parser API collecting direct descendants of a
+-- cursor: this will be the table where they go.
+local collectTab
+
+local CollectDirectChildren = api.regCursorVisitor(
+function(cur)
+    debugf("CollectDirectChildren: %s, child cursor kind: %s", tostring(collectTab), cur:kind())
+    collectTab[#collectTab+1] = Cursor_t(cur[0])
+    return api.ChildVisitResult.Continue
+end)
+
+----------------------------------------------------------------------------
+
+class
+{
+    Cursor_t,
+
     __eq = function(cur1, cur2)
         if (ffi.istype(Cursor_t, cur1) and ffi.istype(Cursor_t, cur2)) then
             return (clang.clang_equalCursors(cur1._cur, cur2._cur) ~= 0)
@@ -426,262 +483,275 @@ local Cursor_mt = {
         end
     end,
 
-    __index = {
-        parent = function(self)
-            return getCursor(clang.clang_getCursorSemanticParent(self._cur))
-        end,
+    children = function(self, visitoridx)
+        if (visitoridx ~= nil) then
+            -- LJClang way of visiting
+            local ret = support.ljclang_visitChildren(self._cur, visitoridx)
+            return (ret ~= 0)
+        else
+            -- luaclang-parser way
+            assert(collectTab == nil, "children() must not be called while another invocation is active")
 
-        name = function(self)
-            return getString(clang.clang_getCursorSpelling(self._cur))
-        end,
-
-        displayName = function(self)
-            return getString(clang.clang_getCursorDisplayName(self._cur))
-        end,
-
-        kind = function(self)
-            local kindnum = tonumber(self:kindnum())
-            local kindstr = g_CursorKindName[kindnum]
-            return kindstr or "Unknown"
-        end,
-
-        templateKind = function(self)
-            local kindnum = tonumber(clang.clang_getTemplateCursorKind(self._cur))
-            local kindstr = g_CursorKindName[kindnum]
-            return kindstr or "Unknown"
-        end,
-
-        arguments = function(self)
-            local tab = {}
-            local numargs = clang.clang_Cursor_getNumArguments(self._cur)
-            for i=1,numargs do
-                tab[i] = getCursor(clang.clang_Cursor_getArgument(self._cur, i-1))
-            end
+            collectTab = {}
+            support.ljclang_visitChildren(self._cur, CollectDirectChildren)
+            local tab = collectTab
+            collectTab = nil
             return tab
-        end,
+        end
+    end,
 
-        overloadedDecls = function(self)
-            local tab = {}
-            local numdecls = clang.clang_getNumOverloadedDecls(self._cur)
-            for i=1,numdecls do
-                tab[i] = getCursor(clang.clang_getOverloadedDecl(self._cur, i-1))
-            end
-            return tab
-        end,
+    parent = function(self)
+        return getCursor(clang.clang_getCursorSemanticParent(self._cur))
+    end,
 
-        location = function(self, linesfirst)
-            local cxsrcrange = getSourceRange(self._cur)
-            if (cxsrcrange == nil) then
-                return nil
-            end
+    __tostring = "name",
 
-            local Beg, End, filename = getBegEndFilename(cxsrcrange)
+    name = function(self)
+        return getString(clang.clang_getCursorSpelling(self._cur))
+    end,
 
-            if (linesfirst == 'offset') then
-                return filename, Beg.offset, End.offset
-            elseif (linesfirst) then
-                -- LJClang order -- IMO you're usually more interested in the
-                -- line number
-                return filename, Beg.line, End.line, Beg.col, End.col, Beg.offset, End.offset
-            else
-                -- luaclang-parser order (offset: XXX)
-                return filename, Beg.line, Beg.col, End.line, End.col, Beg.offset, End.offset
-            end
-        end,
+    displayName = function(self)
+        return getString(clang.clang_getCursorDisplayName(self._cur))
+    end,
 
-        presumedLocation = function(self, linesfirst)
-            local cxsrcrange = getSourceRange(self._cur)
-            if (cxsrcrange == nil) then
-                return nil
-            end
+    kind = function(self)
+        local kindnum = tonumber(self:kindnum())
+        local kindstr = g_CursorKindName[kindnum]
+        return kindstr or "Unknown"
+    end,
 
-            local Beg, filename = getPresumedLineCol(cxsrcrange, "clang_getRangeStart")
-            local End = getPresumedLineCol(cxsrcrange, "clang_getRangeEnd")
+    templateKind = function(self)
+        local kindnum = tonumber(clang.clang_getTemplateCursorKind(self._cur))
+        local kindstr = g_CursorKindName[kindnum]
+        return kindstr or "Unknown"
+    end,
 
-            if (linesfirst) then
-                return filename, Beg.line, End.line, Beg.col, End.col
-            else
-                return filename, Beg.line, Beg.col, End.line, End.col
-            end
-        end,
+    arguments = function(self)
+        local tab = {}
+        local numargs = clang.clang_Cursor_getNumArguments(self._cur)
+        for i=1,numargs do
+            tab[i] = getCursor(clang.clang_Cursor_getArgument(self._cur, i-1))
+        end
+        return tab
+    end,
 
-        referenced = function(self)
-            return getCursor(clang.clang_getCursorReferenced(self._cur))
-        end,
+    overloadedDecls = function(self)
+        local tab = {}
+        local numdecls = clang.clang_getNumOverloadedDecls(self._cur)
+        for i=1,numdecls do
+            tab[i] = getCursor(clang.clang_getOverloadedDecl(self._cur, i-1))
+        end
+        return tab
+    end,
 
-        definition = function(self)
-            return getCursor(clang.clang_getCursorDefinition(self._cur))
-        end,
+    location = function(self, linesfirst)
+        local cxsrcrange = getSourceRange(self._cur)
+        if (cxsrcrange == nil) then
+            return nil
+        end
 
-        isDeleted = function(self)
-            return clang.clang_CXX_isDeleted(self._cur) ~= 0
-        end,
+        local Beg, End, filename = getBegEndFilename(cxsrcrange)
 
-        isMutable = function(self)
-            return clang.clang_CXXField_isMutable(self._cur) ~= 0
-        end,
+        if (linesfirst == 'offset') then
+            return filename, Beg.offset, End.offset
+        elseif (linesfirst) then
+            -- LJClang order -- IMO you're usually more interested in the
+            -- line number
+            return filename, Beg.line, End.line, Beg.col, End.col, Beg.offset, End.offset
+        else
+            -- luaclang-parser order (offset: XXX)
+            return filename, Beg.line, Beg.col, End.line, End.col, Beg.offset, End.offset
+        end
+    end,
 
-        isDefaulted = function(self)
-            return clang.clang_CXXMethod_isDefaulted(self._cur) ~= 0
-        end,
+    presumedLocation = function(self, linesfirst)
+        local cxsrcrange = getSourceRange(self._cur)
+        if (cxsrcrange == nil) then
+            return nil
+        end
 
-        isPureVirtual = function(self)
-            return clang.clang_CXXMethod_isPureVirtual(self._cur) ~= 0
-        end,
+        local Beg, filename = getPresumedLineCol(cxsrcrange, "clang_getRangeStart")
+        local End = getPresumedLineCol(cxsrcrange, "clang_getRangeEnd")
 
-        isVirtual = function(self)
-            return clang.clang_CXXMethod_isVirtual(self._cur) ~= 0
-        end,
+        if (linesfirst) then
+            return filename, Beg.line, End.line, Beg.col, End.col
+        else
+            return filename, Beg.line, Beg.col, End.line, End.col
+        end
+    end,
 
-        isOverride = function(self)
-            return clang.clang_CXXMethod_isOverride(self._cur) ~= 0
-        end,
+    referenced = function(self)
+        return getCursor(clang.clang_getCursorReferenced(self._cur))
+    end,
 
-        isStatic = function(self)
-            return clang.clang_CXXMethod_isStatic(self._cur) ~= 0
-        end,
+    definition = function(self)
+        return getCursor(clang.clang_getCursorDefinition(self._cur))
+    end,
 
-        isConst = function(self)
-            return clang.clang_CXXMethod_isConst(self._cur) ~= 0
-        end,
+    isDeleted = function(self)
+        return clang.clang_CXX_isDeleted(self._cur) ~= 0
+    end,
 
-        type = function(self)
-            return getType(clang.clang_getCursorType(self._cur))
-        end,
+    isMutable = function(self)
+        return clang.clang_CXXField_isMutable(self._cur) ~= 0
+    end,
 
-        resultType = function(self)
-            return getType(clang.clang_getCursorResultType(self._cur))
-        end,
+    isDefaulted = function(self)
+        return clang.clang_CXXMethod_isDefaulted(self._cur) ~= 0
+    end,
 
-        access = function(self)
-            local spec = clang.clang_getCXXAccessSpecifier(self._cur);
+    isPureVirtual = function(self)
+        return clang.clang_CXXMethod_isPureVirtual(self._cur) ~= 0
+    end,
 
-            if (spec == 'CX_CXXPublic') then
-                return "public"
-            elseif (spec == 'CX_CXXProtected') then
-                return "protected"
-            elseif (spec == 'CX_CXXPrivate') then
-                return "private"
-            else
-                assert(spec == 'CX_CXXInvalidAccessSpecifier')
-                return nil
-            end
-        end,
+    isVirtual = function(self)
+        return clang.clang_CXXMethod_isVirtual(self._cur) ~= 0
+    end,
 
-        --== LJClang-specific ==--
+    isOverride = function(self)
+        return clang.clang_CXXMethod_isOverride(self._cur) ~= 0
+    end,
 
-        translationUnit = function(self)
-            return TranslationUnit_t(clang.clang_Cursor_getTranslationUnit(self._cur))
-        end,
+    isStatic = function(self)
+        return clang.clang_CXXMethod_isStatic(self._cur) ~= 0
+    end,
 
-        -- XXX: Should be a TranslationUnit_t method instead.
-        --
-        -- NOTE: *Sometimes* returns one token too much, see
-        --   http://clang-developers.42468.n3.nabble.com/querying-information-about-preprocessing-directives-in-libclang-td2740612.html
-        -- Related bug report:
-        --   http://llvm.org/bugs/show_bug.cgi?id=9069
-        -- Also, see TOKENIZE_WORKAROUND in extractdecls.lua
-        _tokens = function(self)
-            local tu = self:translationUnit()
-            local cxtu = tu._tu
+    isConst = function(self)
+        return clang.clang_CXXMethod_isConst(self._cur) ~= 0
+    end,
 
-            local _, b, e = self:location('offset')
-            local cxsrcrange = getSourceRange(self._cur)
-            if (cxsrcrange == nil) then
-                return nil
-            end
+    type = function(self)
+        return getType(clang.clang_getCursorType(self._cur))
+    end,
 
-            local ntoksar = ffi.new("unsigned [1]")
-            local tokensar = ffi.new("CXToken *[1]")
-            clang.clang_tokenize(cxtu, cxsrcrange, tokensar, ntoksar)
-            local numtoks = ntoksar[0]
-            local tokens = tokensar[0]
+    resultType = function(self)
+        return getType(clang.clang_getCursorResultType(self._cur))
+    end,
 
-            local tab = {}
-            local tabextra = {}
+    access = function(self)
+        local spec = clang.clang_getCXXAccessSpecifier(self._cur);
 
-            local kinds = {
-                [tonumber(C.CXToken_Punctuation)] = 'Punctuation',
-                [tonumber(C.CXToken_Keyword)] = 'Keyword',
-                [tonumber(C.CXToken_Identifier)] = 'Identifier',
-                [tonumber(C.CXToken_Literal)] = 'Literal',
-                [tonumber(C.CXToken_Comment)] = 'Comment',
-            }
+        if (spec == 'CX_CXXPublic') then
+            return "public"
+        elseif (spec == 'CX_CXXProtected') then
+            return "protected"
+        elseif (spec == 'CX_CXXPrivate') then
+            return "private"
+        else
+            assert(spec == 'CX_CXXInvalidAccessSpecifier')
+            return nil
+        end
+    end,
 
-            for i=0,numtoks-1 do
-                if (clang.clang_getTokenKind(tokens[i]) ~= 'CXToken_Comment') then
-                    local sourcerange = clang.clang_getTokenExtent(cxtu, tokens[i])
-                    local Beg, End, filename = getBegEndFilename(sourcerange)
-                    local tb, te = Beg.offset, End.offset
+    --== LJClang-specific ==--
 
-                    if (tb >= b and te <= e) then
-                        local kind = clang.clang_getTokenKind(tokens[i])
-                        local extent = getString(clang.clang_getTokenSpelling(cxtu, tokens[i]))
-                        tab[#tab+1] = extent
-                        tabextra[#tabextra+1] = {
-                            extent = extent,
-                            kind = kinds[tonumber(kind)],
-                            b = b, e = e,
-                            tb = tb, te = te
-                        }
-                    end
+    translationUnit = function(self)
+        return TranslationUnit_t(clang.clang_Cursor_getTranslationUnit(self._cur))
+    end,
+
+    -- NOTE: *Sometimes* returns one token too much, see
+    --   http://clang-developers.42468.n3.nabble.com/querying-information-about-preprocessing-directives-in-libclang-td2740612.html
+    -- Related bug report:
+    --   http://llvm.org/bugs/show_bug.cgi?id=9069
+    -- Also, see TOKENIZE_WORKAROUND in extractdecls.lua
+    _tokens = function(self)
+        local tu = self:translationUnit()
+        local cxtu = tu._tu
+
+        local _, b, e = self:location('offset')
+        local cxsrcrange = getSourceRange(self._cur)
+        if (cxsrcrange == nil) then
+            return nil
+        end
+
+        local ntoksar = ffi.new("unsigned [1]")
+        local tokensar = ffi.new("CXToken *[1]")
+        clang.clang_tokenize(cxtu, cxsrcrange, tokensar, ntoksar)
+        local numtoks = ntoksar[0]
+        local tokens = tokensar[0]
+
+        local tab = {}
+        local tabextra = {}
+
+        local kinds = {
+            [tonumber(C.CXToken_Punctuation)] = 'Punctuation',
+            [tonumber(C.CXToken_Keyword)] = 'Keyword',
+            [tonumber(C.CXToken_Identifier)] = 'Identifier',
+            [tonumber(C.CXToken_Literal)] = 'Literal',
+            [tonumber(C.CXToken_Comment)] = 'Comment',
+        }
+
+        for i=0,numtoks-1 do
+            if (clang.clang_getTokenKind(tokens[i]) ~= 'CXToken_Comment') then
+                local sourcerange = clang.clang_getTokenExtent(cxtu, tokens[i])
+                local Beg, End, filename = getBegEndFilename(sourcerange)
+                local tb, te = Beg.offset, End.offset
+
+                if (tb >= b and te <= e) then
+                    local kind = clang.clang_getTokenKind(tokens[i])
+                    local extent = getString(clang.clang_getTokenSpelling(cxtu, tokens[i]))
+                    tab[#tab+1] = extent
+                    tabextra[#tabextra+1] = {
+                        extent = extent,
+                        kind = kinds[tonumber(kind)],
+                        b = b, e = e,
+                        tb = tb, te = te
+                    }
                 end
             end
+        end
 
-            clang.clang_disposeTokens(cxtu, tokens, numtoks)
+        clang.clang_disposeTokens(cxtu, tokens, numtoks)
 
-            return tab, tabextra
-        end,
+        return tab, tabextra
+    end,
 
-        lexicalParent = function(self)
-            return getCursor(clang.clang_getCursorLexicalParent(self._cur))
-        end,
+    lexicalParent = function(self)
+        return getCursor(clang.clang_getCursorLexicalParent(self._cur))
+    end,
 
-        baseTemplate = function(self)
-            return getCursor(clang.clang_getSpecializedCursorTemplate(self._cur))
-        end,
+    baseTemplate = function(self)
+        return getCursor(clang.clang_getSpecializedCursorTemplate(self._cur))
+    end,
 
-        -- Returns an enumeration constant, which in LuaJIT can be compared
-        -- against a *string*, too.
-        kindnum = function(self)
-            return clang.clang_getCursorKind(self._cur)
-        end,
+    -- Returns an enumeration constant, which in LuaJIT can be compared
+    -- against a *string*, too.
+    kindnum = function(self)
+        return clang.clang_getCursorKind(self._cur)
+    end,
 
-        haskind = function(self, kind)
-            if (type(kind) == "string") then
-                return self:kindnum() == "CXCursor_"..kind
-            else
-                return self:kindnum() == kind
-            end
-        end,
+    haskind = function(self, kind)
+        if (type(kind) == "string") then
+            return self:kindnum() == "CXCursor_"..kind
+        else
+            return self:kindnum() == kind
+        end
+    end,
 
-        enumValue = function(self, unsigned)
-            if (not self:haskind("EnumConstantDecl")) then
-                error("cursor must have kind EnumConstantDecl", 2)
-            end
+    enumValue = function(self, unsigned)
+        if (not self:haskind("EnumConstantDecl")) then
+            error("cursor must have kind EnumConstantDecl", 2)
+        end
 
-            if (unsigned) then
-                return clang.clang_getEnumConstantDeclUnsignedValue(self._cur)
-            else
-                return clang.clang_getEnumConstantDeclValue(self._cur)
-            end
-        end,
+        if (unsigned) then
+            return clang.clang_getEnumConstantDeclUnsignedValue(self._cur)
+        else
+            return clang.clang_getEnumConstantDeclValue(self._cur)
+        end
+    end,
 
-        enumval = function(self, unsigned)
-            return tonumber(self:enumValue(unsigned))
-        end,
+    enumval = function(self, unsigned)
+        return tonumber(self:enumValue(unsigned))
+    end,
 
-        isDefinition = function(self)
-            return (clang.clang_isCursorDefinition(self._cur) ~= 0)
-        end,
+    isDefinition = function(self)
+        return (clang.clang_isCursorDefinition(self._cur) ~= 0)
+    end,
 
-        typedefType = function(self)
-            return getType(clang.clang_getTypedefDeclUnderlyingType(self._cur))
-        end,
-    },
+    typedefType = function(self)
+        return getType(clang.clang_getTypedefDeclUnderlyingType(self._cur))
+    end,
 }
-
-Cursor_mt.__tostring = Cursor_mt.__index.name
 
 -------------------------------------------------------------------------
 ---------------------------------- Type ---------------------------------
@@ -873,74 +943,7 @@ function Index_mt.__index.parse(self, srcfile, args, opts)
     return tunit
 end
 
--- enum CXDiagnosticSeverity constants
-api.DiagnosticSeverity = ffi.new[[
-struct{
-    static const int Ignored = CXDiagnostic_Ignored;
-    static const int Note = CXDiagnostic_Note;
-    static const int Warning = CXDiagnostic_Warning;
-    static const int Error = CXDiagnostic_Error;
-    static const int Fatal = CXDiagnostic_Fatal;
-}]]
-
--- enum CXChildVisitResult constants
-api.ChildVisitResult = ffi.new[[
-struct{
-    static const int Break = CXChildVisit_Break;
-    static const int Continue = CXChildVisit_Continue;
-    static const int Recurse = CXChildVisit_Recurse;
-}]]
-
-function api.regCursorVisitor(visitorfunc)
-    check(type(visitorfunc)=="function", "<visitorfunc> must be a Lua function", 2)
-
-    local ret = support.ljclang_regCursorVisitor(visitorfunc)
-    if (ret < 0) then
-        error("failed registering visitor function, code "..ret, 2)
-    end
-
-    return ret
-end
-
-local Cursor_ptr_t = ffi.typeof("$ *", Cursor_t)
-
-function api.Cursor(cur)
-    check(ffi.istype(Cursor_ptr_t, cur), "<cur> must be a cursor as passed to the visitor callback", 2)
-    return Cursor_t(cur[0])
-end
-
--- Support for legacy luaclang-parser API collecting direct descendants of a
--- cursor: this will be the table where they go.
-local collectTab
-
-local CollectDirectChildren = api.regCursorVisitor(
-function(cur)
-    debugf("CollectDirectChildren: %s, child cursor kind: %s", tostring(collectTab), cur:kind())
-    collectTab[#collectTab+1] = Cursor_t(cur[0])
-    return api.ChildVisitResult.Continue
-end)
-
-function Cursor_mt.__index.children(self, visitoridx)
-    if (visitoridx ~= nil) then
-        -- LJClang way of visiting
-        local ret = support.ljclang_visitChildren(self._cur, visitoridx)
-        return (ret ~= 0)
-    else
-        -- luaclang-parser way
-        assert(collectTab == nil, "children() must not be called while another invocation is active")
-
-        collectTab = {}
-        support.ljclang_visitChildren(self._cur, CollectDirectChildren)
-        local tab = collectTab
-        collectTab = nil
-        return tab
-    end
-end
-
-
--- Register the metatables for the custom ctypes.
-ffi.metatype(Cursor_t, Cursor_mt)
-
+-- NOTE: This is unsupported.
 api.TranslationUnit_t = TranslationUnit_t_
 api.Cursor_t = Cursor_t
 api.Type_t = Type_t
