@@ -27,6 +27,7 @@ local function usage(hline)
         print(hline)
     end
     print("Usage: "..arg[0].." [our options...] <file.h> [-- [Clang command line args ...]]")
+    print "  -e <enumNameFilterPattern> (enums only)"
     print "  -p <filterPattern>"
     print "  -x <excludePattern1> [-x <excludePattern2>] ..."
     print "  -s <stripPattern>"
@@ -49,11 +50,12 @@ end
 local parsecmdline = require("parsecmdline_pk")
 
 -- Meta-information about options, see parsecmdline_pk.
-local opt_meta = { p=true, x=1, s=true, C=false, R=false, Q=false,
+local opt_meta = { e=true, p=true, x=1, s=true, C=false, R=false, Q=false,
                    ['1']=true, ['2']=true, w=true, f=true }
 
 local opts, args = parsecmdline.getopts(opt_meta, arg, usage)
 
+local enumNameFilterPattern = opts.e
 local filterPattern = opts.p
 local excludePatterns = opts.x
 local stripPattern = opts.s
@@ -71,6 +73,10 @@ local suffixString = opts['2']
 
 if (#args == 0) then
     usage()
+end
+
+if (not extractEnum and enumNameFilterPattern ~= nil) then
+    usage("Option -e only available for enum extraction")
 end
 
 if (not (extractEnum or extractMacro) and (printConstInt or reverse)) then
@@ -158,7 +164,11 @@ local visitor = cl.regCursorVisitor(
 function(cur, parent)
     if (extractEnum) then
         if (cur:haskind("EnumDecl")) then
-            return V.Recurse
+            if (enumNameFilterPattern ~= nil and not cur:name():find(enumNameFilterPattern)) then
+                return V.Continue
+            else
+                return V.Recurse
+            end
         end
     end
 
