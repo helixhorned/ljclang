@@ -169,14 +169,23 @@ describe("Enumerations", function()
 
         local expectedEnums = {
             { Name = "Fruits",
+              IntType = "int",
               { "Apple", 0, s },
               { "Pear", -4, s },
               { "Orange", -3, s }
             },
 
             { Name = "BigNumbers",
+              IntType = "unsigned long long",
               { "Billion", 1000000000, u },
               { "Trillion", 1000000000000, u }
+            },
+
+            { Name = "",
+              IntType = "short",
+              { "Red", 0, s },
+              { "Green", 1, s },
+              { "Blue", 2, s }
             }
         }
 
@@ -185,7 +194,13 @@ describe("Enumerations", function()
         for _, enumDeclCur in ipairs(tuCursor:children()) do
             assert.are.equal(enumDeclCur:kind(), "EnumDecl")
 
-            enums[#enums + 1] = { Name = enumDeclCur:name() }
+            local integerType = enumDeclCur:enumIntegerType()
+            assert.is_not_nil(integerType)
+
+            enums[#enums + 1] = {
+                Name = enumDeclCur:name(),
+                IntType = integerType:name(),
+            }
 
             for _, cur in ipairs(enumDeclCur:children()) do
                 assert.are.equal(cur:kind(), "EnumConstantDecl")
