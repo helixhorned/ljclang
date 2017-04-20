@@ -2,8 +2,8 @@
 local pairs = pairs
 
 -- Get options and positional arguments from command line. A '--' stops option
--- processing and collects it and the following arguments into 'args'
--- (positional arguments), irrespective of whether they start with a dash.
+-- processing and collects the following arguments into 'args' (positional
+-- arguments), irrespective of whether they start with a dash.
 --
 -- opts, args = getopts(opt_meta, arg, usage_func)
 --
@@ -44,6 +44,7 @@ local function getopts(opt_meta, arg, usage)
 
         if (arg[i] == "--") then
             processOpts = false
+            goto next
         end
 
         if (processOpts and arg[i]:sub(1,1)=="-") then

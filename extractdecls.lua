@@ -26,7 +26,7 @@ local function usage(hline)
     if (hline) then
         print(hline)
     end
-    print("Usage: "..arg[0].." [our_options...] <file.h> [clang_options...]")
+    print("Usage: "..arg[0].." [our options...] <file.h> [-- [Clang command line args ...]]")
     print "  -p <filterPattern>"
     print "  -x <excludePattern1> [-x <excludePattern2>] ..."
     print "  -s <stripPattern>"
