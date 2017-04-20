@@ -2,15 +2,20 @@
 
 local arg = arg
 
-local string = require("string")
 local io = require("io")
 local os = require("os")
+local math = require("math")
+local string = require("string")
 local table = require("table")
 
 local cl = require("ljclang")
 
-local format = string.format
+local assert = assert
+local ipairs = ipairs
 local print = print
+local tonumber = tonumber
+
+local format = string.format
 
 ----------
 
@@ -38,8 +43,17 @@ local function usage(hline)
     print "  -R: reverse mapping, only if one-to-one. Print lines like"
     print "       [123] = \"membname\";  (enums/macros only)"
     print "  -f <formatFunc>: user-provided body for formatting function (enums/macros only)"
-    print "       Accepts args `k', `v'; `f' is string.format. Must return a formatted line."
-    print[[       Example: "return f('%s = %s%s,', k, k:find('KEY_') and '65536+' or '', v)"]]
+    print "       Arguments to that function are named"
+    print "         * 'k' (enum constant / macro name)"
+    print "         * 'v' (its numeric value)"
+    print "         * 'enumName' (the name in 'enum <name>', or the empty string)"
+    print "         * 'enumIntTypeName' (the name of the underlying integer type of an enum)"
+    print "         * 'enumPrefixLength' (the length of the common prefix of all names; enums only)"
+    print "       Also, the following is provided:"
+    print "         * 'f' as a shorthand for 'string.format'"
+    print "       Must return a formatted line."
+    print "       Example:"
+    print[[         "return f('%s = %s%s,', k, k:find('KEY_') and '65536+' or '', v)"]]
     print "       Incompatible with -C or -R."
     print "  -Q: be quiet"
     print "  -w: extract what? Can be"
@@ -95,7 +109,7 @@ if (fmtfuncCode) then
 
     local func, errmsg = loadstring([[
 local f=string.format
-return function(k, v)
+return function(k, v, enumName, enumIntTypeName, enumPrefixLength)
 ]]..fmtfuncCode..[[
 end
 ]])
@@ -160,6 +174,35 @@ local function getDefStr(cur)
     return table.concat(tokens, " ", 2, #tokens)
 end
 
+local function getCommonPrefixLengthOfEnums(enumDeclCur)
+    local enumConstantCursors = enumDeclCur:children()
+
+    if (#enumConstantCursors == 0) then
+        return nil
+    end
+
+    local commonPrefix = enumConstantCursors[1]:displayName()
+
+    for _, cur in ipairs(enumConstantCursors) do
+        assert(cur:haskind("EnumConstantDecl"))
+        local name = cur:displayName()
+
+        for i = 1, math.min(#commonPrefix, #name) do
+            if (commonPrefix:sub(1, i) ~= name:sub(1, i)) then
+                commonPrefix = commonPrefix:sub(1, i-1)
+            end
+        end
+    end
+
+    return #commonPrefix
+end
+
+-- The <name> in 'enum <name>' if available, or the empty string:
+local currentEnumName
+
+local currentEnumIntTypeName
+local currentEnumPrefixLength
+
 local visitor = cl.regCursorVisitor(
 function(cur, parent)
     if (extractEnum) then
@@ -167,6 +210,9 @@ function(cur, parent)
             if (enumNameFilterPattern ~= nil and not cur:name():find(enumNameFilterPattern)) then
                 return V.Continue
             else
+                currentEnumName = cur:name()
+                currentEnumIntTypeName = cur:enumIntegerType():name()
+                currentEnumPrefixLength = getCommonPrefixLengthOfEnums(cur)
                 return V.Recurse
             end
         end
@@ -187,7 +233,11 @@ function(cur, parent)
                     -- like a literal number.
                     if (not extractMacro or tonumber(val) ~= nil) then
                         if (fmtfunc) then
-                            print(fmtfunc(ourname, val))
+                            local str = fmtfunc(ourname, val,
+                                                currentEnumName,
+                                                currentEnumIntTypeName,
+                                                currentEnumPrefixLength)
+                            print(str)
                         elseif (reverse) then
                             if (enumname[val]) then
                                 printf("Error: enumeration value %d not unique: %s and %s",

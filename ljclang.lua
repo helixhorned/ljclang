@@ -514,7 +514,6 @@ local collectTab
 
 local CollectDirectChildren = api.regCursorVisitor(
 function(cur)
-    debugf("CollectDirectChildren: %s, child cursor kind: %s", tostring(collectTab), cur:kind())
     collectTab[#collectTab+1] = Cursor_t(cur[0])
     return api.ChildVisitResult.Continue
 end)
