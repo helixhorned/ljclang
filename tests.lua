@@ -18,22 +18,25 @@ ffi.cdef[[
 time_t time(time_t *);
 ]]
 
+----------
+
+local nonExistentFileName = "/non_exisitent_file"
+assert(io.open(nonExistentFileName) == nil)
+
+local clangOpts = { "-std=c++14", "-Wall", "-pedantic" }
+
+describe("Attempting to parse a nonexistent file", function()
+    local index = cl.createIndex()
+    local tu, errorCode = index:parse(nonExistentFileName, { "-std=c99" })
+    assert.is_nil(tu)
+    assert.are.not_equal(errorCode, cl.ErrorCode.Success)
+end)
+
 describe("Loading a cpp file without includes", function()
     local fileName = "test_data/simple.cpp"
     local astFileName = "/tmp/ljclang_test_simple.cpp.ast"
-    local nonExistentFileName = "/non_exisitent_file"
 
-    assert(io.open(nonExistentFileName) == nil)
-
-    it("tests attempting to parse a nonexistent file", function()
-        local index = cl.createIndex()
-        local tu, errorCode = index:parse(nonExistentFileName, { "-std=c99" })
-        assert.is_nil(tu)
-        assert.are.not_equal(errorCode, cl.ErrorCode.Success)
-    end)
-
-    local tu, errorCode = cl.createIndex(true):parse(
-        fileName, { "-std=c++14", "-Wall", "-pedantic" })
+    local tu, errorCode = cl.createIndex():parse(fileName, clangOpts)
 
     -- Test that we don't need to keep the index (from createIndex()) around:
     collectgarbage()
@@ -50,8 +53,10 @@ describe("Loading a cpp file without includes", function()
 
         it("tests its cursor", function()
             local tuCursor = tu:cursor()
-            assert.is_true(tuCursor:haskind("TranslationUnit"))
             assert.are.equal(tuCursor, tuCursor)
+            -- Test that the following two forms are equivalent:
+            assert.is_true(tuCursor:haskind("TranslationUnit"))
+            assert.are.equal(tuCursor:kind(), "TranslationUnit")
         end)
 
         it("tests diagnostics from it", function()
@@ -88,19 +93,15 @@ describe("Loading a cpp file without includes", function()
     describe("Collection of children", function()
         local tuCursor = tu:cursor()
         local expectedKinds = {
-            "StructDecl", "FunctionDecl", "EnumDecl", "EnumDecl",
-            "StaticAssert", "FunctionDecl"
+            "StructDecl", "FunctionDecl", "EnumDecl", "FunctionDecl"
         }
 
         it("tests the luaclang-parser convention", function()
-            local cursors = tuCursor:children()
-
-            assert.is_table(cursors)
-            assert.are.equal(#cursors, #expectedKinds)
-
-            for i, cur in ipairs(cursors) do
-                assert.is_true(cur:haskind(expectedKinds[i]))
+            local kinds = {}
+            for i, cur in ipairs(tuCursor:children()) do
+                kinds[i] = cur:kind()
             end
+            assert.are.same(kinds, expectedKinds)
         end)
 
         local V = cl.ChildVisitResult
@@ -120,7 +121,7 @@ describe("Loading a cpp file without includes", function()
             local visitor = cl.regCursorVisitor(
             function(cur)
                 i = i + 1
-                assert.is_true(cur:haskind(expectedKinds[i]))
+                assert.are.equal(cur:kind(), expectedKinds[i])
                 assert.are.equal(cl.Cursor(cur), cur)
                 return V.Continue
             end)
@@ -128,44 +129,79 @@ describe("Loading a cpp file without includes", function()
             tuCursor:children(visitor)
         end)
 
-        it("tests the ljclang convention: Continue + Recurse; enums", function()
-            local s, u = "ctype<int64_t>", "ctype<uint64_t>"
-
-            local expectedEnums = {
-                -- From 'enum Fruits':
-                { "Apple", 0, s },
-                { "Pear", -4, s },
-                { "Orange", -3, s },
-
-                -- From 'enum BigNumbers':
-                { "Billion", 1000000000, u },
-                { "Trillion", 1000000000000, u },
+        it("tests the ljclang convention: Recurse", function()
+            local expectedMembers = {
+                { "int", "a" }, { "long", "b" }
             }
 
-            local enums = {}
+            local members = {}
 
             local visitor = cl.regCursorVisitor(
             function(cur)
-                if (cur:haskind("EnumDecl")) then
+                if (cur:haskind("StructDecl")) then
+                    assert.is_equal(cur:name(), "First")
                     return V.Recurse
                 end
 
-                if (cur:haskind("EnumConstantDecl")) then
-                    local val = cur:enumval()
-                    local value = cur:enumValue()
-
-                    assert.is_number(val)
-                    assert.is_true(type(value) == "cdata")
-                    assert.are_equal(value, val)
-
-                    enums[#enums + 1] = { cur:name(), val, tostring(ffi.typeof(value)) }
+                if (cur:haskind("FieldDecl")) then
+                    members[#members + 1] = { cur:type():name(), cur:name() }
                 end
 
                 return V.Continue
             end)
 
             tuCursor:children(visitor)
-            assert.are_same(expectedEnums, enums)
+            assert.are.same(members, expectedMembers)
         end)
+    end)
+end)
+
+describe("Enumerations", function()
+    local fileName = "test_data/enums.cpp"
+
+    local tu = cl.createIndex():parse(fileName, clangOpts)
+    assert.is_not_nil(tu)
+
+    local tuCursor = tu:cursor()
+
+    it("tests various queries on enumerations", function()
+        local s, u = "ctype<int64_t>", "ctype<uint64_t>"
+
+        local expectedEnums = {
+            { Name = "Fruits",
+              { "Apple", 0, s },
+              { "Pear", -4, s },
+              { "Orange", -3, s }
+            },
+
+            { Name = "BigNumbers",
+              { "Billion", 1000000000, u },
+              { "Trillion", 1000000000000, u }
+            }
+        }
+
+        local enums = {}
+
+        for _, enumDeclCur in ipairs(tuCursor:children()) do
+            assert.are.equal(enumDeclCur:kind(), "EnumDecl")
+
+            enums[#enums + 1] = { Name = enumDeclCur:name() }
+
+            for _, cur in ipairs(enumDeclCur:children()) do
+                assert.are.equal(cur:kind(), "EnumConstantDecl")
+
+                local val = cur:enumval()
+                local value = cur:enumValue()
+
+                assert.is_number(val)
+                assert.is_true(type(value) == "cdata")
+                assert.are_equal(value, val)
+
+                local enumTable = enums[#enums]
+                enumTable[#enumTable + 1] = { cur:name(), val, tostring(ffi.typeof(value)) }
+            end
+        end
+
+        assert.are_same(expectedEnums, enums)
     end)
 end)

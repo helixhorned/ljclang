@@ -14,17 +14,8 @@ int func()
 enum Fruits
 {
     Apple,
-    Pear = -4,
-    Orange,
+    Pear,
 };
-
-enum BigNumbers : unsigned long long
-{
-    Billion = 1000000000,
-    Trillion = 1'000'000'000'000,
-};
-
-static_assert(Trillion == 1'000'000'000'000ULL, "");
 
 int badFunc()
 {
