@@ -40,12 +40,16 @@ ffi.cdef("typedef " .. ffi.string(support.ljclang_getTimeTypeString()) .. " time
 local supportLLVMVersion = ffi.string(support.ljclang_getLLVMVersion())
 
 require("ljclang_Index_h")
-local g_CursorKindName = require("ljclang_cursor_kind").name
+
+local ExtractedEnums = require("ljclang_cursor_kind")
+-- enum value -> name (i.e "reverse") mapping of cursor kinds:
+local g_CursorKindName = ExtractedEnums.CursorKindName
+ExtractedEnums.CursorKindName = nil
 
 -------------------------------------------------------------------------
 
 -- The table of externally exposed elements, returned at the end.
-local api = {}
+local api = ExtractedEnums
 
 --[[
 local function debugf(fmt, ...)
@@ -94,46 +98,6 @@ ffi.cdef[[
 int ljclang_regCursorVisitor(LJCX_CursorVisitor visitor);
 int ljclang_visitChildren(CXCursor parent, int visitoridx);
 ]]
-
--------------------------------------------------------------------------
--------------------------------- Constants ------------------------------
--------------------------------------------------------------------------
-
--- enum CXErrorCode constants
-api.ErrorCode = ffi.new[[
-struct{
-    static const int Success = CXError_Success;
-    static const int Failure = CXError_Failure;
-    static const int Crashed = CXError_Crashed;
-    static const int InvalidArguments = CXError_InvalidArguments;
-    static const int ASTReadError = CXError_ASTReadError;
-}]]
-
--- enum CXSaveError constants
-api.SaveError = ffi.new[[
-struct{
-    static const int None = CXSaveError_None;
-    static const int Unknown = CXSaveError_Unknown;
-    static const int TranslationErrors = CXSaveError_TranslationErrors;
-}]]
-
--- enum CXDiagnosticSeverity constants
-api.DiagnosticSeverity = ffi.new[[
-struct{
-    static const int Ignored = CXDiagnostic_Ignored;
-    static const int Note = CXDiagnostic_Note;
-    static const int Warning = CXDiagnostic_Warning;
-    static const int Error = CXDiagnostic_Error;
-    static const int Fatal = CXDiagnostic_Fatal;
-}]]
-
--- enum CXChildVisitResult constants
-api.ChildVisitResult = ffi.new[[
-struct{
-    static const int Break = CXChildVisit_Break;
-    static const int Continue = CXChildVisit_Continue;
-    static const int Recurse = CXChildVisit_Recurse;
-}]]
 
 -------------------------------------------------------------------------
 -------------------------------- CXString -------------------------------
@@ -515,7 +479,7 @@ local collectTab
 local CollectDirectChildren = api.regCursorVisitor(
 function(cur)
     collectTab[#collectTab+1] = Cursor_t(cur[0])
-    return api.ChildVisitResult.Continue
+    return 'CXChildVisit_Continue'
 end)
 
 ----------------------------------------------------------------------------

@@ -32,6 +32,7 @@ local function usage(hline)
         print(hline)
     end
     print("Usage: "..arg[0].." [our options...] <file.h> [-- [Clang command line args ...]]")
+    print " (Our options may also come after the file name.)"
     print "  -e <enumNameFilterPattern> (enums only)"
     print "  -p <filterPattern>"
     print "  -x <excludePattern1> [-x <excludePattern2>] ..."
@@ -159,8 +160,6 @@ local enumname = {}
 -- Mapping of running index to enum value for -R.
 local enumseq = {}
 
-local V = cl.ChildVisitResult
-
 local function checkexclude(name)
     for i=1,#excludePatterns do
         if (name:find(excludePatterns[i])) then
@@ -209,17 +208,20 @@ local currentEnumName
 local currentEnumIntTypeName
 local currentEnumPrefixLength
 
+-- NOTE: cl.ChildVisitResult is not available when run from 'make bootstrap', so
+-- use string enum constant names.
+
 local visitor = cl.regCursorVisitor(
 function(cur, parent)
     if (extractEnum) then
         if (cur:haskind("EnumDecl")) then
             if (enumNameFilterPattern ~= nil and not cur:name():find(enumNameFilterPattern)) then
-                return V.Continue
+                return 'CXChildVisit_Continue'
             else
                 currentEnumName = cur:name()
                 currentEnumIntTypeName = cur:enumIntegerType():name()
                 currentEnumPrefixLength = getCommonPrefixLengthOfEnums(cur)
-                return V.Recurse
+                return 'CXChildVisit_Recurse'
             end
         end
     end
@@ -286,7 +288,7 @@ function(cur, parent)
         end
     end
 
-    return V.Continue
+    return 'CXChildVisit_Continue'
 end)
 
 if (prefixString) then

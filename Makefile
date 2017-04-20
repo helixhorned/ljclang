@@ -67,15 +67,38 @@ ljclang_Index_h.lua:
 	$(luajit) ./createheader.lua $(incdir)/clang-c > $@
 
 CKIND_LUA := ljclang_cursor_kind.lua
-EXTRACT_OPTS := -R -p '^CXCursor_' -x '_First' -x '_Last' -x '_GCCAsmStmt' -x '_MacroInstantiation' -s '^CXCursor_' \
-    -1 'return { name={' -2 '}, }' -Q
+CKIND_LUA_TMP := $(CKIND_LUA).tmp
+
+EXTRACT_OPTS_KINDS := -Q -R -p '^CXCursor_' -s '^CXCursor_' \
+    -x '_First' -x '_Last' -x '_GCCAsmStmt' -x '_MacroInstantiation' \
+    -1 'CursorKindName = {' -2 '},'
+
+EXTRACT_OPTS_ENUM := -Q \
+    -f "return f('    static const int %s = %s;', k:sub(enumPrefixLength+1), k)" \
+    -1 "$$enumName = ffi.new[[struct{" -2 "}]],"
+
+ENUMS := ErrorCode SaveError DiagnosticSeverity ChildVisitResult
+
+EXTRACT_CMD_ENV := LD_LIBRARY_PATH="$(libdir):$(THIS_DIR)"
+EXTRACT_CMD := $(EXTRACT_CMD_ENV) ./extractdecls.lua -A -I$(incdir) $(incdir)/clang-c/Index.h
+
+.SILENT: bootstrap
 
 # Generate list of CXCursorKind names
 bootstrap: libljclang_support$(so)
-	@echo 'return {}' > $(CKIND_LUA)
-	LD_LIBRARY_PATH="$(libdir):$(THIS_DIR)" $(luajit) ./extractdecls.lua $(EXTRACT_OPTS) $(incdir)/clang-c/Index.h > $(CKIND_LUA).tmp
-	@mv $(CKIND_LUA).tmp $(CKIND_LUA)
-	@printf "\033[1mGenerated $(CKIND_LUA)\033[0m\n"
+	echo 'return {}' > $(CKIND_LUA)
+    # -- Extract enums
+	echo 'local ffi=require"ffi"' > $(CKIND_LUA_TMP)
+	echo 'return {' >> $(CKIND_LUA_TMP)
+	for enumName in $(ENUMS); do \
+	    $(EXTRACT_CMD) $(EXTRACT_OPTS_ENUM) -e "^CX$$enumName$$" >> $(CKIND_LUA_TMP); \
+	done
+    # -- Extract cursor kinds
+	$(EXTRACT_CMD) $(EXTRACT_OPTS_KINDS) >> $(CKIND_LUA_TMP)
+	echo '}' >> $(CKIND_LUA_TMP)
+    # -- Done extracting
+	mv $(CKIND_LUA_TMP) $(CKIND_LUA)
+	printf "* \033[1mGenerated $(CKIND_LUA)\033[0m\n"
 
 doc: README.md.in ljclang.lua
 	$(luajit) ./make_docs.lua $^ > README.md

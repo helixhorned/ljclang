@@ -1,4 +1,31 @@
-return { name={
+local ffi=require"ffi"
+return {
+ErrorCode = ffi.new[[struct{
+    static const int Success = CXError_Success;
+    static const int Failure = CXError_Failure;
+    static const int Crashed = CXError_Crashed;
+    static const int InvalidArguments = CXError_InvalidArguments;
+    static const int ASTReadError = CXError_ASTReadError;
+}]],
+SaveError = ffi.new[[struct{
+    static const int None = CXSaveError_None;
+    static const int Unknown = CXSaveError_Unknown;
+    static const int TranslationErrors = CXSaveError_TranslationErrors;
+    static const int InvalidTU = CXSaveError_InvalidTU;
+}]],
+DiagnosticSeverity = ffi.new[[struct{
+    static const int Ignored = CXDiagnostic_Ignored;
+    static const int Note = CXDiagnostic_Note;
+    static const int Warning = CXDiagnostic_Warning;
+    static const int Error = CXDiagnostic_Error;
+    static const int Fatal = CXDiagnostic_Fatal;
+}]],
+ChildVisitResult = ffi.new[[struct{
+    static const int Break = CXChildVisit_Break;
+    static const int Continue = CXChildVisit_Continue;
+    static const int Recurse = CXChildVisit_Recurse;
+}]],
+CursorKindName = {
 [1] = "UnexposedDecl";
 [2] = "StructDecl";
 [3] = "UnionDecl";
@@ -212,4 +239,5 @@ return { name={
 [602] = "StaticAssert";
 [603] = "FriendDecl";
 [700] = "OverloadCandidate";
-}, }
+},
+}
