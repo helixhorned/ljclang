@@ -1,8 +1,8 @@
 -- LuaJIT-based binding to libclang, modelled after
 -- https://github.com/mkottman/luaclang-parser
 --
--- See COPYRIGHT.TXT for the Copyright Notice of LJClang.
--- LICENSE_LLVM.TXT is the license for libclang.
+-- See LICENSE for the Copyright Notice of LJClang.
+-- LLVM_LICENSE.TXT is the license for libclang.
 
 local assert = assert
 local error = error
