@@ -101,7 +101,7 @@ end
     fmtfunc = func()
 end
 
-local opts = extractMacro and {"DetailedPreprocessingRecord"} or nil
+local tuOptions = extractMacro and {"DetailedPreprocessingRecord"} or nil
 
 local filename = args[1]
 do
@@ -114,9 +114,9 @@ do
 end
 
 local index = cl.createIndex(true, false)
-local tu = index:parse("", args, opts)
+local tu, errorCode = index:parse("", args, tuOptions)
 if (tu == nil) then
-    errprintf("ERROR: Failed parsing %s", filename)
+    errprintf("ERROR: Failed parsing %s (%s)", filename, errorCode)
     os.exit(1)
 end
 
