@@ -8,6 +8,8 @@ BINDIR ?= /usr/local
 LLVM_CONFIG ?= llvm-config
 llvm-config := $(shell which $(LLVM_CONFIG))
 
+MARKDOWN := cmark
+
 ifeq ($(llvm-config),)
     $(error "$(LLVM_CONFIG) not found, use LLVM_CONFIG=<path/to/llvm-config> make")
 endif
@@ -75,8 +77,9 @@ bootstrap: libljclang_support$(so)
 	@mv $(CKIND_LUA).tmp $(CKIND_LUA)
 	@printf "\033[1mGenerated $(CKIND_LUA)\033[0m\n"
 
-doc:
-	$(asciidoc) README.adoc
+doc: README.md.in ljclang.lua
+	$(luajit) $(THIS_DIR)/make_docs.lua $^ > README.md
+	which $(MARKDOWN) && $(MARKDOWN) README.md > README.html
 
 test: libljclang_support$(so)
 	LLVM_LIBDIR="$(libdir)" $(SHELL) $(THIS_DIR)/run_tests.sh

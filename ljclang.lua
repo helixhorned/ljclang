@@ -475,13 +475,18 @@ end
 
 -------------------------------- Visitation --------------------------------
 
-local Cursor_ptr_t = ffi.typeof("$ *", Cursor_t)
-
-function api.Cursor(cur)
-    check(ffi.istype(Cursor_ptr_t, cur), "<cur> must be a cursor as passed to the visitor callback", 2)
-    return Cursor_t(cur[0])
-end
-
+-- #### `visitorHandle = clang.regCursorVisitor(visitorFunc)`
+--
+-- Registers a child visitor callback function `visitorFunc` with LJClang,
+-- returning a handle which can be passed to `Cursor:children()`. The callback
+-- function receives two input arguments, `(cursor, parent)` -- with the cursors
+-- of the currently visited entity as well as its parent, and must return a value
+-- from the `ChildVisitResult` enumeration to indicate whether or how libclang
+-- should carry on AST visiting.
+--
+-- CAUTION: The `cursor` passed to the visitor callback is only valid during one
+-- particular callback invocation. If it is to be used after the function has
+-- returned, it **must** be copied using the `Cursor` constructor mentioned below.
 function api.regCursorVisitor(visitorfunc)
     check(type(visitorfunc)=="function", "<visitorfunc> must be a Lua function", 2)
 
@@ -491,6 +496,16 @@ function api.regCursorVisitor(visitorfunc)
     end
 
     return ret
+end
+
+local Cursor_ptr_t = ffi.typeof("$ *", Cursor_t)
+
+-- #### `permanentCursor = clang.Cursor(cursor)`
+--
+-- Creates a permanent cursor from one received by the visitor callback.
+function api.Cursor(cur)
+    check(ffi.istype(Cursor_ptr_t, cur), "<cur> must be a cursor as passed to the visitor callback", 2)
+    return Cursor_t(cur[0])
 end
 
 -- Support for legacy luaclang-parser API collecting direct descendants of a
@@ -887,7 +902,14 @@ class
 
 -------------------------------------------------------------------------
 
---| index = clang.createIndex([excludeDeclarationsFromPCH [, displayDiagnostics]])
+-- #### `index = clang.createIndex([excludeDeclarationsFromPCH [, displayDiagnostics]])`
+--
+-- [`clang_createIndex`]:
+--  http://clang.llvm.org/doxygen/group__CINDEX.html#ga51eb9b38c18743bf2d824c6230e61f93
+--
+-- Binding for [`clang_createIndex`]. Will create an `Index` into which you can
+-- parse `TranslationUnit`s. Both input arguments are optional and default to
+-- **false**.
 function api.createIndex(excludeDeclarationsFromPCH, displayDiagnostics)
     local cxidx = clang.clang_createIndex(excludeDeclarationsFromPCH or false,
                                           displayDiagnostics or false)
@@ -930,11 +952,27 @@ local function check_iftab_iscellstr(tab, name)
     end
 end
 
---| tunit = index:parse(srcfile, args [, opts])
---|
---| <args>: string or sequence of strings
---| <opts>: number or sequence of strings (CXTranslationUnit_* enum members,
---|  without the prefix)
+-- #### `translationUnit, errorCode = index:parse(sourceFileName, cmdLineArgs [, opts])`
+--
+-- [`clang_parseTranslationUnit2`]:
+--  http://clang.llvm.org/doxygen/group__CINDEX__TRANSLATION__UNIT.html#ga494de0e725c5ae40cbdea5fa6081027d
+--
+-- [`CXTranslationUnit_*`]:
+--  http://clang.llvm.org/doxygen/group__CINDEX__TRANSLATION__UNIT.html#enum-members
+--
+-- Binding for [`clang_parseTranslationUnit2`]. This will parse a given source
+-- file named `sourceFileName` with the command line arguments `cmdLineArgs` given
+-- to the compiler, containing e.g. include paths or defines. If `sourceFile` is
+-- the empty string, the source file is expected to be named in `cmdLineArgs`.
+--
+-- The optional argument `opts` is expected to be a sequence containing
+-- [`CXTranslationUnit_*`] enum names without the `"CXTranslationUnit_"` prefix,
+-- for example `{ "DetailedPreprocessingRecord", "SkipFunctionBodies" }`.
+--
+-- NOTE: Both `cmdLineArgs` and `opts` (if given) must not contain an element at index 0.
+--
+-- On failure, `translationUnit` is `nil` and `errorCode` (comparable against
+-- values in `clang.ErrorCode`) can be examined.
 function Index_mt.__index.parse(self, srcfile, args, opts)
     check(type(srcfile)=="string", "<srcfile> must be a string", 2)
     check(type(args)=="string" or type(args)=="table", "<args> must be a string or table", 2)
@@ -945,7 +983,7 @@ function Index_mt.__index.parse(self, srcfile, args, opts)
     end
 
     if (opts == nil) then
-        opts = 0
+        opts = C.CXTranslationUnit_None;
     else
         check(type(opts)=="number" or type(opts)=="table", 2)
         check_iftab_iscellstr(args, "<opts>")
