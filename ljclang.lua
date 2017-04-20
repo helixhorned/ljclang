@@ -772,7 +772,7 @@ class
 
     haskind = function(self, kind)
         if (type(kind) == "string") then
-            return self:kindnum() == "CXCursor_"..kind
+            return self:kindnum() == C["CXCursor_"..kind]
         else
             return self:kindnum() == kind
         end
