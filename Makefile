@@ -78,11 +78,11 @@ bootstrap: libljclang_support$(so)
 	@printf "\033[1mGenerated $(CKIND_LUA)\033[0m\n"
 
 doc: README.md.in ljclang.lua
-	$(luajit) $(THIS_DIR)/make_docs.lua $^ > README.md
+	$(luajit) ./make_docs.lua $^ > README.md
 	which $(MARKDOWN) && $(MARKDOWN) README.md > README.html
 
 test: libljclang_support$(so)
-	LLVM_LIBDIR="$(libdir)" $(SHELL) $(THIS_DIR)/run_tests.sh
+	LLVM_LIBDIR="$(libdir)" $(SHELL) ./run_tests.sh
 
 install: libljclang_support$(so)
 	sed "s|LJCLANG_DEV_DIR|$(THIS_DIR)|g; s|LLVM_LIBDIR|$(libdir)|g;" ./mgrep.sh.in > $(BINDIR)/mgrep
