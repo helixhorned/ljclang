@@ -38,6 +38,7 @@ local function usage(hline)
     print "  -s <stripPattern>"
     print "  -1 <string to print before everything>"
     print "  -2 <string to print after everything>"
+    print "  -A <single Clang command line arg> (same as if specified as positional arg)"
     print "  -C: print lines like"
     print "       static const int membname = 123;  (enums/macros only)"
     print "  -R: reverse mapping, only if one-to-one. Print lines like"
@@ -64,11 +65,12 @@ end
 local parsecmdline = require("parsecmdline_pk")
 
 -- Meta-information about options, see parsecmdline_pk.
-local opt_meta = { e=true, p=true, x=1, s=true, C=false, R=false, Q=false,
+local opt_meta = { e=true, p=true, A=1, x=1, s=true, C=false, R=false, Q=false,
                    ['1']=true, ['2']=true, w=true, f=true }
 
 local opts, args = parsecmdline.getopts(opt_meta, arg, usage)
 
+local additionalArgs = opts.A
 local enumNameFilterPattern = opts.e
 local filterPattern = opts.p
 local excludePatterns = opts.x
@@ -131,6 +133,10 @@ do
         os.exit(1)
     end
     f:close()
+end
+
+for _, additionalArg in ipairs(additionalArgs) do
+    args[#args + 1] = additionalArg
 end
 
 local index = cl.createIndex(true, false)
