@@ -65,19 +65,31 @@ various kinds of C declarations from (usually) headers and print them in
 various forms usable as FFI C declarations or descriptive tables with LuaJIT.
 
 ~~~~~~~~~~
-Usage: ./extractdecls.lua [our_options...] <file.h> [clang_options...]
+Usage: ./extractdecls.lua [our options...] <file.h> [-- [Clang command line args ...]]
+ (Our options may also come after the file name.)
+  -e <enumNameFilterPattern> (enums only)
   -p <filterPattern>
   -x <excludePattern1> [-x <excludePattern2>] ...
   -s <stripPattern>
   -1 <string to print before everything>
   -2 <string to print after everything>
+  -A <single Clang command line arg> (same as if specified as positional arg)
   -C: print lines like
        static const int membname = 123;  (enums/macros only)
   -R: reverse mapping, only if one-to-one. Print lines like
        [123] = "membname";  (enums/macros only)
   -f <formatFunc>: user-provided body for formatting function (enums/macros only)
-       Accepts args `k', `v'; `f' is string.format. Must return a formatted line.
-       Example: "return f('%s = %s%s,', k, k:find('KEY_') and '65536+' or '', v)"
+       Arguments to that function are named
+         * 'k' (enum constant / macro name)
+         * 'v' (its numeric value)
+         * 'enumName' (the name in 'enum <name>', or the empty string)
+         * 'enumIntTypeName' (the name of the underlying integer type of an enum)
+         * 'enumPrefixLength' (the length of the common prefix of all names; enums only)
+       Also, the following is provided:
+         * 'f' as a shorthand for 'string.format'
+       Must return a formatted line.
+       Example:
+         "return f('%s = %s%s,', k, k:find('KEY_') and '65536+' or '', v)"
        Incompatible with -C or -R.
   -Q: be quiet
   -w: extract what? Can be
@@ -90,14 +102,16 @@ names. The `bootstrap` target in the `Makefile` extracts the relevant
 information using these options:
 
 ~~~~~~~~~~
--R -p '^CXCursor_' -x '_First' -x '_Last' -x '_GCCAsmStmt' -x '_MacroInstantiation' -s '^CXCursor_' \
-    -1 'return { name={' -2 '}, }' -Q
+-Q -R -p '^CXCursor_' -s '^CXCursor_' \
+    -x '_First' -x '_Last' -x '_GCCAsmStmt' -x '_MacroInstantiation' \
+    -1 'CursorKindName = {' -2 '},'
 ~~~~~~~~~~
 
-Thus, the `typedef` declarations are filtered to begin with `CXCursor_`
-and all "secondary" names aliasing the one considered the main one are
-rejected. (For example, `CXCursor_AsmStmt` and `CXCursor_GCCAsmStmt` have the
-same value.) Finally, the prefix is stripped (`-s`) to yield lines like
+
+Thus, the enum constant names are filtered to begin with `CXCursor_` and all
+"secondary" names aliasing the one considered the main one are rejected. (For
+example, `CXCursor_AsmStmt` and `CXCursor_GCCAsmStmt` have the same value.)
+Finally, the common prefix is stripped (`-s`) to yield lines like
 
 ~~~~~~~~~~
 [215] = "AsmStmt";
