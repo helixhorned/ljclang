@@ -15,6 +15,8 @@ local cl = require("ljclang")
 
 local ffi = require("ffi")
 
+local math = require("math")
+
 ffi.cdef[[
 time_t time(time_t *);
 ]]
@@ -106,6 +108,42 @@ describe("Loading a cpp file without includes", function()
         end)
 
         local V = cl.ChildVisitResult
+
+        it("tests the ljclang convention: passing a Lua function to cursor:children(),"..
+               " checking that visitor callback objects are freed", function()
+            -- From http://luajit.org/ext_ffi_semantics.html#callback_resources
+            --
+            -- "Callbacks take up resources -- you can only have a limited number
+            -- of them at the same time (500 - 1000, depending on the
+            -- architecture)."
+            local numLoops = 490
+
+            collectgarbage()
+            local memInUseBefore = collectgarbage("count")
+
+            for i = 1, numLoops do
+                local a, b = math.random(), math.random()
+
+                tuCursor:children(function()
+                    return (a + b >= 1) and V.Recurse or V.Continue
+                end)
+            end
+
+            collectgarbage()
+            local memUsageGrowth = collectgarbage("count") / memInUseBefore - 1
+
+            -- As determined experimentally, that value is very permissive: it was
+            -- rather around one permille. Without freeing the callbacks, the
+            -- memory usage grew by around 7 percent though.
+            --
+            -- Note that we do leak memory though, even if only a small amount. Is
+            -- this because the Lua functions are not collected?
+            -- From http://luajit.org/ext_ffi_semantics.html#callback_resources
+            --
+            --  "The associated Lua functions are anchored to prevent garbage
+            --  collection, too."
+            assert.is_true(memUsageGrowth < 0.01)
+        end)
 
         it("tests the ljclang convention: Break", function()
             local i = 0

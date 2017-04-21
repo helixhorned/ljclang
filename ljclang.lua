@@ -452,10 +452,12 @@ end
 -- CAUTION: The `cursor` passed to the visitor callback is only valid during one
 -- particular callback invocation. If it is to be used after the function has
 -- returned, it **must** be copied using the `Cursor` constructor mentioned below.
-function api.regCursorVisitor(visitorfunc)
-    check(type(visitorfunc)=="function", "<visitorfunc> must be a Lua function", 2)
-    return LJCX_CursorVisitor(visitorfunc)
+local function wrapCursorVisitor(visitorFunc)
+    check(type(visitorFunc)=="function", "<visitorfunc> must be a Lua function", 2)
+    return LJCX_CursorVisitor(visitorFunc)
 end
+
+api.regCursorVisitor = wrapCursorVisitor
 
 local Cursor_ptr_t = ffi.typeof("$ *", Cursor_t)
 
@@ -471,7 +473,7 @@ end
 -- cursor: this will be the table where they go.
 local collectTab
 
-local CollectDirectChildren = api.regCursorVisitor(
+local CollectDirectChildren = wrapCursorVisitor(
 function(cur)
     collectTab[#collectTab+1] = Cursor_t(cur[0])
     return 'CXChildVisit_Continue'
@@ -491,12 +493,24 @@ class
         end
     end,
 
-    children = function(self, visitorFuncHandle)
-        if (visitorFuncHandle ~= nil) then
+    children = function(self, visitor)
+        if (visitor ~= nil) then
             -- LJClang way of visiting
-            check(ffi.istype(LJCX_CursorVisitor, visitorFuncHandle),
-                  "<visitorFuncHandle> must be a handle obtained with regCursorVisitor()", 2)
-            local ret = support.ljclang_visitChildrenWith(self._cur, visitorFuncHandle)
+            local isFunction = (type(visitor) == "function")
+
+            if (isFunction) then
+                visitor = wrapCursorVisitor(visitor)
+            else
+                check(ffi.istype(LJCX_CursorVisitor, visitor),
+                      "<visitor> must be a handle obtained with regCursorVisitor() or a Lua function", 2)
+            end
+
+            local ret = support.ljclang_visitChildrenWith(self._cur, visitor)
+
+            if (isFunction) then
+                visitor:free()
+            end
+
             return (ret ~= 0)
         else
             -- luaclang-parser way
