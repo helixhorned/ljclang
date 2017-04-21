@@ -161,6 +161,7 @@ describe("Enumerations", function()
 
     local tu = cl.createIndex():parse(fileName, clangOpts)
     assert.is_not_nil(tu)
+    assert.are.same(tu:diagnostics(), {})
 
     local tuCursor = tu:cursor()
 

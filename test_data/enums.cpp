@@ -17,4 +17,4 @@ enum /* anonymous */ : short
     Red,
     Green,
     Blue
-}
+};
