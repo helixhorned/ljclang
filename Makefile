@@ -37,6 +37,9 @@ lib := -L$(libdir) -lclang
 cxxflags := -std=c++14 -I$(incdir) -fPIC
 cxxflags += -DLJCLANG_LLVM_VERSION='"$(llvm_version)"'
 cxxflags += -Werror -Wall -Wextra -Wold-style-cast -pedantic
+ifneq ($(findstring clang,$(CXX)),)
+    cxxflags += -Wno-unused-const-variable
+endif
 
 # NOTE: Additional flags (such as for enabling sanitizers or debugging symbols)
 # can be specified with CXXFLAGS on the command-line, and they will be appended.
