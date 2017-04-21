@@ -2,11 +2,7 @@
  * (Mostly C callbacks with pass-by-value compound arguments/results.) */
 
 #include <cstdint>
-#include <cstdlib>
-
-#include <vector>
 #include <type_traits>
-
 #include <time.h>
 
 #include <clang-c/Index.h>
@@ -42,46 +38,16 @@ const char *ljclang_getTimeTypeString()
 using LJCX_CursorVisitor = CXChildVisitResult (*)(
     CXCursor *cursor, CXCursor *parent, CXClientData client_data);
 
-struct LJCX_CursorVisitorData
-{
-    LJCX_CursorVisitorData(LJCX_CursorVisitor v) : visitor(v) {}
-
-    LJCX_CursorVisitor visitor;
-};
-
-static std::vector<LJCX_CursorVisitorData> CursorVisitors;
-
-
-/* Registers a LJClang_CursorVisitor callback <visitor> and returns an index by
- * which it can be subsequently referenced.
- *
- * Returns:
- * >=0: the visitor function index on success.
- *  -1: failed realloc().
- */
-extern "C"
-int ljclang_regCursorVisitor(LJCX_CursorVisitor visitor)
-{
-    const size_t idx = CursorVisitors.size();
-    CursorVisitors.emplace_back(visitor);
-    return idx;
-}
-
 static enum CXChildVisitResult
 ourCursorVisitor(CXCursor cursor, CXCursor parent, CXClientData client_data)
 {
-    LJCX_CursorVisitorData *cvd = static_cast<LJCX_CursorVisitorData *>(client_data);
-    return cvd->visitor(&cursor, &parent, nullptr);
+    LJCX_CursorVisitor *visitor = static_cast<LJCX_CursorVisitor *>(client_data);
+    return (*visitor)(&cursor, &parent, nullptr);
 }
 
 extern "C"
-int ljclang_visitChildren(CXCursor parent, int visitoridx)
+int ljclang_visitChildrenWith(CXCursor parent, LJCX_CursorVisitor visitor)
 {
-    if (static_cast<unsigned>(visitoridx) >= CursorVisitors.size())
-        return -1;
-
-    const unsigned wasBroken = clang_visitChildren(
-        parent, ourCursorVisitor, CursorVisitors.data() + visitoridx);
-
+    const unsigned wasBroken = clang_visitChildren(parent, ourCursorVisitor, &visitor);
     return (wasBroken ? 1 : 0);
 }

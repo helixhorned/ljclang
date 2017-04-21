@@ -89,6 +89,12 @@ ENUMS := ErrorCode SaveError DiagnosticSeverity ChildVisitResult
 EXTRACT_CMD_ENV := LD_LIBRARY_PATH="$(libdir):$(THIS_DIR)"
 EXTRACT_CMD := $(EXTRACT_CMD_ENV) ./extractdecls.lua -A -I$(incdir) $(incdir)/clang-c/Index.h
 
+CHECK_EXTRACTED_ENUMS_CMD := $(EXTRACT_CMD_ENV) $(luajit) \
+    -e "require('ffi').cdef[[typedef int time_t;]]" \
+    -e "require '$(subst .lua,,$(INDEX_H_LUA))'" \
+    -e "l=require '$(subst .lua,,$(EXTRACTED_ENUMS_LUA))'" \
+    -e "assert(l.CursorKindName[1] ~= nil)"
+
 .SILENT: $(EXTRACTED_ENUMS_LUA)
 
 $(EXTRACTED_ENUMS_LUA): $(LJCLANG_SUPPORT_SO) $(GENERATED_FILES_STAGE_1) $(incdir)/clang-c/*
@@ -104,7 +110,10 @@ $(EXTRACTED_ENUMS_LUA): $(LJCLANG_SUPPORT_SO) $(GENERATED_FILES_STAGE_1) $(incdi
 	echo '}' >> $(EXTRACTED_ENUMS_LUA_TMP)
     # -- Done extracting
 	mv $(EXTRACTED_ENUMS_LUA_TMP) $(EXTRACTED_ENUMS_LUA)
-	printf "* \033[1mGenerated $(EXTRACTED_ENUMS_LUA)\033[0m\n"
+	($(CHECK_EXTRACTED_ENUMS_CMD) && \
+	    printf "* \033[1mGenerated $(EXTRACTED_ENUMS_LUA)\033[0m\n") \
+	|| (printf "* \033[1;31mError\033[0m generating $(EXTRACTED_ENUMS_LUA)\n" && \
+	    mv $(EXTRACTED_ENUMS_LUA) $(EXTRACTED_ENUMS_LUA)_ && false)
 
 # ---------- Post-build ----------
 

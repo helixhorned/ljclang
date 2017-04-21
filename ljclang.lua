@@ -94,9 +94,10 @@ typedef enum CXChildVisitResult (*LJCX_CursorVisitor)(
     $ *cursor, $ *parent, CXClientData client_data);
 ]], Cursor_t, Cursor_t)
 
+local LJCX_CursorVisitor = ffi.typeof("LJCX_CursorVisitor")
+
 ffi.cdef[[
-int ljclang_regCursorVisitor(LJCX_CursorVisitor visitor);
-int ljclang_visitChildren(CXCursor parent, int visitoridx);
+int ljclang_visitChildrenWith(CXCursor parent, LJCX_CursorVisitor visitor);
 ]]
 
 -------------------------------------------------------------------------
@@ -453,13 +454,7 @@ end
 -- returned, it **must** be copied using the `Cursor` constructor mentioned below.
 function api.regCursorVisitor(visitorfunc)
     check(type(visitorfunc)=="function", "<visitorfunc> must be a Lua function", 2)
-
-    local ret = support.ljclang_regCursorVisitor(visitorfunc)
-    if (ret < 0) then
-        error("failed registering visitor function, code "..ret, 2)
-    end
-
-    return ret
+    return LJCX_CursorVisitor(visitorfunc)
 end
 
 local Cursor_ptr_t = ffi.typeof("$ *", Cursor_t)
@@ -496,17 +491,19 @@ class
         end
     end,
 
-    children = function(self, visitoridx)
-        if (visitoridx ~= nil) then
+    children = function(self, visitorFuncHandle)
+        if (visitorFuncHandle ~= nil) then
             -- LJClang way of visiting
-            local ret = support.ljclang_visitChildren(self._cur, visitoridx)
+            check(ffi.istype(LJCX_CursorVisitor, visitorFuncHandle),
+                  "<visitorFuncHandle> must be a handle obtained with regCursorVisitor()", 2)
+            local ret = support.ljclang_visitChildrenWith(self._cur, visitorFuncHandle)
             return (ret ~= 0)
         else
             -- luaclang-parser way
             assert(collectTab == nil, "children() must not be called while another invocation is active")
 
             collectTab = {}
-            support.ljclang_visitChildren(self._cur, CollectDirectChildren)
+            support.ljclang_visitChildrenWith(self._cur, CollectDirectChildren)
             local tab = collectTab
             collectTab = nil
             return tab
