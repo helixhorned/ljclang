@@ -11,7 +11,8 @@ llvm-config := $(shell which $(LLVM_CONFIG))
 luajit := luajit
 
 # Will use this Markdown processor for .md -> .html if it is found:
-markdown := cmark
+MARKDOWN := cmark
+markdown := $(shell which $(MARKDOWN))
 
 ifeq ($(llvm-config),)
     $(error "$(LLVM_CONFIG) not found, use LLVM_CONFIG=<path/to/llvm-config> make")
@@ -112,9 +113,12 @@ $(EXTRACTED_ENUMS_LUA): $(LJCLANG_SUPPORT_SO) $(GENERATED_FILES_STAGE_1) $(incdi
 doc: README.md.in ljclang.lua ./make_docs.lua
 	$(luajit) ./make_docs.lua $^ > README.md \
 	    && printf "* \033[1mGenerated README.md\033[0m\n"
-	(which $(markdown) > /dev/null && $(markdown) README.md > README.html \
-	    && printf "* \033[1mGenerated README.html\033[0m\n") \
-	|| echo "* Did not generate README.html"
+ifneq ($(markdown),)
+	$(markdown) README.md > README.html \
+	    && printf "* \033[1mGenerated README.html\033[0m\n"
+else
+	echo "* Did not generate README.html: '$(MARKDOWN)' not installed"
+endif
 
 test: $(LJCLANG_SUPPORT_SO) $(GENERATED_FILES_STAGE_2)
 	LLVM_LIBDIR="$(libdir)" $(SHELL) ./run_tests.sh
@@ -122,3 +126,10 @@ test: $(LJCLANG_SUPPORT_SO) $(GENERATED_FILES_STAGE_2)
 install: $(LJCLANG_SUPPORT_SO) $(GENERATED_FILES_STAGE_2)
 	sed "s|LJCLANG_DEV_DIR|$(THIS_DIR)|g; s|LLVM_LIBDIR|$(libdir)|g;" ./mgrep.sh.in > $(BINDIR)/mgrep
 	chmod +x $(BINDIR)/mgrep
+
+# This target is merely there to create compile_commands.json entries for the test
+# source files in case we are invoked with 'bear'.
+compile_commands.json: $(patsubst %.cpp,%.o,$(wildcard test_data/*.cpp))
+
+test_data/%.o: test_data/%.cpp
+	$(CXX) -c $(subst -Werror,,$(cxxflags)) $< -o /dev/null
