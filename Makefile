@@ -46,13 +46,13 @@ cxxflags += $(CXXFLAGS)
 ########## RULES ##########
 
 INDEX_H_LUA := ljclang_Index_h.lua
-CKIND_LUA := ljclang_cursor_kind.lua
-CKIND_LUA_TMP := $(CKIND_LUA).tmp
+EXTRACTED_ENUMS_LUA := ljclang_extracted_enums.lua
+EXTRACTED_ENUMS_LUA_TMP := $(EXTRACTED_ENUMS_LUA).tmp
 
 LJCLANG_SUPPORT_SO := libljclang_support.so
 
 GENERATED_FILES_STAGE_1 := $(INDEX_H_LUA)
-GENERATED_FILES_STAGE_2 := $(GENERATED_FILES_STAGE_1) $(CKIND_LUA)
+GENERATED_FILES_STAGE_2 := $(GENERATED_FILES_STAGE_1) $(EXTRACTED_ENUMS_LUA)
 
 .PHONY: all clean veryclean bootstrap doc test install
 
@@ -62,9 +62,9 @@ clean:
 	rm -f $(LJCLANG_SUPPORT_SO)
 
 veryclean: clean
-	rm -f $(GENERATED_FILES_STAGE_2) $(CKIND_LUA_TMP)
+	rm -f $(GENERATED_FILES_STAGE_2) $(EXTRACTED_ENUMS_LUA_TMP)
 
-bootstrap: $(CKIND_LUA)
+bootstrap: $(EXTRACTED_ENUMS_LUA)
 
 # ---------- Build ----------
 
@@ -88,23 +88,22 @@ ENUMS := ErrorCode SaveError DiagnosticSeverity ChildVisitResult
 EXTRACT_CMD_ENV := LD_LIBRARY_PATH="$(libdir):$(THIS_DIR)"
 EXTRACT_CMD := $(EXTRACT_CMD_ENV) ./extractdecls.lua -A -I$(incdir) $(incdir)/clang-c/Index.h
 
-.SILENT: $(CKIND_LUA)
+.SILENT: $(EXTRACTED_ENUMS_LUA)
 
-# Generate list of CXCursorKind names
-$(CKIND_LUA): $(LJCLANG_SUPPORT_SO) $(GENERATED_FILES_STAGE_1) $(incdir)/clang-c/*
-	echo 'return {}' > $(CKIND_LUA)
+$(EXTRACTED_ENUMS_LUA): $(LJCLANG_SUPPORT_SO) $(GENERATED_FILES_STAGE_1) $(incdir)/clang-c/*
+	echo 'return {}' > $(EXTRACTED_ENUMS_LUA)
     # -- Extract enums
-	echo 'local ffi=require"ffi"' > $(CKIND_LUA_TMP)
-	echo 'return {' >> $(CKIND_LUA_TMP)
+	echo 'local ffi=require"ffi"' > $(EXTRACTED_ENUMS_LUA_TMP)
+	echo 'return {' >> $(EXTRACTED_ENUMS_LUA_TMP)
 	for enumName in $(ENUMS); do \
-	    $(EXTRACT_CMD) $(EXTRACT_OPTS_ENUM) -e "^CX$$enumName$$" >> $(CKIND_LUA_TMP); \
+	    $(EXTRACT_CMD) $(EXTRACT_OPTS_ENUM) -e "^CX$$enumName$$" >> $(EXTRACTED_ENUMS_LUA_TMP); \
 	done
     # -- Extract cursor kinds
-	$(EXTRACT_CMD) $(EXTRACT_OPTS_KINDS) >> $(CKIND_LUA_TMP)
-	echo '}' >> $(CKIND_LUA_TMP)
+	$(EXTRACT_CMD) $(EXTRACT_OPTS_KINDS) >> $(EXTRACTED_ENUMS_LUA_TMP)
+	echo '}' >> $(EXTRACTED_ENUMS_LUA_TMP)
     # -- Done extracting
-	mv $(CKIND_LUA_TMP) $(CKIND_LUA)
-	printf "* \033[1mGenerated $(CKIND_LUA)\033[0m\n"
+	mv $(EXTRACTED_ENUMS_LUA_TMP) $(EXTRACTED_ENUMS_LUA)
+	printf "* \033[1mGenerated $(EXTRACTED_ENUMS_LUA)\033[0m\n"
 
 # ---------- Post-build ----------
 

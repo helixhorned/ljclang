@@ -41,7 +41,7 @@ local supportLLVMVersion = ffi.string(support.ljclang_getLLVMVersion())
 
 require("ljclang_Index_h")
 
-local ExtractedEnums = require("ljclang_cursor_kind")
+local ExtractedEnums = require("ljclang_extracted_enums")
 -- enum value -> name (i.e "reverse") mapping of cursor kinds:
 local g_CursorKindName = ExtractedEnums.CursorKindName
 ExtractedEnums.CursorKindName = nil
