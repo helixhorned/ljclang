@@ -1,6 +1,8 @@
 #!/usr/bin/env luajit
 -- mgrep.lua -- Search for named member accesses.
 
+local require = require
+
 local io = require("io")
 local os = require("os")
 local math = require("math")
@@ -17,6 +19,7 @@ local class = require("class").class
 local abs = math.abs
 local format = string.format
 
+local arg = arg
 local assert = assert
 local print = print
 

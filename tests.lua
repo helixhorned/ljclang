@@ -6,6 +6,7 @@ local assert = assert
 local describe = describe
 local it = it
 
+local collectgarbage = collectgarbage
 local ipairs = ipairs
 local type = type
 local tostring = tostring
@@ -18,10 +19,10 @@ ffi.cdef[[
 time_t time(time_t *);
 ]]
 
-----------
-
 local nonExistentFileName = "/non_exisitent_file"
 assert(io.open(nonExistentFileName) == nil)
+
+----------
 
 local clangOpts = { "-std=c++14", "-Wall", "-pedantic" }
 

@@ -1,9 +1,11 @@
 
 local ffi = require("ffi")
 
+local assert = assert
 local error = error
 local pairs = pairs
 local setmetatable = setmetatable
+local tostring = tostring
 local type = type
 
 ----------

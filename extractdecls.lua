@@ -2,6 +2,8 @@
 
 local arg = arg
 
+local require = require
+
 local io = require("io")
 local os = require("os")
 local math = require("math")
@@ -14,6 +16,7 @@ local assert = assert
 local ipairs = ipairs
 local print = print
 local tonumber = tonumber
+local loadstring = loadstring
 
 local format = string.format
 
