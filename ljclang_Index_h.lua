@@ -31,7 +31,7 @@ typedef struct {
 |*                                                                            *|
 |*===----------------------------------------------------------------------===*|
 |*                                                                            *|
-|* This header provides a public inferface to use CompilationDatabase without *|
+|* This header provides a public interface to use CompilationDatabase without *|
 |* the full Clang C++ API.                                                    *|
 |*                                                                            *|
 \*===----------------------------------------------------------------------===*/
@@ -110,12 +110,13 @@ enum CXErrorCode {
 |*                                                                            *|
 |*===----------------------------------------------------------------------===*|
 |*                                                                            *|
-|* This header provides a public inferface to a Clang library for extracting  *|
+|* This header provides a public interface to a Clang library for extracting  *|
 |* high-level symbol information from source files without exposing the full  *|
 |* Clang C++ API.                                                             *|
 |*                                                                            *|
 \*===----------------------------------------------------------------------===*/
 typedef void *CXIndex;
+typedef struct CXTargetInfoImpl *CXTargetInfo;
 typedef struct CXTranslationUnitImpl *CXTranslationUnit;
 typedef void *CXClientData;
 struct CXUnsavedFile {
@@ -144,7 +145,26 @@ typedef struct CXVersion {
 
   int Subminor;
 } CXVersion;
+enum CXCursor_ExceptionSpecificationKind {
 
+  CXCursor_ExceptionSpecificationKind_None,
+
+  CXCursor_ExceptionSpecificationKind_DynamicNone,
+
+  CXCursor_ExceptionSpecificationKind_Dynamic,
+
+  CXCursor_ExceptionSpecificationKind_MSAny,
+
+  CXCursor_ExceptionSpecificationKind_BasicNoexcept,
+
+  CXCursor_ExceptionSpecificationKind_ComputedNoexcept,
+
+  CXCursor_ExceptionSpecificationKind_Unevaluated,
+
+  CXCursor_ExceptionSpecificationKind_Uninstantiated,
+
+  CXCursor_ExceptionSpecificationKind_Unparsed
+};
  CXIndex clang_createIndex(int excludeDeclarationsFromPCH,
                                          int displayDiagnostics);
  void clang_disposeIndex(CXIndex index);
@@ -162,6 +182,8 @@ typedef enum {
 } CXGlobalOptFlags;
  void clang_CXIndex_setGlobalOptions(CXIndex, unsigned options);
  unsigned clang_CXIndex_getGlobalOptions(CXIndex);
+ void
+clang_CXIndex_setInvocationEmissionPathOption(CXIndex, const char *Path);
 typedef void *CXFile;
  CXString clang_getFileName(CXFile SFile);
  time_t clang_getFileTime(CXFile SFile);
@@ -173,6 +195,8 @@ typedef struct {
 clang_isFileMultipleIncludeGuarded(CXTranslationUnit tu, CXFile file);
  CXFile clang_getFile(CXTranslationUnit tu,
                                     const char *file_name);
+ const char *clang_getFileContents(CXTranslationUnit tu,
+                                                 CXFile file, size_t *size);
  int clang_File_isEqual(CXFile file1, CXFile file2);
 typedef struct {
   const void *ptr_data[2];
@@ -357,7 +381,9 @@ enum CXTranslationUnit_Flags {
 
   CXTranslationUnit_CreatePreambleOnFirstParse = 0x100,
 
-  CXTranslationUnit_KeepGoing = 0x200
+  CXTranslationUnit_KeepGoing = 0x200,
+
+  CXTranslationUnit_SingleFileParse = 0x400
 };
  unsigned clang_defaultEditingTranslationUnitOptions(void);
  CXTranslationUnit
@@ -404,6 +430,7 @@ enum CXSaveError {
  int clang_saveTranslationUnit(CXTranslationUnit TU,
                                              const char *FileName,
                                              unsigned options);
+ unsigned clang_suspendTranslationUnit(CXTranslationUnit);
  void clang_disposeTranslationUnit(CXTranslationUnit);
 enum CXReparse_Flags {
 
@@ -455,6 +482,14 @@ typedef struct CXTUResourceUsage {
 } CXTUResourceUsage;
  CXTUResourceUsage clang_getCXTUResourceUsage(CXTranslationUnit TU);
  void clang_disposeCXTUResourceUsage(CXTUResourceUsage usage);
+ CXTargetInfo
+clang_getTranslationUnitTargetInfo(CXTranslationUnit CTUnit);
+ void
+clang_TargetInfo_dispose(CXTargetInfo Info);
+ CXString
+clang_TargetInfo_getTriple(CXTargetInfo Info);
+ int
+clang_TargetInfo_getPointerWidth(CXTargetInfo Info);
 enum CXCursorKind {
   /* Declarations */
 
@@ -974,6 +1009,12 @@ enum CXLanguageKind {
   CXLanguage_CPlusPlus
 };
  enum CXLanguageKind clang_getCursorLanguage(CXCursor cursor);
+enum CXTLSKind {
+  CXTLS_None = 0,
+  CXTLS_Dynamic,
+  CXTLS_Static
+};
+ enum CXTLSKind clang_getCursorTLSKind(CXCursor cursor);
  CXTranslationUnit clang_Cursor_getTranslationUnit(CXCursor);
 typedef struct CXCursorSetImpl *CXCursorSet;
  CXCursorSet clang_createCXCursorSet(void);
@@ -1029,8 +1070,10 @@ enum CXTypeKind {
   CXType_ObjCClass = 28,
   CXType_ObjCSel = 29,
   CXType_Float128 = 30,
+  CXType_Half = 31,
+  CXType_Float16 = 32,
   CXType_FirstBuiltin = CXType_Void,
-  CXType_LastBuiltin  = CXType_ObjCSel,
+  CXType_LastBuiltin  = CXType_Float16,
   CXType_Complex = 100,
   CXType_Pointer = 101,
   CXType_BlockPointer = 102,
@@ -1051,7 +1094,50 @@ enum CXTypeKind {
   CXType_MemberPointer = 117,
   CXType_Auto = 118,
 
-  CXType_Elaborated = 119
+  CXType_Elaborated = 119,
+  /* OpenCL PipeType. */
+  CXType_Pipe = 120,
+  /* OpenCL builtin types. */
+  CXType_OCLImage1dRO = 121,
+  CXType_OCLImage1dArrayRO = 122,
+  CXType_OCLImage1dBufferRO = 123,
+  CXType_OCLImage2dRO = 124,
+  CXType_OCLImage2dArrayRO = 125,
+  CXType_OCLImage2dDepthRO = 126,
+  CXType_OCLImage2dArrayDepthRO = 127,
+  CXType_OCLImage2dMSAARO = 128,
+  CXType_OCLImage2dArrayMSAARO = 129,
+  CXType_OCLImage2dMSAADepthRO = 130,
+  CXType_OCLImage2dArrayMSAADepthRO = 131,
+  CXType_OCLImage3dRO = 132,
+  CXType_OCLImage1dWO = 133,
+  CXType_OCLImage1dArrayWO = 134,
+  CXType_OCLImage1dBufferWO = 135,
+  CXType_OCLImage2dWO = 136,
+  CXType_OCLImage2dArrayWO = 137,
+  CXType_OCLImage2dDepthWO = 138,
+  CXType_OCLImage2dArrayDepthWO = 139,
+  CXType_OCLImage2dMSAAWO = 140,
+  CXType_OCLImage2dArrayMSAAWO = 141,
+  CXType_OCLImage2dMSAADepthWO = 142,
+  CXType_OCLImage2dArrayMSAADepthWO = 143,
+  CXType_OCLImage3dWO = 144,
+  CXType_OCLImage1dRW = 145,
+  CXType_OCLImage1dArrayRW = 146,
+  CXType_OCLImage1dBufferRW = 147,
+  CXType_OCLImage2dRW = 148,
+  CXType_OCLImage2dArrayRW = 149,
+  CXType_OCLImage2dDepthRW = 150,
+  CXType_OCLImage2dArrayDepthRW = 151,
+  CXType_OCLImage2dMSAARW = 152,
+  CXType_OCLImage2dArrayMSAARW = 153,
+  CXType_OCLImage2dMSAADepthRW = 154,
+  CXType_OCLImage2dArrayMSAADepthRW = 155,
+  CXType_OCLImage3dRW = 156,
+  CXType_OCLSampler = 157,
+  CXType_OCLEvent = 158,
+  CXType_OCLQueue = 159,
+  CXType_OCLReserveID = 160
 };
 enum CXCallingConv {
   CXCallingConv_Default = 0,
@@ -1064,7 +1150,9 @@ enum CXCallingConv {
   CXCallingConv_AAPCS_VFP = 7,
   CXCallingConv_X86RegCall = 8,
   CXCallingConv_IntelOclBicc = 9,
-  CXCallingConv_X86_64Win64 = 10,
+  CXCallingConv_Win64 = 10,
+  /* Alias for compatibility with older versions of API. */
+  CXCallingConv_X86_64Win64 = CXCallingConv_Win64,
   CXCallingConv_X86_64SysV = 11,
   CXCallingConv_X86VectorCall = 12,
   CXCallingConv_Swift = 13,
@@ -1116,6 +1204,8 @@ enum CXTemplateArgumentKind {
  unsigned clang_Cursor_isFunctionInlined(CXCursor C);
  unsigned clang_isVolatileQualifiedType(CXType T);
  unsigned clang_isRestrictQualifiedType(CXType T);
+ unsigned clang_getAddressSpace(CXType T);
+ CXString clang_getTypedefName(CXType CT);
  CXType clang_getPointeeType(CXType T);
  CXCursor clang_getTypeDeclaration(CXType T);
  CXString clang_getDeclObjCTypeEncoding(CXCursor C);
@@ -1123,16 +1213,19 @@ enum CXTemplateArgumentKind {
  CXString clang_getTypeKindSpelling(enum CXTypeKind K);
  enum CXCallingConv clang_getFunctionTypeCallingConv(CXType T);
  CXType clang_getResultType(CXType T);
+ int clang_getExceptionSpecificationType(CXType T);
  int clang_getNumArgTypes(CXType T);
  CXType clang_getArgType(CXType T, unsigned i);
  unsigned clang_isFunctionTypeVariadic(CXType T);
  CXType clang_getCursorResultType(CXCursor C);
+ int clang_getCursorExceptionSpecificationType(CXCursor C);
  unsigned clang_isPODType(CXType T);
  CXType clang_getElementType(CXType T);
  long long clang_getNumElements(CXType T);
  CXType clang_getArrayElementType(CXType T);
  long long clang_getArraySize(CXType T);
  CXType clang_Type_getNamedType(CXType T);
+ unsigned clang_Type_isTransparentTagTypedef(CXType T);
 enum CXTypeLayoutError {
 
   CXTypeLayoutError_Invalid = -1,
@@ -1260,11 +1353,15 @@ typedef enum {
  unsigned clang_Cursor_getObjCDeclQualifiers(CXCursor C);
  unsigned clang_Cursor_isObjCOptional(CXCursor C);
  unsigned clang_Cursor_isVariadic(CXCursor C);
+ unsigned clang_Cursor_isExternalSymbol(CXCursor C,
+                                       CXString *language, CXString *definedIn,
+                                       unsigned *isGenerated);
  CXSourceRange clang_Cursor_getCommentRange(CXCursor C);
  CXString clang_Cursor_getRawCommentText(CXCursor C);
  CXString clang_Cursor_getBriefCommentText(CXCursor C);
  CXString clang_Cursor_getMangling(CXCursor);
  CXStringSet *clang_Cursor_getCXXManglings(CXCursor);
+ CXStringSet *clang_Cursor_getObjCManglings(CXCursor);
 typedef void *CXModule;
  CXModule clang_Cursor_getModule(CXCursor C);
  CXModule clang_getModuleForFile(CXTranslationUnit, CXFile);
@@ -1286,6 +1383,8 @@ CXFile clang_Module_getTopLevelHeader(CXTranslationUnit,
  unsigned clang_CXXMethod_isPureVirtual(CXCursor C);
  unsigned clang_CXXMethod_isStatic(CXCursor C);
  unsigned clang_CXXMethod_isVirtual(CXCursor C);
+ unsigned clang_CXXRecord_isAbstract(CXCursor C);
+ unsigned clang_EnumDecl_isScoped(CXCursor C);
  unsigned clang_CXXMethod_isConst(CXCursor C);
  enum CXCursorKind clang_getTemplateCursorKind(CXCursor C);
 
@@ -1643,7 +1742,8 @@ typedef enum {
   CXIdxEntityLang_None = 0,
   CXIdxEntityLang_C    = 1,
   CXIdxEntityLang_ObjC = 2,
-  CXIdxEntityLang_CXX  = 3
+  CXIdxEntityLang_CXX  = 3,
+  CXIdxEntityLang_Swift  = 4
 } CXIdxEntityLanguage;
 typedef enum {
   CXIdxEntity_NonTemplate   = 0,
