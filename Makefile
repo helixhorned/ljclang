@@ -79,7 +79,7 @@ $(INDEX_H_LUA): ./createheader.lua $(incdir)/clang-c/*
 	@$(luajit) ./createheader.lua $(incdir)/clang-c > $@
 	@printf "* \033[1mGenerated $@ from files in $(incdir)/clang-c \033[0m\n"
 
-EXTRACT_OPTS_KINDS := -Q -R -p '^CXCursor_' -s '^CXCursor_' \
+EXTRACT_OPTS_KINDS := -Q -R -e 'CXCursorKind' -p '^CXCursor_' -s '^CXCursor_' \
     -x '_First' -x '_Last' -x '_GCCAsmStmt' -x '_MacroInstantiation' \
     -1 'CursorKindName = {' -2 '},'
 
