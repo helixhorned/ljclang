@@ -26,6 +26,7 @@ namespace
     template <> struct TimeType<int64_t> { static constexpr const char *String = "int64_t"; };
     template <> struct TimeType<uint32_t> { static constexpr const char *String = "uint32_t"; };
     template <> struct TimeType<uint64_t> { static constexpr const char *String = "uint64_t"; };
+    template <> struct TimeType<long int> { static constexpr const char *String = "long int"; };
 }
 
 extern "C"
