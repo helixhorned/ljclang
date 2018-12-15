@@ -583,7 +583,7 @@ class
             -- line number
             return filename, Beg.line, End.line, Beg.col, End.col, Beg.offset, End.offset
         else
-            -- luaclang-parser order (offset: XXX)
+            -- luaclang-parser order (offset: undocumented)
             return filename, Beg.line, Beg.col, End.line, End.col, Beg.offset, End.offset
         end
     end,

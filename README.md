@@ -19,16 +19,18 @@ Requirements
 * LuaJIT 2.0 or greater
 
 * LLVM/Clang -- from the Linux distribution or
-  [here](http://apt.llvm.org/). Lately, development has been done using LLVM
-  4.0, which fixes a long-standing issue searching with system includes.
+  [here](http://apt.llvm.org/). Development is done using the latest stable
+  version, but older versions should work mostly fine (except that interfaces
+  exposed by newer version are not available, of course).
 
 
 Building
 --------
 
-The following builds the required support library `libljclang_support.so`,
-converts libclang C headers into a form that can be used by LuaJIT and finally
-extracts additional information using LJClang itself:
+The following command builds the required support library `libljclang_support.so`,
+converts libclang C headers into a form that can be used by LuaJIT (using a Lua
+program that essentially strips text that would not be understood by LuaJIT's
+`ffi.cdef`) and finally extracts additional information using LJClang itself:
 
 ~~~~~~~~~~
 LLVM_CONFIG=</path/to/llvm-config> make
@@ -44,13 +46,13 @@ tree (AST) of C/C++ source files. These are the main classes:
 * `Index` -- represents a set of translation units that could be linked together
 * `TranslationUnit` -- a source file together with everything included by it
   either directly or transitively
-* `Cursor` -- an element in the AST in a translation unit such as a `typedef`
-  declaration or a statement
+* `Cursor` -- points to an element in the AST in a translation unit such as a
+  `typedef` declaration or a statement
 * `Type` -- the type of an element (for example, that of a variable, structure
   member, or a function's input argument or return value)
 
 To make something interesting happen, you usually create a single `Index`
-object, parse into it one or many translation units, and define a callback
+object, parse into it one or more translation units, and define a callback
 function to be invoked on each visit of a `Cursor` by libclang.
 
 
@@ -102,16 +104,17 @@ names. The `bootstrap` target in the `Makefile` extracts the relevant
 information using these options:
 
 ~~~~~~~~~~
--Q -R -p '^CXCursor_' -s '^CXCursor_' \
+-Q -R -e 'CXCursorKind' -p '^CXCursor_' -s '^CXCursor_' \
     -x '_First' -x '_Last' -x '_GCCAsmStmt' -x '_MacroInstantiation' \
     -1 'CursorKindName = {' -2 '},'
 ~~~~~~~~~~
 
 
-Thus, the enum constant names are filtered to begin with `CXCursor_` and all
-"secondary" names aliasing the one considered the main one are rejected. (For
-example, `CXCursor_AsmStmt` and `CXCursor_GCCAsmStmt` have the same value.)
-Finally, the common prefix is stripped (`-s`) to yield lines like
+Thus, the enum constant names are filtered to be taken from `enum CXCursorKind`,
+beginning with `CXCursor_` (that prefix being stripped) and all "secondary" names
+aliasing the one considered the main one are rejected. (For example,
+`CXCursor_AsmStmt` and `CXCursor_GCCAsmStmt` have the same value.) This yields
+lines like
 
 ~~~~~~~~~~
 [215] = "AsmStmt";
