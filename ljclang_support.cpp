@@ -17,8 +17,8 @@ const char *ljclang_getLLVMVersion()
 
 namespace
 {
-    static_assert(std::is_integral<time_t>::value, "");
-    static_assert(sizeof(time_t) == 4 || sizeof(time_t) == 8, "");
+    static_assert(std::is_integral<time_t>::value);
+    static_assert(sizeof(time_t) == 4 || sizeof(time_t) == 8);
 
     template <typename T> struct TimeType {};
 
@@ -46,7 +46,7 @@ using LJCX_CursorVisitor = CXChildVisitResult (*)(
 static enum CXChildVisitResult
 ourCursorVisitor(CXCursor cursor, CXCursor parent, CXClientData client_data)
 {
-    LJCX_CursorVisitor *visitor = static_cast<LJCX_CursorVisitor *>(client_data);
+    auto *visitor = static_cast<LJCX_CursorVisitor *>(client_data);
     return (*visitor)(&cursor, &parent, nullptr);
 }
 
