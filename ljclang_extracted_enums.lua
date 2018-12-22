@@ -129,6 +129,7 @@ CursorKindName = {
 [146] = "ObjCSelfExpr";
 [147] = "OMPArraySectionExpr";
 [148] = "ObjCAvailabilityCheckExpr";
+[149] = "FixedPointLiteral";
 [200] = "UnexposedStmt";
 [201] = "LabelStmt";
 [202] = "CompoundStmt";
