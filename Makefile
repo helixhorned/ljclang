@@ -79,18 +79,7 @@ $(INDEX_H_LUA): ./createheader.lua $(incdir)/clang-c/*
 	@$(luajit) ./createheader.lua $(incdir)/clang-c > $@
 	@printf "* \033[1mGenerated $@ from files in $(incdir)/clang-c \033[0m\n"
 
-EXTRACT_OPTS_KINDS := -Q -R -e 'CXCursorKind' -p '^CXCursor_' -s '^CXCursor_' \
-    -x '_First' -x '_Last' -x '_GCCAsmStmt' -x '_MacroInstantiation' \
-    -1 'CursorKindName = {' -2 '},'
-
-EXTRACT_OPTS_ENUM := -Q \
-    -f "return f('    static const int %s = %s;', k:sub(enumPrefixLength+1), k)" \
-    -1 "$$enumName = ffi.new[[struct{" -2 "}]],"
-
-ENUMS := ErrorCode SaveError DiagnosticSeverity ChildVisitResult
-
-EXTRACT_CMD_ENV := LD_LIBRARY_PATH="$(libdir):$(THIS_DIR)"
-EXTRACT_CMD := $(EXTRACT_CMD_ENV) ./extractdecls.lua -A -I$(incdir) $(incdir)/clang-c/Index.h
+EXTRACT_CMD_ENV := LD_LIBRARY_PATH="$(libdir):$(THIS_DIR)" incdir="$(incdir)"
 
 CHECK_EXTRACTED_ENUMS_CMD := $(EXTRACT_CMD_ENV) $(luajit) \
     -e "require('ffi').cdef[[typedef int time_t;]]" \
@@ -102,21 +91,14 @@ CHECK_EXTRACTED_ENUMS_CMD := $(EXTRACT_CMD_ENV) $(luajit) \
 
 $(EXTRACTED_ENUMS_LUA): $(LJCLANG_SUPPORT_SO) $(GENERATED_FILES_STAGE_1) $(incdir)/clang-c/*
 	echo 'return {}' > $(EXTRACTED_ENUMS_LUA)
-    # -- Extract enums
-	echo 'local ffi=require"ffi"' > $(EXTRACTED_ENUMS_LUA_TMP)
-	echo 'return {' >> $(EXTRACTED_ENUMS_LUA_TMP)
-	for enumName in $(ENUMS); do \
-	    $(EXTRACT_CMD) $(EXTRACT_OPTS_ENUM) -e "^CX$$enumName$$" >> $(EXTRACTED_ENUMS_LUA_TMP); \
-	done
-    # -- Extract cursor kinds
-	$(EXTRACT_CMD) $(EXTRACT_OPTS_KINDS) >> $(EXTRACTED_ENUMS_LUA_TMP)
-	echo '}' >> $(EXTRACTED_ENUMS_LUA_TMP)
-    # -- Done extracting
+    # Do the extraction.
+	$(EXTRACT_CMD_ENV) ./print_extracted_enums_lua.sh > $(EXTRACTED_ENUMS_LUA_TMP)
+    # Check that we can load the generated file in Lua.
 	mv $(EXTRACTED_ENUMS_LUA_TMP) $(EXTRACTED_ENUMS_LUA)
 	($(CHECK_EXTRACTED_ENUMS_CMD) && \
 	    printf "* \033[1mGenerated $(EXTRACTED_ENUMS_LUA)\033[0m\n") \
 	|| (printf "* \033[1;31mError\033[0m generating $(EXTRACTED_ENUMS_LUA)\n" && \
-	    mv $(EXTRACTED_ENUMS_LUA) $(EXTRACTED_ENUMS_LUA)_ && false)
+	    mv $(EXTRACTED_ENUMS_LUA) $(EXTRACTED_ENUMS_LUA).reject && false)
 
 # ---------- Post-build ----------
 
