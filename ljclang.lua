@@ -67,11 +67,18 @@ local function check(pred, msg, level)
     end
 end
 
-local TranslationUnit_t_ = ffi.typeof "struct { CXTranslationUnit _tu; }"
--- NOTE: CXCursor is a struct type by itself, but we wrap it to e.g. provide a
--- kind() *method* (CXCursor contains a member of the same name).
-local Cursor_t = ffi.typeof "struct { CXCursor _cur; }"
-local Type_t = ffi.typeof "struct { CXType _typ; }"
+-- Give our structs names for nicer error messages.
+ffi.cdef[[
+struct LJClangTranslationUnit { CXTranslationUnit _tu; };
+// NOTE: CXCursor is a struct type by itself, but we wrap it to e.g. provide a
+// kind() *method* (CXCursor contains a member of the same name).
+struct LJClangCursor { CXCursor _cur; };
+struct LJClangType { CXType _typ; };
+]]
+
+local TranslationUnit_t_ = ffi.typeof "struct LJClangTranslationUnit"
+local Cursor_t = ffi.typeof "struct LJClangCursor"
+local Type_t = ffi.typeof "struct LJClangType"
 
 -- [<address of CXTranslationUnit as string>] = count
 local TUCount = {}
