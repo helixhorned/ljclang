@@ -54,6 +54,23 @@ describe("Loading a cpp file without includes", function()
             assert.is_true(ffi.C.time(nil) > modTime)
         end)
 
+        -- TODO: location in a system header, location outside a system header but not in
+        -- the main file either.
+
+        it("tests tu:location()", function()
+            local loc = tu:location(fileName, 5, 4)
+            assert.is_not_nil(loc)
+            assert.is_false(loc:isInSystemHeader())
+            assert.is_true(loc:isFromMainFile())
+        end)
+
+        it("tests tu:locationFromOffset()", function()
+            local loc = tu:locationForOffset(fileName, 10)
+            assert.is_not_nil(loc)
+            assert.is_false(loc:isInSystemHeader())
+            assert.is_true(loc:isFromMainFile())
+        end)
+
         it("tests its cursor", function()
             local tuCursor = tu:cursor()
             assert.are.equal(tuCursor, tuCursor)

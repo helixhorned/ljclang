@@ -314,6 +314,31 @@ local function NewIndex(cxidx)
 end
 
 -------------------------------------------------------------------------
+---------------------------- SourceLocation -----------------------------
+-------------------------------------------------------------------------
+
+local SourceLocation = class
+{
+    function(cxloc, tu)
+        assert(ffi.istype("CXSourceLocation", cxloc))
+        return {
+            _loc = cxloc,
+            _tu = tu  -- the translation unit must live as long as we live
+        }
+    end,
+
+    -- TODO: __eq?
+
+    isInSystemHeader = function(self)
+        return (clang.clang_Location_isInSystemHeader(self._loc) ~= 0)
+    end,
+
+    isFromMainFile = function(self)
+        return (clang.clang_Location_isFromMainFile(self._loc) ~= 0)
+    end,
+}
+
+-------------------------------------------------------------------------
 ---------------------------- TranslationUnit ----------------------------
 -------------------------------------------------------------------------
 
@@ -327,6 +352,11 @@ end
 -- NULL cursor, return nil.
 local function getCursor(cxcur)
     return (clang.clang_Cursor_isNull(cxcur) == 0) and Cursor_t(cxcur) or nil
+end
+
+local function getFile(tu, filename)
+    check(type(filename) == "string", "<filename> must be a string", 3)
+    return clang.clang_getFile(tu, filename)
 end
 
 class
@@ -364,10 +394,23 @@ class
 
     file = function(self, filename)
         check_tu_valid(self)
-        check(type(filename) == "string", "<filename> must be a string", 2)
-        local cxfile = clang.clang_getFile(self._tu, filename)
+        local cxfile = getFile(self._tu, filename)
         local mTime = tonumber(clang.clang_getFileTime(cxfile))
         return getString(clang.clang_getFileName(cxfile)), mTime
+    end,
+
+    location = function(self, filename, line, column)
+        check_tu_valid(self)
+        local cxfile = getFile(self._tu, filename)
+        local cxloc = clang.clang_getLocation(self._tu, cxfile, line, column)
+        return SourceLocation(cxloc, self)
+    end,
+
+    locationForOffset = function(self, filename, offset)
+        check_tu_valid(self)
+        local cxfile = getFile(self._tu, filename)
+        local cxloc = clang.clang_getLocationForOffset(self._tu, cxfile, offset)
+        return SourceLocation(cxloc, self)
     end,
 
     diagnostics = function(self)
