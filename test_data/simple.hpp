@@ -5,7 +5,7 @@ struct First
     long b = 2;
 };
 
-int func()
+inline int func()
 {
     First f;
     return f.a;
@@ -17,7 +17,7 @@ enum Fruits
     Pear,
 };
 
-int badFunc()
+inline int badFunc()
 {
     int i;
     return i;  // uninitialized use

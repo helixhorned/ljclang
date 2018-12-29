@@ -36,8 +36,8 @@ describe("Attempting to parse a nonexistent file", function()
 end)
 
 describe("Loading a cpp file without includes", function()
-    local fileName = "test_data/simple.cpp"
-    local astFileName = "/tmp/ljclang_test_simple.cpp.ast"
+    local fileName = "test_data/simple.hpp"
+    local astFileName = "/tmp/ljclang_test_simple.hpp.ast"
 
     local tu, errorCode = cl.createIndex():parse(fileName, clangOpts)
 
@@ -213,7 +213,7 @@ describe("Loading a cpp file without includes", function()
 end)
 
 describe("Enumerations", function()
-    local fileName = "test_data/enums.cpp"
+    local fileName = "test_data/enums.hpp"
 
     local tu = cl.createIndex():parse(fileName, clangOpts)
     assert.is_not_nil(tu)
