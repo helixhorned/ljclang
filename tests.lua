@@ -88,7 +88,7 @@ describe("Loading a cpp file without includes", function()
             assert.are.equal(tuCursor:kind(), "TranslationUnit")
         end)
 
-        it("tests diagnostics from it", function()
+        it("tests diagnostics from it using tu:diagnostics()", function()
             local diags = tu:diagnostics()
             assert.is_table(diags)
             assert.are.equal(#diags, 1)
@@ -99,6 +99,17 @@ describe("Loading a cpp file without includes", function()
             assert.are.equal(diag.severity, cl.DiagnosticSeverity.Warning)
             assert.are.equal(diag.category, "Semantic Issue")
             assert.is_string(diag.text)
+        end)
+
+        it("tests diagnostics from it using tu:diagnosticSet()", function()
+            local diags = tu:diagnosticSet()
+            assert.are.equal(#diags, 1)
+
+            local diag = diags[1]
+
+            assert.are.equal(diag:severity(), "warning")
+            assert.are.equal(diag:category(), "Semantic Issue")
+            assert.is_string(diag:spelling())
         end)
 
         it("tests loading a nonexistent translation unit", function()
