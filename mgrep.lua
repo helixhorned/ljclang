@@ -21,6 +21,7 @@ local format = string.format
 
 local arg = arg
 local assert = assert
+local ipairs = ipairs
 local print = print
 
 ffi.cdef[[
@@ -375,8 +376,7 @@ if (useCompDb) then
         abort("Fatal: Compilation database contains no entries, or an error occurred")
     end
 
-    for ci = 1, #cmds do
-        local cmd = cmds[ci]
+    for ci, cmd in ipairs(cmds) do
         -- NOTE: Strip "-c" and "-o" options from args. (else: "crash detected" for me)
         local argsWithoutC = cl.stripArgs(cmd:getArgs(false), "^-c$", 1)
         local args = cl.stripArgs(argsWithoutC, "^-o$", 2)

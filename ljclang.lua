@@ -202,6 +202,17 @@ local CompileCommands_t = class
         local numArgs = clang.clang_CompileCommand_getNumArgs(cmdPtr)
         return CompileCommand_t(cmdPtr, numArgs)
     end,
+
+    __ipairs = function(self)
+        local iterator = function(_, i)
+            i = i+1
+            if i <= #self then
+                return i, self[i]
+            end
+        end
+
+        return iterator, nil, 0
+    end,
 }
 
 local CompilationDatabase_t = class
