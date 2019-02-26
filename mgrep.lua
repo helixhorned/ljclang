@@ -23,6 +23,7 @@ local arg = arg
 local assert = assert
 local ipairs = ipairs
 local print = print
+local type = type
 
 ffi.cdef[[
 char *getcwd(char *buf, size_t size);
@@ -171,7 +172,7 @@ end)
 local Bold = "1;"
 --local Uline = "4;"
 
---local Black = "30m"
+local Black = "30m"
 local Red = "31m"
 --local Green = "32m"
 --local Yellow = "33m"
@@ -397,17 +398,65 @@ if (useCompDb) then
     end
 end
 
-local function GetColorizeTripleFunc(color)
+local function GetColorizeTripleFunc(severityTextColor, colorizeMainText)
     return function(pre, tag, post)
         return
             colorize(pre, Bold..White)..
-            colorize(tag, Bold..color)..
-            colorize(post, Bold..White)
+            colorize(tag, Bold..severityTextColor)..
+            (colorizeMainText and colorize(post, Bold..White) or post)
     end
 end
 
-local ColorizeErrorFunc = GetColorizeTripleFunc(Red)
-local ColorizeWarningFunc = GetColorizeTripleFunc(Purple)
+local ColorizeErrorFunc = GetColorizeTripleFunc(Red, true)
+local ColorizeWarningFunc = GetColorizeTripleFunc(Purple, true)
+local ColorizeNoteFunc = GetColorizeTripleFunc(Black, false)
+
+local function FormatDiagnostic(diag, printCategory)
+    local text = diag:format()
+
+    if (useColors) then
+        text = text:gsub("(.*)(error: )(.*)", ColorizeErrorFunc)
+        text = text:gsub("(.*)(warning: )(.*)", ColorizeWarningFunc)
+        text = text:gsub("(.*)(note: )(.*)", ColorizeNoteFunc)
+    end
+
+    local category = diag:category()
+    return text .. ((printCategory and #category > 0) and " ["..category.."]" or "")
+end
+
+local function PrintPrefixDiagnostics(diags, indentation)
+    for i = 1, #diags do
+        local text = diags[i]:spelling()
+
+        if (text:match("^in file included from ")) then
+            errprintf("%s%s", string.rep(" ", indentation), "In"..text:sub(3))
+        else
+            return i
+        end
+    end
+
+    return #diags + 1
+end
+
+local function PrintDiagnostics(diags, startIndex, indentation)
+    assert(type(startIndex) == "number")
+    assert(type(indentation) == "number")
+
+    for i = startIndex, #diags do
+        local diag = diags[i]
+        local childDiags = diag:childDiagnostics()
+
+        local innerStartIndex = PrintPrefixDiagnostics(childDiags, indentation)
+        errprintf("%s%s", string.rep(" ", indentation), FormatDiagnostic(diag, indentation == 0))
+        -- Recurse. We expect only at most two levels in total (but do not check for that).
+        PrintDiagnostics(diag:childDiagnostics(), innerStartIndex, indentation + 2)
+
+        if (indentation == 0) then
+            -- Print a newline.
+            errprintf("")
+        end
+    end
+end
 
 local foundStruct = false
 
@@ -434,15 +483,7 @@ for fi=1,#files do
     end
 
     if (not quiet) then
-        local diags = tu:diagnostics()
-        for i=1,#diags do
-            local text = diags[i].text
-            if (useColors) then
-                text = text:gsub("(.*)(error: )(.*)", ColorizeErrorFunc)
-                text = text:gsub("(.*)(warning: )(.*)", ColorizeWarningFunc)
-            end
-            errprintf("%s", text)
-        end
+        PrintDiagnostics(tu:diagnosticSet(), 1, 0)
     end
 
     if (not dryrun) then
