@@ -58,6 +58,8 @@ describe("Loading a cpp file without includes", function()
         -- the main file either.
 
         it("tests tu:location()", function()
+            assert.is_nil(tu:location(nonExistentFileName, 1, 1))
+
             local loc = tu:location(fileName, 5, 4)
             assert.is_not_nil(loc)
             assert.is_false(loc:isInSystemHeader())
@@ -65,6 +67,8 @@ describe("Loading a cpp file without includes", function()
         end)
 
         it("tests tu:locationFromOffset()", function()
+            assert.is_nil(tu:locationForOffset(nonExistentFileName, 1))
+
             local loc = tu:locationForOffset(fileName, 10)
             assert.is_not_nil(loc)
             assert.is_false(loc:isInSystemHeader())
