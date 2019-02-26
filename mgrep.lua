@@ -123,7 +123,6 @@ end
 
 local typeName, memberName = parseQueryString(queryStr)
 
-local g_curFileName
 -- The ClassDecl or StructDecl of the type we're searching for:
 local g_structDecl
 local g_cursorKind
@@ -323,26 +322,6 @@ local function printResults()
     end
 end
 
-local function getAllSourceFiles(db)
-    local cmds = db:getAllCompileCommands()
-
-    local haveSrc = {}
-    local srcFiles = {}
-
-    for ci=1,#cmds do
-        local fns = cmds[ci]:getSourcePaths()
-        for j=1,#fns do
-            local fn = fns[j]
-            if (not haveSrc[fn]) then
-                haveSrc[fn] = true
-                srcFiles[#srcFiles+1] = fn
-            end
-        end
-    end
-
-    return srcFiles
-end
-
 -- Make "-Irelative/subdir" -> "-I/path/to/relative/subdir",
 -- <opts> is modified in-place.
 local function absifyIncOpts(opts, prefixDir)
@@ -364,7 +343,7 @@ end
 
 -- Use a compilation database?
 local useCompDb = (compDbName ~= nil)
-local compArgs = {}  -- if using compDB, will have #compArgs == #files, each a table
+local compArgs = {}  -- if using compDB, will have #compArgs == #compDbEntries, each a table
 
 if (not useCompDb and #files == 0) then
     os.exit(0)
@@ -387,23 +366,20 @@ if (useCompDb) then
         abort("Fatal: Could not load compilation database")
     end
 
-    -- Get all source files, uniq'd.
-    files = getAllSourceFiles(db)
+    local cmds = db:getAllCompileCommands()
 
-    if (#files == 0) then
-        -- NOTE: We may get a CompilationDatabase even if
+    if (#cmds == 0) then
+        -- NOTE: We get a CompilationDatabase even if
         -- clang_CompilationDatabase_fromDirectory() failed (as evidenced by
         -- error output from "LIBCLANG TOOLING").
         abort("Fatal: Compilation database contains no entries, or an error occurred")
     end
 
-    for fi=1,#files do
-        local cmds = db:getCompileCommands(files[fi])
-        -- NOTE: Only use the first CompileCommand for a given file name:
-        local cmd = cmds[1]
-
+    for ci = 1, #cmds do
+        local cmd = cmds[ci]
         -- NOTE: Strip "-c" and "-o" options from args. (else: "crash detected" for me)
-        local args = cl.stripArgs(cmd:getArgs(false), "^-[co]$", 2)
+        local argsWithoutC = cl.stripArgs(cmd:getArgs(false), "^-c$", 1)
+        local args = cl.stripArgs(argsWithoutC, "^-o$", 2)
         absifyIncOpts(args, cmd:getDirectory())
 
         if (clangOpts ~= nil) then
@@ -412,9 +388,12 @@ if (useCompDb) then
                 args[#args+1] = suffixArgs[ai]
             end
         end
-        compArgs[fi] = args
+        compArgs[ci] = args
+    end
 
---        if (fi == 1) then print("Args: "..table.concat(args, ', ').."\n") end
+    for i=1,#cmds do
+        -- Fake presence of files for compilation database mode for the later loop.
+        files[i] = "/dev/null"  -- XXX: Windows
     end
 end
 
@@ -434,7 +413,6 @@ local foundStruct = false
 
 for fi=1,#files do
     local fn = files[fi]
-    g_curFileName = fn
 
     local index = cl.createIndex(true, false)
     local opts = useCompDb and compArgs[fi] or clangOpts or {}
@@ -448,7 +426,7 @@ for fi=1,#files do
         f:close()
     end
 
-    local tu, errorCode = index:parse("", opts, {"KeepGoing"})
+    local tu, errorCode = index:parse(useCompDb and "" or fn, opts, {"KeepGoing"})
 
     if (tu == nil) then
         errprintf("ERROR: Failed parsing %s: %s", fn, errorCode)

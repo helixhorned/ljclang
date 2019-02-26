@@ -158,7 +158,7 @@ end
 local CompileCommand_t = class
 {
     "CXCompileCommand _ptr;"..
-    "const double numArgs, numSources;",
+    "const double numArgs;",
 
     -- args = cmd:getArgs([alsoCompilerExe])
     -- args: sequence table. If <alsoCompilerExe> is true, args[0] is the
@@ -177,37 +177,6 @@ local CompileCommand_t = class
     getDirectory = function(self)
         local cxstr = clang.clang_CompileCommand_getDirectory(self._ptr)
         return getString(cxstr)
-    end,
-
-    -- paths = cmd:getSourcePaths()
-    -- paths: sequence table.
-    getSourcePaths = function(self)
-        -- XXX: This is a workaround implementation due to a missing
-        -- clang_CompileCommand_getNumMappedSources symbol in libclang.so,
-        -- see commented out code below.
-        local args = self:getArgs()
-        for i=1,#args do
-            if (args[i] == '-c' and args[i+1]) then
-                local sourceFile = args[i+1]
-                if (sourceFile:sub(1,1) ~= "/") then  -- XXX: Windows
-                    sourceFile = self:getDirectory() .. "/" .. sourceFile
-                end
-                return { sourceFile }
-            end
-        end
-
-        print(table.concat(args, ' '))
-        check(false, "Did not find -c option (workaround for missing "..
-                  "clang_CompileCommand_getMappedSourcePath symbol)")
---[[
-        local paths = {}
-        for i=0,self.numSources-1 do
-            -- XXX: for me, the symbol is missing in libclang.so:
-            local cxstr = clang.clang_CompileCommand_getMappedSourcePath(self._ptr, i)
-            paths[i] = getString(cxstr)
-        end
-        return paths
---]]
     end,
 }
 
@@ -228,11 +197,10 @@ local CompileCommands_t = class
     -- commands[i]: get the i'th CompileCommand object (i is 1-based)
     __index = function(self, i)
         check(type(i) == "number", "<i> must be a number", 2)
-        check(i >= 1 and i <= self.numCommands, "<i> must be in [1, numCommands]", 2)
+        check(i >= 1 and i <= self.numCommands, "<i> must be in [1, #self]", 2)
         local cmdPtr = clang.clang_CompileCommands_getCommand(self._ptr, i-1)
         local numArgs = clang.clang_CompileCommand_getNumArgs(cmdPtr)
-        local numSources = 0 --clang.clang_CompileCommand_getNumMappedSources(cmdPtr)
-        return CompileCommand_t(cmdPtr, numArgs, numSources)
+        return CompileCommand_t(cmdPtr, numArgs)
     end,
 }
 
