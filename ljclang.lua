@@ -293,11 +293,21 @@ end
 
 local SourceLocation = class
 {
-    function(cxloc, tu)
+    function(cxloc, parent)
         assert(ffi.istype("CXSourceLocation", cxloc))
+
+        -- XXX: ffi.istype(...) is not what we want: there is no anchoring then, after all!
+        -- TODO: make them all into tables!
+        assert(type(parent) == "table" or ffi.istype("struct LJClangTranslationUnit", parent))
+
+        if (clang.clang_equalLocations(cxloc, clang.clang_getNullLocation()) ~= 0) then
+            -- Return nil (and not a SourceLocation object) on invalid (null) location.
+            return nil
+        end
+
         return {
             _loc = cxloc,
-            _tu = tu  -- the translation unit must live as long as we live
+            _parent = parent
         }
     end,
 
@@ -309,6 +319,128 @@ local SourceLocation = class
 
     isFromMainFile = function(self)
         return (clang.clang_Location_isFromMainFile(self._loc) ~= 0)
+    end,
+}
+
+-------------------------------------------------------------------------
+------------------------------- Diagnostic ------------------------------
+-------------------------------------------------------------------------
+
+local DiagnosticSet
+
+-- TODO: have "safe enum" instead? Meaning: supported operations are:
+--  * <safe-enum-value> == <string>: comparison with suffix (e.g. "Warning"), error if not
+--    an enum constant
+--  * tostring(<safe-enum-value>): returns suffix as string
+--  * to/from number?
+local SeverityEnumToString = {
+    [tonumber(C.CXDiagnostic_Ignored)] = "ignored",
+    [tonumber(C.CXDiagnostic_Note)] = "note",
+    [tonumber(C.CXDiagnostic_Warning)] = "warning",
+    [tonumber(C.CXDiagnostic_Error)] = "error",
+    [tonumber(C.CXDiagnostic_Fatal)] = "fatal",
+}
+
+function api.defaultDiagnosticDisplayOptions()
+    return clang.clang_defaultDiagnosticDisplayOptions()
+end
+
+local Diagnostic = class
+{
+    function(cxdiag, parent)
+        assert(ffi.istype("CXDiagnostic", cxdiag))
+        assert(cxdiag ~= nil)
+        assert(type(parent) == "table")
+
+        return {
+            _diag = cxdiag,
+            _parent = parent
+        }
+    end,
+
+    childDiagnostics = function(self)
+        local cxdiagset = clang.clang_getChildDiagnostics(self._diag)
+        return DiagnosticSet(cxdiagset, self, true)
+    end,
+
+    format = function(self, opts)
+        opts = util.checkOptionsArgAndGetDefault(opts, api.defaultDiagnosticDisplayOptions())
+        opts = util.handleTableOfOptionStrings(clang, "CXDiagnostic_", opts)
+        return getString(clang.clang_formatDiagnostic(self._diag, opts))
+    end,
+
+    severity = function(self)
+        local severityEnumValue = clang.clang_getDiagnosticSeverity(self._diag)
+        return SeverityEnumToString[tonumber(severityEnumValue)]
+    end,
+
+    location = function(self)
+        local cxsrcloc = clang.clang_getDiagnosticLocation(self._diag)
+        return SourceLocation(cxsrcloc, self)
+    end,
+
+    spelling = function(self)
+        return getString(clang.clang_getDiagnosticSpelling(self._diag))
+    end,
+
+    option = function(self)
+        local disabledOptionCXString = CXString()
+        local enabledOptionCXString = clang.clang_getDiagnosticOption(self._diag, disabledOptionCXString)
+        -- TODO: test: what if there is no "option that disables this diagnostic" (from libclang doc)?
+        --       Will we assert in getString() then?
+        return getString(enabledOptionCXString), getString(disabledOptionCXString)
+    end,
+
+    category = function(self)
+        return getString(clang.clang_getDiagnosticCategoryText(self._diag))
+    end,
+
+    -- TODO: ranges()?
+    -- TODO: fixIts()?
+
+    __gc = function(self)
+        -- NOTE: in LLVM 7 at least, this is a no-op. See LLVM's
+        -- clang/tools/libclang/CIndexDiagnostic.cpp
+        clang.clang_disposeDiagnostic(self._diag)
+    end,
+}
+
+-------------------------------------------------------------------------
+----------------------------- DiagnosticSet -----------------------------
+-------------------------------------------------------------------------
+
+DiagnosticSet = class
+{
+    function(cxdiagset, parent, needsNoDisposal)
+        assert(ffi.istype("CXDiagnosticSet", cxdiagset))
+
+        -- XXX: ffi.istype(...) is not what we want: there is no anchoring then, after all!
+        -- TODO: make them all into tables!
+        assert(type(parent) == "table" or ffi.istype("struct LJClangTranslationUnit", parent))
+
+        assert(needsNoDisposal == nil or type(needsNoDisposal) == "boolean")
+        local haveDiagSet = (cxdiagset ~= nil)
+
+        local tab = {
+            _set = cxdiagset,
+            _parent = parent,
+            _needsDisposal = haveDiagSet and not needsNoDisposal,
+        }
+
+        if (haveDiagSet) then
+            for i = 1, clang.clang_getNumDiagnosticsInSet(cxdiagset) do
+                local cxdiag = clang.clang_getDiagnosticInSet(cxdiagset, i-1)
+                tab[i] = Diagnostic(cxdiag, tab)
+            end
+        end
+
+        return tab
+    end,
+
+    __gc = function(self)
+        if (self._needsDisposal) then
+            clang.clang_disposeDiagnosticSet(self._set)
+        end
     end,
 }
 
@@ -387,6 +519,13 @@ class
         return SourceLocation(cxloc, self)
     end,
 
+    diagnosticSet = function(self)
+        check_tu_valid(self)
+        local cxdiagset = clang.clang_getDiagnosticSetFromTU(self._tu)
+        return DiagnosticSet(cxdiagset, self)
+    end,
+
+    -- deprecated
     diagnostics = function(self)
         check_tu_valid(self)
 

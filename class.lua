@@ -71,8 +71,10 @@ function api.class(tab)
     if (type(ctor) == "function") then
         local factory = function(...)
             local t = ctor(...)
-            check(type(t) == "table", "constructor must return a table", 2)
-            return setmetatable(t, mt)
+            check(t == nil or type(t) == "table", "constructor must return nil or a table", 2)
+            if (t ~= nil) then
+                return setmetatable(t, mt)
+            end
         end
 
         return factory
