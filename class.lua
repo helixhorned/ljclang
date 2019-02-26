@@ -10,11 +10,7 @@ local type = type
 
 ----------
 
-local function check(pred, msg, level)
-    if (not pred) then
-        error(msg, level+1)
-    end
-end
+local check = require("util").check
 
 ----------
 

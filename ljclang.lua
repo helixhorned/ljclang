@@ -27,6 +27,7 @@ local function lib(basename)
 end
 
 local class = require("class").class
+local util = require("util")
 
 local clang = ffi.load(lib"clang")
 local support = ffi.load(lib"ljclang_support")
@@ -59,13 +60,7 @@ end
 local function debugf() end
 --]=]
 
--- Wrap 'error' in assert-like call to write type checks in one line instead of
--- three.
-local function check(pred, msg, level)
-    if (not pred) then
-        error(msg, level+1)
-    end
-end
+local check = util.check
 
 -- Give our structs names for nicer error messages.
 ffi.cdef[[
@@ -947,37 +942,7 @@ function api.createIndex(excludeDeclarationsFromPCH, displayDiagnostics)
     return NewIndex(cxidx)
 end
 
--- argstab = clang.splitAtWhitespace(args)
-function api.splitAtWhitespace(args)
-    assert(type(args) == "string")
-    local argstab = {}
-    -- Split delimited by whitespace.
-    for str in args:gmatch("[^%s]+") do
-        argstab[#argstab+1] = str
-    end
-    return argstab
-end
-
--- Is <tab> a sequence of strings?
-local function iscellstr(tab)
-    for i=1,#tab do
-        if (type(tab[i]) ~= "string") then
-            return false
-        end
-    end
-
-    -- We require this because in ARGS_FROM_TAB below, an index 0 would be
-    -- interpreted as the starting index.
-    return (tab[0] == nil)
-end
-
-local function check_iftab_iscellstr(tab, name)
-    if (type(tab)=="table") then
-        if (not iscellstr(tab)) then
-            error(name.." must be a string sequence when a table, with no element at [0]", 3)
-        end
-    end
-end
+api.splitAtWhitespace = util.splitAtWhitespace
 
 -- #### `translationUnit, errorCode = index:parse(sourceFileName, cmdLineArgs [, opts])`
 --
@@ -1003,18 +968,13 @@ end
 function Index_mt.__index.parse(self, srcfile, args, opts)
     check(type(srcfile)=="string", "<srcfile> must be a string", 2)
     check(type(args)=="string" or type(args)=="table", "<args> must be a string or table", 2)
-    check_iftab_iscellstr(args, "<args>")
+    util.check_iftab_iscellstr(args, "<args>", 2)
 
     if (srcfile == "") then
         srcfile = nil
     end
 
-    if (opts == nil) then
-        opts = C.CXTranslationUnit_None;
-    else
-        check(type(opts)=="number" or type(opts)=="table", 2)
-        check_iftab_iscellstr(args, "<opts>")
-    end
+    local opts = util.checkOptionsArgAndGetDefault(opts, C.CXTranslationUnit_None)
 
     -- Input argument handling.
 
@@ -1022,13 +982,7 @@ function Index_mt.__index.parse(self, srcfile, args, opts)
         args = api.splitAtWhitespace(args)
     end
 
-    if (type(opts)=="table") then
-        local optflags = {}
-        for i=1,#opts do
-            optflags[i] = clang["CXTranslationUnit_"..opts[i]]  -- look up the enum
-        end
-        opts = bit.bor(unpack(optflags))
-    end
+    opts = util.handleTableOfOptionStrings(clang, "CXTranslationUnit_", opts)
 
     local argsptrs = ffi.new("const char * [?]", #args, args)  -- ARGS_FROM_TAB
 
