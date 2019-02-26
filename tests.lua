@@ -15,6 +15,7 @@ local cl = require("ljclang")
 
 local ffi = require("ffi")
 
+local io = require("io")
 local math = require("math")
 
 ffi.cdef[[
@@ -35,6 +36,11 @@ describe("Attempting to parse a nonexistent file", function()
     assert.are.not_equal(errorCode, cl.ErrorCode.Success)
 end)
 
+local function assertParseWasSuccess(tu, errorCode)
+    assert.is_not_nil(tu)
+    assert.are.equal(errorCode, cl.ErrorCode.Success)
+end
+
 describe("Loading a cpp file without includes", function()
     local fileName = "test_data/simple.hpp"
     local astFileName = "/tmp/ljclang_test_simple.hpp.ast"
@@ -44,8 +50,7 @@ describe("Loading a cpp file without includes", function()
     -- Test that we don't need to keep the index (from createIndex()) around:
     collectgarbage()
 
-    assert.is_not_nil(tu)
-    assert.are.equal(errorCode, cl.ErrorCode.Success)
+    assertParseWasSuccess(tu, errorCode)
 
     describe("Translation unit", function()
         it("tests tu:file()", function()
@@ -213,6 +218,58 @@ describe("Loading a cpp file without includes", function()
             tuCursor:children(visitor)
             assert.are.same(members, expectedMembers)
         end)
+    end)
+end)
+
+local function writeToFile(fileName, string)
+    local f = io.open(fileName, 'w')
+    f:write(string..'\n')
+    f:close()
+end
+
+local function concatTables(...)
+    local sourceTables = {...}
+    local tab = {}
+
+    for ti=1,#sourceTables do
+        local sourceTab = sourceTables[ti]
+        assert(type(sourceTab) == "table")
+
+        for i=1,#sourceTab do
+            tab[#tab + 1] = sourceTab[i]
+        end
+    end
+
+    return tab
+end
+
+describe("Loading a file with includes", function()
+    local fileName1 = "/tmp/ljclang_test_includes_simple.cpp"
+    local fileName2 = "/tmp/ljclang_test_includes_enums.cpp"
+
+    writeToFile(fileName1, '#include "simple.hpp"')
+    writeToFile(fileName2, '#include "enums.hpp"')
+
+    local additionalOpts = {"-Itest_data/"}
+    local clangOpts = concatTables(clangOpts, additionalOpts)
+
+    it("tests passing a single source file name", function()
+        local tu, errorCode = cl.createIndex():parse(fileName1, clangOpts)
+        assertParseWasSuccess(tu, errorCode)
+    end)
+
+    it("tests passing multiple source file names (1)", function()
+        local clangOpts = concatTables(clangOpts, {fileName1, fileName2})
+        local tu, errorCode = cl.createIndex():parse("", clangOpts)
+        assert.is_nil(tu)
+        assert.are.equal(errorCode, cl.ErrorCode.ASTReadError)
+    end)
+
+    it("tests passing multiple source file names (2)", function()
+        local clangOpts = concatTables(clangOpts, {fileName2})
+        local tu, errorCode = cl.createIndex():parse(fileName1, clangOpts)
+        assert.is_nil(tu)
+        assert.are.equal(errorCode, cl.ErrorCode.ASTReadError)
     end)
 end)
 
