@@ -448,10 +448,10 @@ for fi=1,#files do
         f:close()
     end
 
-    local tu = index:parse(fn, opts)
+    local tu, errorCode = index:parse("", opts, {"KeepGoing"})
 
     if (tu == nil) then
-        errprintf("ERROR: Failed parsing %s", fn)
+        errprintf("ERROR: Failed parsing %s: %s", fn, errorCode)
         goto nextfile
     end
 
