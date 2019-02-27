@@ -14,8 +14,9 @@ local pairs = pairs
 --  false: doesn't have argument (i.e. is switch)
 --  true: has argument, collect once
 --  1: has argument, collect all
--- opt_meta[0] is an offset for the indices of the returned <args> table. For
--- example, if it's -1, the args[0] will be the first positional argument.
+-- opt_meta[0] is an offset for the indices of the returned <args> table.
+-- For example, if it's -1, the args[0] will be the first positional argument.
+-- Defaults to 0.
 --
 -- <arg>: The arguments provided to the program
 -- <usage_func>: Function to print usage and terminate. Should accept optional
