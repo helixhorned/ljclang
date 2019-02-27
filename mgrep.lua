@@ -16,6 +16,8 @@ local C = ffi.C
 local cl = require("ljclang")
 local class = require("class").class
 
+local compile_commands_util = require("compile_commands_util")
+
 local abs = math.abs
 local format = string.format
 
@@ -324,25 +326,6 @@ local function printResults()
     end
 end
 
--- Make "-Irelative/subdir" -> "-I/path/to/relative/subdir",
--- <opts> is modified in-place.
-local function absifyIncOpts(opts, prefixDir)
-    if (prefixDir:sub(1,1) ~= "/") then
-        -- XXX: Windows.
-        errprintf("mgrep.lua: prefixDir '%s' does not start with '/'.", prefixDir)
-        os.exit(1)
-    end
-
-    for i=1,#opts do
-        local opt = opts[i]
-        if (opt:sub(1,2)=="-I" and opt:sub(3,3)~="/") then
-            opts[i] = "-I" .. prefixDir .. "/" .. opt:sub(3)
-        end
-    end
-
-    return opts
-end
-
 -- Use a compilation database?
 local useCompDb = (compDbName ~= nil)
 local compArgs = {}  -- if using compDB, will have #compArgs == #compDbEntries, each a table
@@ -378,10 +361,7 @@ if (useCompDb) then
     end
 
     for ci, cmd in ipairs(cmds) do
-        -- NOTE: Strip "-c" and "-o" options from args. (else: "crash detected" for me)
-        local argsWithoutC = cl.stripArgs(cmd:getArgs(false), "^-c$", 1)
-        local args = cl.stripArgs(argsWithoutC, "^-o$", 2)
-        absifyIncOpts(args, cmd:getDirectory())
+        local args = compile_commands_util.sanitize_args(cmd:getArgs(), cmd:getDirectory())
 
         if (clangOpts ~= nil) then
             local suffixArgs = cl.splitAtWhitespace(clangOpts)
