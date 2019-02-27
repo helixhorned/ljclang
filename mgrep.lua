@@ -167,27 +167,8 @@ end)
 
 --------------------
 
--- For reference:
--- https://wiki.archlinux.org/index.php/Color_Bash_Prompt#List_of_colors_for_prompt_and_Bash
-
---local Normal = "0;"
-local Bold = "1;"
---local Uline = "4;"
-
-local Black = "30m"
-local Red = "31m"
---local Green = "32m"
---local Yellow = "33m"
---local Blue = "34m"
-local Purple = "35m"
---local Cyan = "36m"
-local White = "37m"
-
-local function colorize(str, modcolor)
-    return "\027["..modcolor..str.."\027[m"
-end
-
---------------------
+local Col = require("terminal_colors")
+local colorize = Col.colorize
 
 local SourceFile = class
 {
@@ -292,7 +273,7 @@ local function colorizeResult(str, colBegEnds)
         local e = colBegEnds[i+1]
 
         strtab[#strtab+1] = str:sub(a,b-1)
-        strtab[#strtab+1] = colorize(str:sub(b,e-1), Bold..Red)
+        strtab[#strtab+1] = colorize(str:sub(b,e-1), Col.Bold..Col.Red)
         a = e
     end
     strtab[#strtab+1] = str:sub(a)
