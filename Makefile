@@ -94,11 +94,33 @@ $(EXTRACTED_ENUMS_LUA): $(LJCLANG_SUPPORT_SO) $(GENERATED_FILES_STAGE_1) $(incdi
     # Do the extraction.
 	$(EXTRACT_CMD_ENV) ./print_extracted_enums_lua.sh > $(EXTRACTED_ENUMS_LUA_TMP)
     # Check that we can load the generated file in Lua.
-	mv $(EXTRACTED_ENUMS_LUA_TMP) $(EXTRACTED_ENUMS_LUA)
+	mv $(EXTRACTED_ENUMS_LUA_TMP) $@
 	($(CHECK_EXTRACTED_ENUMS_CMD) && \
-	    printf "* \033[1mGenerated $(EXTRACTED_ENUMS_LUA)\033[0m\n") \
-	|| (printf "* \033[1;31mError\033[0m generating $(EXTRACTED_ENUMS_LUA)\n" && \
-	    mv $(EXTRACTED_ENUMS_LUA) $(EXTRACTED_ENUMS_LUA).reject && false)
+	    printf "* \033[1mGenerated $@\033[0m\n") \
+	|| (printf "* \033[1;31mError\033[0m generating $@\n" && \
+	    mv $@ $@.reject && false)
+
+inotify_h ?= /usr/include/x86_64-linux-gnu/sys/inotify.h
+inotify_decls_lua := inotify_decls.lua
+inotify_decls_lua_tmp := $(inotify_decls_lua).tmp
+
+CHECK_EXTRACTED_INOTIFY_CMD := $(EXTRACT_CMD_ENV) $(luajit) \
+    -e "require'inotify_decls'"
+
+$(inotify_decls_lua): $(EXTRACTED_ENUMS_LUA) $(inotify_h)
+	@echo 'local ffi=require"ffi"' > $(inotify_decls_lua_tmp)
+	@echo 'ffi.cdef[[' >> $(inotify_decls_lua_tmp)
+	@$(EXTRACT_CMD_ENV) ./extractdecls.lua -w FunctionDecl -p 'inotify_' $(inotify_h) >> $(inotify_decls_lua_tmp)
+	@echo ']]' >> $(inotify_decls_lua_tmp)
+	@echo 'return ffi.new[[struct {' >> $(inotify_decls_lua_tmp)
+	@$(EXTRACT_CMD_ENV) ./extractdecls.lua -C -p '^IN_' -s '^IN_' $(inotify_h) >> $(inotify_decls_lua_tmp)
+	@$(EXTRACT_CMD_ENV) ./extractdecls.lua -w MacroDefinition -C -p '^IN_' -s '^IN_' $(inotify_h) >> $(inotify_decls_lua_tmp)
+	@echo '}]]' >> $(inotify_decls_lua_tmp)
+	@mv $(inotify_decls_lua_tmp) $@
+	@($(CHECK_EXTRACTED_INOTIFY_CMD) && \
+	    printf "* \033[1mGenerated $@\033[0m\n") \
+	|| (printf "* \033[1;31mError\033[0m generating $@\n" && \
+	    mv $@ $@.reject && false)
 
 # ---------- Post-build ----------
 
