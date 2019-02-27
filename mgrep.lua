@@ -17,6 +17,7 @@ local cl = require("ljclang")
 local class = require("class").class
 
 local compile_commands_util = require("compile_commands_util")
+local diagnostics_util = require("diagnostics_util")
 
 local abs = math.abs
 local format = string.format
@@ -359,66 +360,6 @@ if (useCompDb) then
     end
 end
 
-local function GetColorizeTripleFunc(severityTextColor, colorizeMainText)
-    return function(pre, tag, post)
-        return
-            colorize(pre, Bold..White)..
-            colorize(tag, Bold..severityTextColor)..
-            (colorizeMainText and colorize(post, Bold..White) or post)
-    end
-end
-
-local ColorizeErrorFunc = GetColorizeTripleFunc(Red, true)
-local ColorizeWarningFunc = GetColorizeTripleFunc(Purple, true)
-local ColorizeNoteFunc = GetColorizeTripleFunc(Black, false)
-
-local function FormatDiagnostic(diag, printCategory)
-    local text = diag:format()
-
-    if (useColors) then
-        text = text:gsub("(.*)(error: )(.*)", ColorizeErrorFunc)
-        text = text:gsub("(.*)(warning: )(.*)", ColorizeWarningFunc)
-        text = text:gsub("(.*)(note: )(.*)", ColorizeNoteFunc)
-    end
-
-    local category = diag:category()
-    return text .. ((printCategory and #category > 0) and " ["..category.."]" or "")
-end
-
-local function PrintPrefixDiagnostics(diags, indentation)
-    for i = 1, #diags do
-        local text = diags[i]:spelling()
-
-        if (text:match("^in file included from ")) then
-            errprintf("%s%s", string.rep(" ", indentation), "In"..text:sub(3))
-        else
-            return i
-        end
-    end
-
-    return #diags + 1
-end
-
-local function PrintDiagnostics(diags, startIndex, indentation)
-    assert(type(startIndex) == "number")
-    assert(type(indentation) == "number")
-
-    for i = startIndex, #diags do
-        local diag = diags[i]
-        local childDiags = diag:childDiagnostics()
-
-        local innerStartIndex = PrintPrefixDiagnostics(childDiags, indentation)
-        errprintf("%s%s", string.rep(" ", indentation), FormatDiagnostic(diag, indentation == 0))
-        -- Recurse. We expect only at most two levels in total (but do not check for that).
-        PrintDiagnostics(diag:childDiagnostics(), innerStartIndex, indentation + 2)
-
-        if (indentation == 0) then
-            -- Print a newline.
-            errprintf("")
-        end
-    end
-end
-
 local foundStruct = false
 
 for fi=1,#files do
@@ -444,7 +385,7 @@ for fi=1,#files do
     end
 
     if (not quiet) then
-        PrintDiagnostics(tu:diagnosticSet(), 1, 0)
+        diagnostics_util.PrintDiags(tu:diagnosticSet(), useColors, errprintf)
     end
 
     if (not dryrun) then
