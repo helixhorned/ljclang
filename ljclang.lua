@@ -113,8 +113,7 @@ local CXString = ffi.typeof("CXString")
 local function getString(cxstr)
     assert(ffi.istype(CXString, cxstr))
     local cstr = clang.clang_getCString(cxstr)
-    assert(cstr ~= nil)
-    local str = ffi.string(cstr)
+    local str = cstr ~= nil and ffi.string(cstr) or nil
     clang.clang_disposeString(cxstr)
     return str
 end
