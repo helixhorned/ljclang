@@ -4,9 +4,7 @@ local C = ffi.C
 local IN = require("inotify_decls")
 
 local class = require("class").class
-local util = require("util")
-
-local check = util.check
+local check = require("error_util").check
 
 local error = error
 local tostring = tostring

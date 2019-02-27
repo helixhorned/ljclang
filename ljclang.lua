@@ -26,6 +26,7 @@ local function lib(basename)
     return (ffi.os=="Windows" and "lib" or "")..basename
 end
 
+local check = require("error_util").check
 local class = require("class").class
 local util = require("util")
 
@@ -59,8 +60,6 @@ end
 --[=[]]
 local function debugf() end
 --]=]
-
-local check = util.check
 
 -- Give our structs names for nicer error messages.
 ffi.cdef[[

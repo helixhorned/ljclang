@@ -2,6 +2,9 @@ local ffi = require("ffi")
 
 local bit = require("bit")
 
+local check = require("error_util").check
+local class = require("class").class
+
 local assert = assert
 local error = error
 local type = type
@@ -10,15 +13,6 @@ local unpack = unpack
 ----------
 
 local api = {}
-
--- Wrap 'error' in assert-like call to write type checks in one line instead of three.
-function api.check(pred, msg, level)
-    if (not pred) then
-        error(msg, level+1)
-    end
-end
-
-local check = api.check
 
 -- argstab = splitAtWhitespace(args)
 function api.splitAtWhitespace(args)

@@ -8,9 +8,7 @@ local setmetatable = setmetatable
 local tostring = tostring
 local type = type
 
-----------
-
-local check = require("util").check
+local check = require("error_util").check
 
 ----------
 

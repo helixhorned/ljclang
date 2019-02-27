@@ -2,7 +2,8 @@ local io = require("io")
 
 local math = require("math")
 local util = require("util")
-local check = util.check
+
+local check = require("error_util").check
 
 local assert = assert
 local ipairs = ipairs
