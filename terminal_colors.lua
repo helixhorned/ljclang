@@ -5,11 +5,11 @@
 return {
 --Normal = "0;",
 Bold = "1;",
---Uline = "4;",
+Uline = "4;",
 
 Black = "30m",
 Red = "31m",
---Green = "32m",
+Green = "32m",
 --Yellow = "33m",
 --Blue = "34m",
 Purple = "35m",

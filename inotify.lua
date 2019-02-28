@@ -13,7 +13,9 @@ local type = type
 ----------
 
 ffi.cdef[[
+size_t read(int, void *, size_t);
 int close(int);
+
 char *strerror(int);
 
 struct inotify_event {
@@ -33,7 +35,8 @@ local function getErrnoString(errno)
     return (errmsgCStr ~= nil) and ffi.string(errmsgCStr) or "errno="..tostring(errno)
 end
 
-local inotify_event = ffi.typeof("struct inotify_event")
+local inotify_event_t = ffi.typeof("struct inotify_event")
+local sizeof_inotify_event = ffi.sizeof(inotify_event_t)
 
 api.init = class
 {
@@ -67,6 +70,20 @@ api.init = class
             error("inotify_add_watch() on '"..pathname.."' failed: "..getErrnoString())
         end
     end,
+
+    check_ = function(self, printf) -- TEMP
+        local ev = inotify_event_t()
+        local numBytes = C.read(self.fd, ev, sizeof_inotify_event)
+
+        if (numBytes == -1) then
+            error("read() failed: "..getErrnoString())
+        end
+
+        -- TODO: read all in the queue (needs switching between nonblocking and blocking at
+        -- runtime?)
+
+        printf("%d %d %d", ev.wd, ev.mask, ev.cookie)
+    end
 }
 
 -- Done!
