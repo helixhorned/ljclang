@@ -14,13 +14,18 @@ local function strip_c_and_o(args)
     return cl.stripArgs(argsWithoutC, "^-o$", 2)
 end
 
+function api.absify(filename, directory)
+    local isAbsolute = (filename:sub(1,1) == "/")  -- XXX: Windows
+    return isAbsolute and filename or directory.."/"..filename
+end
+
 -- Make "-Irelative/subdir" -> "-I/path/to/relative/subdir",
--- <opts> is modified in-place.
+-- <args> is modified in-place.
 local function absifyIncludeOptions(args, prefixDir)
     for i=1,#args do
-        local opt = args[i]
-        if (opt:sub(1,2)=="-I" and opt:sub(3,3)~="/") then
-            args[i] = "-I" .. prefixDir .. "/" .. opt:sub(3)
+        local arg = args[i]
+        if (arg:sub(1,2)=="-I") then
+            args[i] = "-I"..api.absify(arg:sub(3), prefixDir)
         end
     end
 

@@ -3,6 +3,8 @@ local io = require("io")
 local math = require("math")
 local util = require("util")
 
+local compile_commands_util = require("compile_commands_util")
+
 local check = require("error_util").check
 
 local assert = assert
@@ -26,9 +28,9 @@ local function tweak_json_string_for_load_as_lua_table(str)
     return "return "..str:gsub('\n( *)"([a-z]+)": ', '\n%1%2= ')
 end
 
-local function validate_compile_commands_table(cmds)
-    local PREFIX = "ERROR: Unexpected input: parsed result "
+local PREFIX = "ERROR: Unexpected input: parsed result "
 
+local function validate_compile_commands_table(cmds)
     if (type(cmds) ~= "table") then
         return PREFIX.."is not a Lua table"
     end
@@ -94,7 +96,9 @@ local function validate_compile_commands_table(cmds)
     return nil, hasCommand
 end
 
--- If the entries have key 'command', add key 'args'.
+-- If the entries have key 'command' (and thus do not have key 'args', since we validated
+-- mutual exclusion), add key 'args'. Also make keys 'file' absolute file names by prefixing
+-- them with key 'directory' whenever they are not already absolute.
 local function tweak_compile_commands_table(cmds, hasCommand)
     assert(type(cmds) == "table")
 
@@ -104,12 +108,48 @@ local function tweak_compile_commands_table(cmds, hasCommand)
             local arguments = {}
 
             for i = 2,#argv do
-                -- Keep only the arguments, not the invoked executable name.
+                -- Keep only the arguments, not the invoked compiler executable name.
                 arguments[i - 1] = argv[i]
             end
 
             cmd.arguments = arguments
+            cmd.compiler_executable = argv[1]
             cmd.command = nil
+        end
+    else
+        for _, cmd in ipairs(cmds) do
+            local args = cmd.arguments
+
+            cmd.compiler_executable = args[1]
+
+            for i = 1, #args do
+                args[i] = args[i+1]
+            end
+        end
+    end
+
+    for _, cmd in ipairs(cmds) do
+        -- The key 'file' as it appears in the compile_commands.json:
+        local compiledFileName = cmd.file
+        -- Absify it:
+        local absoluteFileName = compile_commands_util.absify(cmd.file, cmd.directory)
+        cmd.file = absoluteFileName
+
+        -- And also absify it appearing in the argument list.
+
+        local matchCount = 0
+
+        for ai, arg in ipairs(cmd.arguments) do
+            if (arg == compiledFileName) then
+                cmd.arguments[ai] = absoluteFileName
+                matchCount = matchCount + 1
+            end
+        end
+
+        -- NOTE: "== 1" is overly strict. I'm just curious about the situation in the wild.
+        if (matchCount ~= 1) then
+            return nil, PREFIX.."contains an entry for which the name of "..
+                "the compiled file is not found in the compiler arguments"
         end
     end
 
