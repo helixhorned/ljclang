@@ -872,23 +872,6 @@ class
         end
     end,
 
-    -- TODO: remove
-    presumedLocation = function(self, linesfirst)
-        local cxsrcrange = getSourceRange(self._cur)
-        if (cxsrcrange == nil) then
-            return nil
-        end
-
-        local Beg, filename = getPresumedLineCol(cxsrcrange, "clang_getRangeStart")
-        local End = getPresumedLineCol(cxsrcrange, "clang_getRangeEnd")
-
-        if (linesfirst) then
-            return filename, Beg.line, End.line, Beg.col, End.col
-        else
-            return filename, Beg.line, Beg.col, End.line, End.col
-        end
-    end,
-
     referenced = function(self)
         return getCursor(clang.clang_getCursorReferenced(self._cur))
     end,
