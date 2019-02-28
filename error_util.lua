@@ -21,7 +21,7 @@ function api.checktype(object, argIdx, typename, level)
     assert(type(typename) == "string")
 
     if (type(object) ~= typename) then
-        local msg = "argument #"..argIdx.." must be a "..typename
+        local msg = "argument #"..argIdx.." must be a "..typename.." (got "..type(object)..")"
         error(msg, level+1)
     end
 end

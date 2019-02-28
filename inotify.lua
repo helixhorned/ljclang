@@ -64,7 +64,7 @@ api.init = class
         local wd = C.inotify_add_watch(self.fd, pathname, mask)
 
         if (wd == -1) then
-            error("inotify_add_watch() failed: "..getErrnoString())
+            error("inotify_add_watch() on '"..pathname.."' failed: "..getErrnoString())
         end
     end,
 }
