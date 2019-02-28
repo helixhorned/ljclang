@@ -296,6 +296,8 @@ local SourceLocation = class
 
         -- XXX: ffi.istype(...) is not what we want: there is no anchoring then, after all!
         -- TODO: make them all into tables!
+        --
+        -- type(parent) can be: TODO:
         assert(type(parent) == "table" or ffi.istype("struct LJClangTranslationUnit", parent))
 
         if (clang.clang_equalLocations(cxloc, clang.clang_getNullLocation()) ~= 0) then
@@ -421,6 +423,8 @@ DiagnosticSet = class
 
         -- XXX: ffi.istype(...) is not what we want: there is no anchoring then, after all!
         -- TODO: make them all into tables!
+        --
+        -- type(parent) can be: TODO
         assert(type(parent) == "table" or ffi.istype("struct LJClangTranslationUnit", parent))
 
         assert(needsNoDisposal == nil or type(needsNoDisposal) == "boolean")
