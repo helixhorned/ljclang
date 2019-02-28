@@ -3,6 +3,7 @@ local string = require("string")
 
 local assert = assert
 local type = type
+local unpack = unpack
 
 local checktype = require("error_util").checktype
 
@@ -53,12 +54,20 @@ local function PrintPrefixDiagnostics(diags, onNewTextLine, indentation)
     return #diags + 1
 end
 
--- <onNewTextLine>: gets passed (fmt, ...) for each line of text that is emitted. Note:
+-- <callbacks>: table { <onDiagBegin>, <onNewTextLine> [, <onDiagEnd>] }
+--  <onNewTextLine> gets passed (fmt, ...) for each line of text that is emitted. Note:
 --  `fmt` is not newline-terminated -- <onNewTextLine> is supposed to do that itself.
-local function PrintDiags(diags, useColors, onNewTextLine, startIndex, indentation)
+local function PrintDiags(diags, useColors, callbacks, startIndex, indentation)
     checktype(diags, 1, "table", 2)
     checktype(useColors, 2, "boolean", 2)
-    checktype(onNewTextLine, 3, "function", 3)
+    checktype(callbacks, 3, "table", 3)
+
+    local localCallbacks = { unpack(callbacks) }
+    if (localCallbacks[3] == nil) then
+        localCallbacks[3] = function() end
+    end
+
+    local onDiagBegin, onNewTextLine, onDiagEnd = unpack(localCallbacks, 1, 3)
 
     if (startIndex == nil) then
         startIndex = 1
@@ -71,6 +80,8 @@ local function PrintDiags(diags, useColors, onNewTextLine, startIndex, indentati
     checktype(indentation, 5, "number")
 
     for i = startIndex, #diags do
+        onDiagBegin(i, indentation)
+
         local diag = diags[i]
         local childDiags = diag:childDiagnostics()
 
@@ -79,9 +90,10 @@ local function PrintDiags(diags, useColors, onNewTextLine, startIndex, indentati
         onNewTextLine("%s%s", string.rep(" ", indentation), formattedDiag)
 
         -- Recurse. We expect only at most two levels in total (but do not check for that).
-        PrintDiags(diag:childDiagnostics(), useColors, onNewTextLine,
+        PrintDiags(diag:childDiagnostics(), useColors, localCallbacks,
                    innerStartIndex, indentation + 2)
 
+        onDiagEnd(i, indentation)
         if (indentation == 0) then
             -- Add a newline.
             onNewTextLine("")

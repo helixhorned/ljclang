@@ -385,7 +385,19 @@ for fi=1,#files do
     end
 
     if (not quiet) then
-        diagnostics_util.PrintDiags(tu:diagnosticSet(), useColors, errprintf)
+        local callbacks = {
+            function() end,
+            errprintf,
+
+            function(i, indentation)
+                if (indentation == 0) then
+                    -- Print a newline.
+                    errprintf("")
+                end
+            end
+        }
+
+        diagnostics_util.PrintDiags(tu:diagnosticSet(), useColors, callbacks)
     end
 
     if (not dryrun) then
