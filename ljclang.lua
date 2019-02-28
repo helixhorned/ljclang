@@ -654,21 +654,6 @@ class
         local cxfile = clang.clang_getFile(self._tu, filename)
         return (cxfile ~= nil) and File(cxfile, self) or nil
     end,
---[[
-    location = function(self, filename, line, column)
-        check_tu_valid(self)
-        local cxfile = getFile(self._tu, filename)
-        local cxloc = clang.clang_getLocation(self._tu, cxfile, line, column)
-        return SourceLocation(cxloc, self)
-    end,
-
-    locationForOffset = function(self, filename, offset)
-        check_tu_valid(self)
-        local cxfile = getFile(self._tu, filename)
-        local cxloc = clang.clang_getLocationForOffset(self._tu, cxfile, offset)
-        return SourceLocation(cxloc, self)
-    end
---]]
 
     diagnosticSet = function(self)
         check_tu_valid(self)
