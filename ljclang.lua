@@ -289,6 +289,53 @@ end
 ---------------------------- SourceLocation -----------------------------
 -------------------------------------------------------------------------
 
+local CXFile = ffi.typeof("CXFile")
+local SingleCXFileArray = ffi.typeof("CXFile [1]")
+
+local LineCol = ffi.metatype([[
+union {
+    struct { unsigned line, col; };
+    unsigned ar[2];
+}
+]], {
+    __eq = function(self, other)
+        return self.line == other.line and self.col == other.col
+    end
+})
+
+local LineColOfs = ffi.metatype([[
+union {
+    struct { unsigned line, col, offset; };
+    unsigned ar[3];
+}
+]], {
+    __eq = function(self, other)
+        local isEqual = (self.offset == other.offset)
+        assert((self.line == other.line and self.col == other.col) == isEqual)
+        return isEqual
+    end
+})
+
+-- File and SourceLocation are circularly referential. "Forward-declare" the former.
+local File
+
+-- Private SourceLocation functions
+local SL = {
+    getSite = function(self, clangFunction)
+        local cxfilear = SingleCXFileArray()
+        local lco = LineColOfs()
+        clangFunction(self._loc, cxfilear, lco.ar, lco.ar+1, lco.ar+2)
+        return File(cxfilear[0], self), lco
+    end,
+
+    getSiteOnlyLineCol = function(self, clangFunction)
+        local cxstr = CXString()
+        local lc = LineCol()
+        clangFunction(self._loc, cxstr, lc.ar, lc.ar+1)
+        return getString(cxstr), lc
+    end
+}
+
 local SourceLocation = class
 {
     function(cxloc, parent)
@@ -326,6 +373,40 @@ local SourceLocation = class
 
     isFromMainFile = function(self)
         return (clang.clang_Location_isFromMainFile(self._loc) ~= 0)
+    end,
+
+    -- SourceLocation -> File + line/column/offset mapping functions.
+    -- NOTE: compared to libclang, the suffix "Location" is replaced with "Site".
+
+    -- libclang says:
+    --  If the location refers into a macro expansion, retrieves the location of the macro
+    --  expansion.
+    expansionSite = function(self)
+        return SL.getSite(self, clang.clang_getExpansionLocation)
+    end,
+
+    -- libclang says:
+    --  If the location refers into a macro instantiation, return where the location was
+    --  originally spelled in the source file.
+    spellingSite = function(self)
+        return SL.getSite(self, clang.clang_getSpellingLocation)
+    end,
+
+    -- libclang says:
+    --  If the location refers into a macro expansion, return where the macro was expanded
+    --  or where the macro argument was written, if the location points at a macro argument.
+    fileSite = function(self)
+        return SL.getSite(self, clang.clang_getFileLocation)
+    end,
+
+    -- libclang says:
+    --  Retrieve the file, line and column represented by the given source location, as
+    --  specified in a # line directive.
+    --
+    -- Also NOTE: what's returned is a *file name* (as opposed to a File like with the other
+    -- three "Site" functions).
+    presumedSite = function(self)
+        return SL.getSiteOnlyLineCol(self, clang.clang_getPresumedLocation)
     end,
 }
 
@@ -454,6 +535,65 @@ DiagnosticSet = class
 }
 
 -------------------------------------------------------------------------
+---------------------------------- File ---------------------------------
+-------------------------------------------------------------------------
+
+File = class
+{
+    function(cxfile, parent)
+        assert(ffi.istype(CXFile, cxfile))
+        assert(cxfile ~= nil)
+
+        -- XXX: ffi.istype(...) is not what we want: there is no anchoring then, after all!
+        -- TODO: make them all into tables!
+        -- table can be: SourceLocation
+        assert(type(parent) == "table" or ffi.istype("struct LJClangTranslationUnit", parent))
+
+        return {
+            _cxfile = cxfile,
+            _tu = parent
+        }
+    end,
+
+    __eq = function(self, other)
+        assert(type(other) == "table")
+        return (clang.clang_File_isEqual(self._cxfile, other._cxfile) ~= 0)
+    end,
+
+    name = function(self)
+        return getString(clang.clang_getFileName(self._cxfile))
+    end,
+
+    realPathName = function(self)
+        return getString(clang.clang_File_tryGetRealPathName(self._cxfile))
+    end,
+
+    time = function(self)
+        return tonumber(clang.clang_getFileTime(self._cxfile))
+    end,
+
+    location = function(self, line, column)
+        local cxloc = clang.clang_getLocation(self._tu._tu, self._cxfile, line, column)
+        return SourceLocation(cxloc, self)
+    end,
+
+    locationForOffset = function(self, offset)
+        local cxloc = clang.clang_getLocationForOffset(self._tu._tu, self._cxfile, offset)
+        return SourceLocation(cxloc, self)
+    end,
+
+    -- Convenience functions
+
+    isSystemHeader = function(self)
+        return self:locationForOffset(0):isInSystemHeader()
+    end,
+
+    isMainFile = function(self)
+        return self:locationForOffset(0):isFromMainFile()
+    end,
+}
+
+-------------------------------------------------------------------------
 ---------------------------- TranslationUnit ----------------------------
 -------------------------------------------------------------------------
 
@@ -507,13 +647,14 @@ class
         return getCursor(cxcur)
     end,
 
+    -- Incompatible with luaclang-parser: returns a File object (a wrapped CXFile).
     file = function(self, filename)
         check_tu_valid(self)
-        local cxfile = getFile(self._tu, filename)
-        local mTime = tonumber(clang.clang_getFileTime(cxfile))
-        return getString(clang.clang_getFileName(cxfile)), mTime
+        check(type(filename) == "string", "<filename> must be a string", 3)
+        local cxfile = clang.clang_getFile(self._tu, filename)
+        return (cxfile ~= nil) and File(cxfile, self) or nil
     end,
-
+--[[
     location = function(self, filename, line, column)
         check_tu_valid(self)
         local cxfile = getFile(self._tu, filename)
@@ -526,7 +667,8 @@ class
         local cxfile = getFile(self._tu, filename)
         local cxloc = clang.clang_getLocationForOffset(self._tu, cxfile, offset)
         return SourceLocation(cxloc, self)
-    end,
+    end
+--]]
 
     diagnosticSet = function(self)
         check_tu_valid(self)
@@ -563,22 +705,6 @@ class
 local function getType(cxtyp)
     return (cxtyp.kind ~= 'CXType_Invalid') and Type_t(cxtyp) or nil
 end
-
-local SingleCXFileArray = ffi.typeof("CXFile [1]")
-
-local LineCol = ffi.typeof[[
-union {
-    struct { unsigned line, col; };
-    unsigned ar[2];
-}
-]]
-
-local LineColOfs = ffi.typeof[[
-union {
-    struct { unsigned line, col, offset; };
-    unsigned ar[3];
-}
-]]
 
 -- Get line number, column number and offset for a given CXSourceRange
 local function getLineColOfs(cxsrcrange, cxfile, clang_rangefunc)
@@ -740,6 +866,7 @@ class
         return tab
     end,
 
+    -- deprecate?
     location = function(self, linesfirst)
         local cxsrcrange = getSourceRange(self._cur)
         if (cxsrcrange == nil) then
@@ -760,6 +887,7 @@ class
         end
     end,
 
+    -- TODO: remove
     presumedLocation = function(self, linesfirst)
         local cxsrcrange = getSourceRange(self._cur)
         if (cxsrcrange == nil) then

@@ -35,7 +35,7 @@ assert(cur:haskind("TranslationUnit"))
 
 print("TU: "..cur:name()..", "..cur:displayName())
 local fn = arg[1]:gsub(".*/","")
-print(fn.." in TU: "..tu:file(fn)..", "..tu:file(arg[1]))
+print(fn.." in TU: "..tu:file(fn):name()..", "..tu:file(arg[1]):name())
 
 local diags = tu:diagnostics()
 for i=1,#diags do

@@ -54,27 +54,46 @@ describe("Loading a cpp file without includes", function()
 
     describe("Translation unit", function()
         it("tests tu:file()", function()
-            local absFileName, modTime = tu:file(fileName)
-            assert.is_not_nil(absFileName:find(fileName, 1, true))
+            local file = tu:file(fileName)
+            local obtainedFileName, modTime = file:name(), file:time()
+            local absoluteFileName = file:realPathName()
+
+            assert.is_true(type(obtainedFileName) == "string")
+            assert.is_true(type(absoluteFileName) == "string")
+            assert.is_true(type(modTime) == "number")
+
+            assert.is_true(file:isMainFile())
+            assert.is_false(file:isSystemHeader())
+
+            assert.is_true(obtainedFileName == fileName)
+            assert.is_true(absoluteFileName:sub(1,1) == "/")
+            assert.is_not_nil(absoluteFileName:match("/.+/"..fileName.."$"))
             assert.is_true(ffi.C.time(nil) > modTime)
         end)
 
         -- TODO: location in a system header, location outside a system header but not in
         -- the main file either.
 
-        it("tests tu:location()", function()
-            assert.is_nil(tu:location(nonExistentFileName, 1, 1))
+        -- TODO: SourceLocation:__eq
 
-            local loc = tu:location(fileName, 5, 4)
+        -- TODO: SourceLocation:*Site() functions, also documenting their differences by
+        -- test code.
+
+        it("tests tu:location()", function()
+            assert.is_nil(tu:file(nonExistentFileName))
+
+            local file = tu:file(fileName)
+            local loc = file:location(5, 4)
             assert.is_not_nil(loc)
             assert.is_false(loc:isInSystemHeader())
             assert.is_true(loc:isFromMainFile())
         end)
 
         it("tests tu:locationFromOffset()", function()
-            assert.is_nil(tu:locationForOffset(nonExistentFileName, 1))
+            assert.is_nil(tu:file(nonExistentFileName))
 
-            local loc = tu:locationForOffset(fileName, 10)
+            local file = tu:file(fileName)
+            local loc = file:locationForOffset(10)
             assert.is_not_nil(loc)
             assert.is_false(loc:isInSystemHeader())
             assert.is_true(loc:isFromMainFile())
