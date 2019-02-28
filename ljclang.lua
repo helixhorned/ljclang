@@ -614,6 +614,25 @@ local function getFile(tu, filename)
     return clang.clang_getFile(tu, filename)
 end
 
+-- TODO: generalize with pointed-to type and pointer wrapping map function?
+local WrappedSourceLocArray = class
+{
+    "CXSourceLocation *_ptr; double _length;",
+
+    __len = function(self)
+        return self._length
+    end,
+
+    __index = function(self, i)
+        check(type(i) == "number", "<i> must be a number", 2)
+        check(i >= 1 and i <= self._length, "<i> must be in [1, #self]", 2)
+
+        -- NOTE/XXX: passing dummy parent as anchor. This is sort of OK in the specific
+        -- usage context.
+        return SourceLocation(self._ptr[i - 1], {})
+    end,
+}
+
 class
 {
     TranslationUnit_t_,
@@ -653,6 +672,17 @@ class
         check(type(filename) == "string", "<filename> must be a string", 3)
         local cxfile = clang.clang_getFile(self._tu, filename)
         return (cxfile ~= nil) and File(cxfile, self) or nil
+    end,
+
+    inclusions = function(self, visitor)
+        check(type(visitor) == "function", "<visitor> must be a Lua function", 2)
+
+        local clangInclusionVisitor = function(includedFile, inclusionStackPtr, includeLength, _)
+            local wrappedInclusionStack = WrappedSourceLocArray(inclusionStackPtr, includeLength)
+            visitor(File(includedFile, self), wrappedInclusionStack)
+        end
+
+        clang.clang_getInclusions(self._tu, clangInclusionVisitor, nil)
     end,
 
     diagnosticSet = function(self)
