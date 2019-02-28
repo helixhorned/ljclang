@@ -309,7 +309,14 @@ local SourceLocation = class
         }
     end,
 
-    -- TODO: __eq?
+    __eq = function(self, other)
+        -- NOTE: Lua 5.1 docs say (on the "eq"/"==" operation):
+        --  A metamethod only is selected when both objects being compared have the same
+        --  type and the same metamethod for the selected operation.
+        -- Hence, we know that 'other' is a SourceLocation, too.
+        assert(type(other) == "table")
+        return (clang.clang_equalLocations(self._loc, other._loc) ~= 0)
+    end,
 
     isInSystemHeader = function(self)
         return (clang.clang_Location_isInSystemHeader(self._loc) ~= 0)
