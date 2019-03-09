@@ -11,6 +11,7 @@ local string = require("string")
 local table = require("table")
 
 local cl = require("ljclang")
+local util = require("util")
 
 local assert = assert
 local ipairs = ipairs
@@ -183,26 +184,13 @@ local function getDefStr(cur)
 end
 
 local function getCommonPrefixLengthOfEnums(enumDeclCur)
-    local enumConstantCursors = enumDeclCur:children()
+    local commonPrefix = util.getCommonPrefix(
+        function(_, cur) return cur:displayName() end,
+        ipairs(enumDeclCur:children()))
 
-    if (#enumConstantCursors == 0) then
-        return nil
+    if (commonPrefix ~= nil) then
+        return #commonPrefix
     end
-
-    local commonPrefix = enumConstantCursors[1]:displayName()
-
-    for _, cur in ipairs(enumConstantCursors) do
-        assert(cur:haskind("EnumConstantDecl"))
-        local name = cur:displayName()
-
-        for i = 1, math.min(#commonPrefix, #name) do
-            if (commonPrefix:sub(1, i) ~= name:sub(1, i)) then
-                commonPrefix = commonPrefix:sub(1, i-1)
-            end
-        end
-    end
-
-    return #commonPrefix
 end
 
 -- The <name> in 'enum <name>' if available, or the empty string:

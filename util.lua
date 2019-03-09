@@ -1,6 +1,7 @@
 local ffi = require("ffi")
 
 local bit = require("bit")
+local math = require("math")
 
 local check = require("error_util").check
 local class = require("class").class
@@ -71,6 +72,27 @@ function api.handleTableOfOptionStrings(lib, prefix, opts)
     end
 
     return opts
+end
+
+function api.getCommonPrefix(getString, ...)
+    local commonPrefix = nil
+
+    for key, value in ... do
+        local str = getString(key, value)
+        check(type(str) == "string", "getString(k, v) for iterated k, v should return a string", 2)
+
+        if (commonPrefix == nil) then
+            commonPrefix = str
+        else
+            for i = 1, math.min(#commonPrefix, #str) do
+                if (commonPrefix:sub(1, i) ~= str:sub(1, i)) then
+                    commonPrefix = commonPrefix:sub(1, i-1)
+                end
+            end
+        end
+    end
+
+    return commonPrefix
 end
 
 -- Done!
