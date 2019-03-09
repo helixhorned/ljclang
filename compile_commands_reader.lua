@@ -224,9 +224,12 @@ function api.read_compile_commands(filename)
         return nil, msg
     end
 
-    local str = f:read("*a")
+    local str, msg = f:read("*a")
     f:close()
-    assert(type(str) == "string")
+
+    if (str == nil) then
+        return nil, msg
+    end
 
     return api.parse_compile_commands(str)
 end
