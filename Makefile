@@ -66,7 +66,7 @@ clean:
 	rm -f $(LJCLANG_SUPPORT_SO)
 
 veryclean: clean
-	rm -f $(GENERATED_FILES_STAGE_2) $(EXTRACTED_ENUMS_LUA_TMP)
+	rm -f $(GENERATED_FILES_STAGE_2) $(EXTRACTED_ENUMS_LUA_TMP) $(EXTRACTED_ENUMS_LUA).reject
 
 bootstrap: $(EXTRACTED_ENUMS_LUA)
 
@@ -110,7 +110,7 @@ CHECK_EXTRACTED_INOTIFY_CMD := $(EXTRACT_CMD_ENV) $(luajit) \
 $(inotify_decls_lua): $(EXTRACTED_ENUMS_LUA) $(inotify_h)
 	@echo 'local ffi=require"ffi"' > $(inotify_decls_lua_tmp)
 	@echo 'ffi.cdef[[' >> $(inotify_decls_lua_tmp)
-	@$(EXTRACT_CMD_ENV) ./extractdecls.lua -w FunctionDecl -p 'inotify_' $(inotify_h) >> $(inotify_decls_lua_tmp)
+	@$(EXTRACT_CMD_ENV) ./extractdecls.lua -w FunctionDecl -p '^inotify_' $(inotify_h) >> $(inotify_decls_lua_tmp)
 	@echo ']]' >> $(inotify_decls_lua_tmp)
 	@echo 'return ffi.new[[struct {' >> $(inotify_decls_lua_tmp)
 	@$(EXTRACT_CMD_ENV) ./extractdecls.lua -C -p '^IN_' -s '^IN_' $(inotify_h) >> $(inotify_decls_lua_tmp)
