@@ -35,10 +35,6 @@ local function SVTable()
     return {}
 end
 
-local function identity(x)
-    return x
-end
-
 local Node = class
 {
     function(key)
@@ -50,8 +46,8 @@ local Node = class
         }
     end,
 
-    addEdgeTo = function(self, includedFileName)
-        SVTableAddOrGet(self.edgeTo, includedFileName, true)
+    addEdgeTo = function(self, key, value)
+        SVTableAddOrGet(self.edgeTo, key, value)
     end,
 
     getKey = function(self)
@@ -63,29 +59,27 @@ local Node = class
     end,
 
     iEdges = function(self, mapKey)
-        if (mapKey == nil) then
-            mapKey = identity
-        end
-        checktype(mapKey, 2, "function", 2)
-
-        local nextEdge = function(_, i)
-            i = i + 1
-
-            if (i <= self:getEdgeCount()) then
-                return i, mapKey(self.key), mapKey(self.edgeTo[i])
-            end
-        end
-
-        return nextEdge, nil, 0
+        return ipairs(self.edgeTo)
     end
 }
 
 -- Private InclusionGraph functions
-local IG = {
-    addOrGetNode = function(self, filename)
-        return SVTableAddOrGet(self._nodes, filename, Node(filename))
-    end,
-}
+
+local function addOrGetNode(self, filename)
+    return SVTableAddOrGet(self._nodes, filename, Node(filename))
+end
+
+local function quote(str)
+    checktype(str, 1, "string", 2)
+    -- Graphviz docs ("The DOT language") say:
+    --  In quoted strings in DOT, the only escaped character is double-quote (").
+    --  (...)
+    --  As another aid for readability, dot allows double-quoted strings to span multiple physical lines using the standard C
+    --  convention of a backslash immediately preceding a newline character^2.
+    return '"'..str:gsub('"', '\\"'):gsub('\n', '\\\n')..'"'
+end
+
+-- Public API
 
 api.InclusionGraph = class
 {
@@ -95,14 +89,16 @@ api.InclusionGraph = class
         }
     end,
 
-    addInclusion = function(self, fromFile, toFile)
-        checktype(fromFile, 1, "string", 2)
-        checktype(toFile, 2, "string", 2)
+    -- Edge in the graph will point from a to b.
+    -- Interpretation is up to the user.
+    addInclusion = function(self, aFile, bFile)
+        checktype(aFile, 1, "string", 2)
+        checktype(bFile, 2, "string", 2)
 
-        local fromNode = IG.addOrGetNode(self, fromFile)
-        local toNode = IG.addOrGetNode(self, toFile)
+        local aNode = addOrGetNode(self, aFile)
+        local bNode = addOrGetNode(self, bFile)
 
-        fromNode:addEdgeTo(toFile)
+        aNode:addEdgeTo(bFile, bNode)
     end,
 
     getNodeCount = function(self)
@@ -117,20 +113,39 @@ api.InclusionGraph = class
         return ipairs(self._nodes)
     end,
 
-    -- Get an InclusionGraph with the edges of `self` reversed.
-    getDual = function(self)
-        local dual = api.InclusionGraph()
+    printAsGraphvizDot = function(self, title, reverse, commonPrefix, printf)
+        checktype(title, 1, "string", 2)
+        reverse = (reverse ~= nil) and reverse or false
+        checktype(reverse, 2, "boolean", 2)
+        checktype(printf, 4, "function", 2)
 
-        -- TODO: have convenience function to return iterator over all edges?
-        -- (With optional 'mapKey' function, as for node:edges().)
-        for _, fileName in self:iFileNames() do
-            for _, fromFile, toFile in self:getNode(fileName):iEdges() do
-                dual:addInclusion(toFile, fromFile)
+        local strip = function(fn)
+            return (fn:sub(1, #commonPrefix) == commonPrefix) and
+                fn:sub(#commonPrefix + 1) or
+                fn
+        end
+
+        printf("strict digraph %s {", quote(title))
+        printf("rankdir=LR")
+
+        -- Nodes.
+        for i, filename in self:iFileNames() do
+            printf('%s [shape=box];', quote(strip(filename)))
+        end
+
+        printf('')
+
+        -- Edges.
+        for _, filename in self:iFileNames() do
+            for _, filename2 in self:getNode(filename):iEdges() do
+                local left = (not reverse) and filename or filename2
+                local right = (not reverse) and filename2 or filename
+                printf('%s -> %s;', quote(strip(left)), quote(strip(right)))
             end
         end
 
-        return dual
-    end,
+        printf("}")
+    end
 }
 
 -- Done!
