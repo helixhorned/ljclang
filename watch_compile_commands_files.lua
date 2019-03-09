@@ -1,4 +1,3 @@
-
 local bit = require("bit")
 local io = require("io")
 local os = require("os")
@@ -9,10 +8,14 @@ local cl = require("ljclang")
 local compile_commands_reader = require("compile_commands_reader")
 local compile_commands_util = require("compile_commands_util")
 local diagnostics_util = require("diagnostics_util")
+local util = require("util")
+
 local InclusionGraph = require("inclusion_graph").InclusionGraph
 
 local Col = require("terminal_colors")
 local colorize = Col.colorize
+
+local checktype = require("error_util").checktype
 
 local inotify = require("inotify")
 local IN = inotify.IN
@@ -23,6 +26,7 @@ local ipairs = ipairs
 local pairs = pairs
 local print = print
 local require = require
+local tostring = tostring
 
 local arg = arg
 
@@ -45,65 +49,88 @@ local function abort(str)
     os.exit(1)
 end
 
+local ErrorCode = {
+    CommandLine = 1,
+    CompilationDatabaseLoad = 2,
+    CompilationDatabaseEmpty = 3,
+    RealPathName = 4,
+}
+
 local function usage(hline)
     if (hline) then
         errprint("ERROR: "..hline.."\n")
     end
     local progname = arg[0]:match("([^/]+)$")
-    errprint("Usage:\n  "..progname.." [options...] <compile_commands-file> <project-root-directory>\n")
+    errprint("Usage:\n  "..progname.." [options...] <compile_commands-file>\n")
     errprint[[
 Options:
   -m: Use machine interface / "command mode" (default: for human inspection)
+  -g [includes|isIncludedBy]: Print inclusion graph as a DOT (of Graphviz) file to stdout and exit.
+     Argument specifies the relation between graph nodes (which are file names).
+     Must be used without -m.
 ]]
-    os.exit(1)
+    os.exit(ErrorCode.CommandLine)
 end
 
 local parsecmdline = require("parsecmdline_pk")
-local opts, args = parsecmdline.getopts({ m=false }, arg, usage)
+
+local opts_meta = {
+    m = false,
+    g = true,
+}
+
+local opts, args = parsecmdline.getopts(opts_meta, arg, usage)
 
 local commandMode = opts.m
+local printGraphMode = opts.g
 
 if (commandMode) then
     abort("Command mode not yet implemented!")
 end
 
-local compileCommandsFile = args[1]
-local projectRootDir = args[2]
+if (printGraphMode ~= nil) then
+    if (printGraphMode ~= "includes" and printGraphMode ~= "isIncludedBy") then
+        abort("Argument to option -g must be 'includes' or 'isIncludedBy'")
+    end
+    if (commandMode) then
+        abort("Option -g must be used without option -m")
+    end
+end
 
-if (compileCommandsFile == nil or projectRootDir == nil) then
+local compileCommandsFile = args[1]
+
+if (compileCommandsFile == nil) then
     usage()
 end
 
 ----------
 
-local cmds, errmsg = compile_commands_reader.read_compile_commands(compileCommandsFile)
-if (cmds == nil) then
-    errprintf("ERROR: failed loading '%s': %s", compileCommandsFile, errmsg)
-    os.exit(1)
+local compileCommands, errorMessage =
+    compile_commands_reader.read_compile_commands(compileCommandsFile)
+
+if (compileCommands == nil) then
+    errprintf("ERROR: failed loading '%s': %s", compileCommandsFile, errorMessage)
+    os.exit(ErrorCode.CompilationDatabaseLoad)
 end
 
--- Initial parse of all compilation commands.
+if (#compileCommands == 0) then
+    errprintf("ERROR: '%s' contains zero compile commands", compileCommandsFile)
+    os.exit(ErrorCode.CompilationDatabaseEmpty)
+end
+
+
+-- Initial parse of all compilation commands in the project given by the compilation
+-- database.
+--
 -- Outputs:
 --  1. diagnostics for each compilation command
---  2. a DAG of the #include relation for the whole project (= compilation database)
+--  2. a DAG of the #include relation for the whole project
 
 local index = cl.createIndex(true, false)
 
 ---------- Common to both human and command mode ----------
 
--- Initial setup of inotify to monitor all source files named by any compile command.
---
--- TODO: move to after parsing all commands and creating the inclusion graph:
--- then, we can also add files reached by #include (but not system headers).
-
-local notifier = inotify.init()
-local WATCH_FLAGS = bit.bor(IN.MODIFY, IN.MOVE_SELF, IN.DELETE_SELF)
-
-for _, cmd in ipairs(cmds) do
-    notifier:add_watch(cmd.file, WATCH_FLAGS)
-end
-
-local getSite = function(location)
+local function getSite(location)
     -- Assert that the different location:*Site() functions return the same site (which
     -- means that the location does not refer into a macro instantiation or expansion) and
     -- return it.
@@ -119,101 +146,137 @@ local getSite = function(location)
     return fileSite, fileLco
 end
 
-local BuildInclusionGraph = function(tu)
-    local inclusionGraph = InclusionGraph()
+local function checkAndGetRealName(file)
+    local realName = file:realPathName()
 
+    if (realName == nil) then
+        errprintf("Could not obtain the real path name of '%s'", file:name())
+        os.exit(ErrorCode.RealPathName)
+    end
+
+    return realName
+end
+
+local InclusionGraph_ProcessTU = function(graph, tu)
     local callback = function(includedFile, stack)
         if (#stack == 0) then
             return
         end
 
-        local toFileName = includedFile:name()
         local fromFile = getSite(stack[1])
-        local fromFileName = fromFile:name()
---printf("qwe %s %s", fromFileName, toFileName)
 
         -- Check that all names we get passed are absolute.
         -- This should be the case because compile_commands_reader absifies names for us.
-        assert(toFileName:sub(1,1) == "/")
-        assert(fromFileName:sub(1,1) == "/")
-
+        assert(includedFile:name():sub(1,1) == "/")
+        assert(fromFile:name():sub(1,1) == "/")
         -- Check sanity: system headers never include user files.
         assert(not (stack[1]:isInSystemHeader() and not includedFile:isSystemHeader()))
 
         if (not includedFile:isSystemHeader()) then
-            -- Be even stricter: verify that the names we obtain from plain name() are
-            -- canonical. (We assume that realPathName() gives us the canonical file name.)
-            --
-            -- NOTE: for system headers this may not hold.
-            --
-            -- (XXX: and strictly seen, for user files this does not need to hold, either.
-            -- It is well conceivable that a compile_commands.json includes file names that
-            -- contain '..', for example.)
-            --
-            -- TODO: just use realPathName() across the board, then?
---print("names: ", toFileName, includedFile:realPathName())
-            assert(toFileName == includedFile:realPathName())
-            assert(fromFileName == fromFile:realPathName())
-
-            inclusionGraph:addInclusion(fromFileName, toFileName)
+            local fromRealName = checkAndGetRealName(fromFile)
+            local toRealName = checkAndGetRealName(includedFile)
+            graph:addInclusion(fromRealName, toRealName)
         end
     end
 
     tu:inclusions(callback)
-    return inclusionGraph
+    return graph
 end
 
+local function ProcessCompileCommands(cmds, callback)
+    for i, cmd in ipairs(cmds) do
+        local args = compile_commands_util.sanitize_args(cmd.arguments, cmd.directory)
+        local tu, errorCode = index:parse("", args, {"KeepGoing"})
+        callback(i, tu, errorCode)
+    end
+end
+
+local notifier = inotify.init()
+local WATCH_FLAGS = bit.bor(IN.CLOSE_WRITE, IN.MOVE_SELF, IN.DELETE_SELF)
+
+-- The inclusion graph for the whole project ("global") initial configuration.
+-- Will not be updated on updates to individual files.
+local initialGlobalInclusionGraph = InclusionGraph()
+
+-- Inclusion graphs for each compile command.
+local compileCommandInclusionGraphs = {}
+
 ---------- HUMAN MODE ----------
+
+local function GetDiagnosticsForTU(tu)
+    local lines = {}
+
+    local callbacks = {
+        function() end,
+
+        function(fmt, ...)
+            lines[#lines+1] = format(fmt, ...)
+        end,
+    }
+
+    -- Format diagnostics immediately to not keep the TU around.
+    diagnostics_util.PrintDiags(tu:diagnosticSet(), true, callbacks)
+    return table.concat(lines, '\n')
+end
+
+local function PrintInclusionGraphAsGraphvizDot()
+    local directoryName = compileCommands[1].file:match("^.*/")
+
+    -- Obtain the common prefix of all files named by any compile command and strip that
+    -- prefix from the node labels.
+    local commonPrefix = util.getCommonPrefix(function (_, cmd) return cmd.file end,
+                                              directoryName, ipairs(compileCommands))
+    if (commonPrefix == "/") then
+        commonPrefix = ""
+    end
+
+    local titleSuffix = (commonPrefix == "") and "" or format(" under '%s'", commonPrefix)
+    local title = format("Inclusions (%s) for '%s'%s",
+                         printGraphMode, compileCommandsFile, titleSuffix)
+    local reverse = (printGraphMode == "isIncludedBy")
+    initialGlobalInclusionGraph:printAsGraphvizDot(title, reverse, commonPrefix, printf)
+end
 
 local function humanModeMain()
     -- One formatted DiagnosticSet per compile command in `cmds`.
     local formattedDiagSets = {}
 
-    -- TODO: progress meter. Make it time-based in human mode? (E.g. every 5 seconds.)
-    for i, cmd in ipairs(cmds) do
-        local args = compile_commands_util.sanitize_args(cmd.arguments, cmd.directory)
-        local tu, errorCode = index:parse("", args, {"KeepGoing"})
-
+    ProcessCompileCommands(compileCommands, function(i, tu, errorCode)
         if (tu == nil) then
-            formattedDiagSets[i] = "index:parse() failed: "..errorCode
-            goto nextfile
+            -- TODO: Extend in verbosity and/or handling?
+            formattedDiagSets[i] = "ERROR: index:parse() failed: "..tostring(errorCode)
+        else
+            formattedDiagSets[i] = GetDiagnosticsForTU(tu)
+
+            InclusionGraph_ProcessTU(initialGlobalInclusionGraph, tu)
+            compileCommandInclusionGraphs[i] = InclusionGraph_ProcessTU(InclusionGraph(), tu)
         end
+    end)
 
-        -- Build inclusion graph.
-
-        local inclusionGraph = BuildInclusionGraph(tu)
-
-        -- TEMP
-        for _, fileName in inclusionGraph:iFileNames() do
-            for _, from, to in inclusionGraph:getNode(fileName):iEdges() do
-                printf("%s includes %s", from, to)
-            end
-        end
-
-        -- Obtain diagnostics.
-
-        local lines = {}
-
-        local callbacks = {
-            function() end,
-
-            function(fmt, ...)
-                lines[#lines+1] = format(fmt, ...)
-            end,
-        }
-
-        -- Format diagnostics immediately to not keep the TU around.
-        diagnostics_util.PrintDiags(tu:diagnosticSet(), true, callbacks)
-        formattedDiagSets[i] = table.concat(lines, '\n')
-        ::nextfile::
+    -- TODO: move to separate application
+    if (printGraphMode ~= nil) then
+        PrintInclusionGraphAsGraphvizDot()
+        os.exit(0)
     end
+
+    -- Initial setup of inotify to monitor all files that directly named by any compile
+    -- command or reached by #include, as well as the compile_commands.json file itself.
+
+    for _, filename in initialGlobalInclusionGraph:iFileNames() do
+        notifier:addWatch(filename, WATCH_FLAGS)
+    end
+
+    notifier:addWatch(compileCommandsFile, WATCH_FLAGS)
+
+    -- TODO: build *per-compile-command* include graphs. Use each one to decide whether a
+    -- file change affects a compile command. Note: only the nodes (file names) are needed.
 
     repeat
         -- Print current diagnostics.
         -- TODO: handle case when files change.
         -- TODO: in particular, moves and deletions. (Have common logic with compile_commands.json change?)
 
-        for i, cmd in ipairs(cmds) do
+        for i, cmd in ipairs(compileCommands) do
             -- TODO (prettiness): inform when a file name appears more than once?
             -- TODO (prettiness): print header line (or part of it) in different colors if
             -- compilation succeeded/failed?

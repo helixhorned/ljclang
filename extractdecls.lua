@@ -186,7 +186,7 @@ end
 local function getCommonPrefixLengthOfEnums(enumDeclCur)
     local commonPrefix = util.getCommonPrefix(
         function(_, cur) return cur:displayName() end,
-        ipairs(enumDeclCur:children()))
+        nil, ipairs(enumDeclCur:children()))
 
     if (commonPrefix ~= nil) then
         return #commonPrefix

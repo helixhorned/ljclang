@@ -3,7 +3,9 @@ local ffi = require("ffi")
 local bit = require("bit")
 local math = require("math")
 
-local check = require("error_util").check
+local error_util = require("error_util")
+local check = error_util.check
+local checktype = error_util.checktype
 local class = require("class").class
 
 local assert = assert
@@ -74,8 +76,10 @@ function api.handleTableOfOptionStrings(lib, prefix, opts)
     return opts
 end
 
-function api.getCommonPrefix(getString, ...)
-    local commonPrefix = nil
+function api.getCommonPrefix(getString, commonPrefix, ...)
+    checktype(getString, 1, "function", 2)
+    check(commonPrefix == nil or type(commonPrefix) == "string",
+          "argument #2 must be nil or a string", 2)
 
     for key, value in ... do
         local str = getString(key, value)
