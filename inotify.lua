@@ -6,6 +6,7 @@ local IN = require("inotify_decls")
 local class = require("class").class
 local check = require("error_util").check
 
+local assert = assert
 local error = error
 local tostring = tostring
 local type = type
@@ -24,7 +25,7 @@ struct inotify_event {
     uint32_t cookie;
 
     uint32_t len;
-    char     name[];
+//    char     name[];
 };
 ]]
 
@@ -69,6 +70,9 @@ api.init = class
         if (wd == -1) then
             error("inotify_add_watch() on '"..pathname.."' failed: "..getErrnoString())
         end
+
+        assert(wd >= 0)
+        return wd
     end,
 
     check_ = function(self, printf) -- TEMP
@@ -80,9 +84,10 @@ api.init = class
         end
 
         -- TODO: read all in the queue (needs switching between nonblocking and blocking at
-        -- runtime?)
+        -- runtime?) A: No, did not work out well.
 
-        printf("%d %d %d", ev.wd, ev.mask, ev.cookie)
+        assert(ev.len == 0)
+        return ev
     end
 }
 

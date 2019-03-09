@@ -54,6 +54,9 @@ local ErrorCode = {
     CompilationDatabaseLoad = 2,
     CompilationDatabaseEmpty = 3,
     RealPathName = 4,
+
+    WatchedFileMovedOrDeleted = 100,
+    CompileCommandsJsonGeneratedEvent = 101,
 }
 
 local function usage(hline)
@@ -192,7 +195,8 @@ local function ProcessCompileCommands(cmds, callback)
 end
 
 local notifier = inotify.init()
-local WATCH_FLAGS = bit.bor(IN.CLOSE_WRITE, IN.MOVE_SELF, IN.DELETE_SELF)
+local MOVE_OR_DELETE = bit.bor(IN.MOVE_SELF, IN.DELETE_SELF)
+local WATCH_FLAGS = bit.bor(IN.CLOSE_WRITE, MOVE_OR_DELETE)
 
 -- The inclusion graph for the whole project ("global") initial configuration.
 -- Will not be updated on updates to individual files.
@@ -262,18 +266,26 @@ local function humanModeMain()
     -- Initial setup of inotify to monitor all files that directly named by any compile
     -- command or reached by #include, as well as the compile_commands.json file itself.
 
+    local wdFilename = {}
+
     for _, filename in initialGlobalInclusionGraph:iFileNames() do
-        notifier:addWatch(filename, WATCH_FLAGS)
+        local wd = notifier:add_watch(filename, WATCH_FLAGS)
+
+        -- Assert one-to-oneness. (Should be given by us having passed the file names
+        -- through realPathName() earlier.)
+        assert(wdFilename[wd] == nil or wdFilename[wd] == filename)
+
+        wdFilename[wd] = filename
     end
 
-    notifier:addWatch(compileCommandsFile, WATCH_FLAGS)
+    local compileCommandsWd = notifier:add_watch(compileCommandsFile, WATCH_FLAGS)
 
     -- TODO: build *per-compile-command* include graphs. Use each one to decide whether a
     -- file change affects a compile command. Note: only the nodes (file names) are needed.
 
     repeat
         -- Print current diagnostics.
-        -- TODO: handle case when files change.
+        -- TODO: think about handling case when files change more properly.
         -- TODO: in particular, moves and deletions. (Have common logic with compile_commands.json change?)
 
         for i, cmd in ipairs(compileCommands) do
@@ -286,8 +298,18 @@ local function humanModeMain()
         end
 
         -- Wait for any changes to watched files.
-        notifier:check_(printf)
-        -- TODO
+        local event = notifier:check_(printf)
+
+        if (bit.band(event.mask, MOVE_OR_DELETE) ~= 0) then
+            errprintf("Exiting: a watched file was moved or deleted. (Handling not implemented.)")
+            os.exit(ErrorCode.WatchedFileMovedOrDeleted)
+        end
+
+        if (event.wd == compileCommandsWd) then
+            errprintf("Exiting: an event was generated for '%s'. (Handling not implemented.)",
+                      compileCommandsFile)
+            os.exit(ErrorCode.CompileCommandsJsonGeneratedEvent)
+        end
 
         -- Determine the set of compile commands to reparse.
         -- TODO
