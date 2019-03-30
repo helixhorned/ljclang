@@ -111,6 +111,7 @@ local function tweak_compile_commands_table(cmds, hasCommand)
 
             for i = 2,#argv do
                 -- Keep only the arguments, not the invoked compiler executable name.
+                assert(type(argv[i]) == "string")
                 arguments[i - 1] = argv[i]
             end
 
@@ -125,6 +126,7 @@ local function tweak_compile_commands_table(cmds, hasCommand)
             cmd.compiler_executable = args[1]
 
             for i = 1, #args do
+                -- Shift elements of 'args' one left.
                 args[i] = args[i+1]
             end
         end
@@ -135,6 +137,7 @@ local function tweak_compile_commands_table(cmds, hasCommand)
         local compiledFileName = cmd.file
         -- Absify it:
         local absoluteFileName = compile_commands_util.absify(cmd.file, cmd.directory)
+        assert(type(absoluteFileName) == "string")
         cmd.file = absoluteFileName
 
         -- And also absify it appearing in the argument list.

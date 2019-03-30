@@ -12,6 +12,10 @@ local function stripArgs(args, pattern, num)
     local numArgs = #args
 
     for i=1,numArgs do
+        assert(type(args[i]) == "string")
+    end
+
+    for i=1,numArgs do
         if (args[i] and args[i]:find(pattern)) then
             for j=0,num-1 do
                 args[i+j] = nil
