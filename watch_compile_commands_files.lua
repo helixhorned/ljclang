@@ -312,6 +312,8 @@ local function humanModeMain()
 
         -- Assert one-to-oneness. (Should be given by us having passed the file names
         -- through realPathName() earlier.)
+        --
+        -- TODO: this does not need to hold in the presence of hard links though. Test.
         assert(fileNameOfWd[wd] == nil or fileNameOfWd[wd] == filename)
 
         fileNameOfWd[wd] = filename
@@ -322,13 +324,11 @@ local function humanModeMain()
     info("Have %d compile commands, watching %d files", #compileCommands,
          initialGlobalInclusionGraph:getNodeCount() + 1)
 
-    -- TODO: build *per-compile-command* include graphs. Use each one to decide whether a
-    -- file change affects a compile command. Note: only the nodes (file names) are needed.
-
     repeat
         -- Print current diagnostics.
         -- TODO: think about handling case when files change more properly.
         -- TODO: in particular, moves and deletions. (Have common logic with compile_commands.json change?)
+        -- Later: handle special case of a change of compile_commands.json, too.
 
         for i, cmd in ipairs(compileCommands) do
             -- TODO (prettiness): inform when a file name appears more than once?
@@ -368,8 +368,6 @@ local function humanModeMain()
         info("Need reparsing %d compile commands", #affectedCompileCommandIndexes)
 
         -- TODO: update
-
-        -- Later: handle special case of a change of compile_commands.json, too.
     until (false)
 end
 
