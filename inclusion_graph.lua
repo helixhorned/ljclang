@@ -1,10 +1,13 @@
 
 local error_util = require("error_util")
 local class = require("class").class
+local math = require("math")
+local string = require("string")
 
 local check = error_util.check
 local checktype = error_util.checktype
 
+local assert = assert
 local ipairs = ipairs
 
 ----------
@@ -69,14 +72,18 @@ local function addOrGetNode(self, filename)
     return SVTableAddOrGet(self._nodes, filename, Node(filename))
 end
 
-local function quote(str)
+local function dot_quote(str)
     checktype(str, 1, "string", 2)
     -- Graphviz docs ("The DOT language") say:
     --  In quoted strings in DOT, the only escaped character is double-quote (").
     --  (...)
     --  As another aid for readability, dot allows double-quoted strings to span multiple physical lines using the standard C
     --  convention of a backslash immediately preceding a newline character^2.
-    return '"'..str:gsub('"', '\\"'):gsub('\n', '\\\n')..'"'
+    return str:gsub('"', '\\"'):gsub('\n', '\\\n')
+end
+
+local function quote(str)
+    return '"'..dot_quote(str)..'"'
 end
 
 -- Public API
@@ -113,11 +120,14 @@ api.InclusionGraph = class
         return ipairs(self._nodes)
     end,
 
-    printAsGraphvizDot = function(self, title, reverse, commonPrefix, printf)
+    printAsGraphvizDot = function(self, title, reverse, commonPrefix, edgeCountLimit, printf)
         checktype(title, 1, "string", 2)
         reverse = (reverse ~= nil) and reverse or false
         checktype(reverse, 2, "boolean", 2)
-        checktype(printf, 4, "function", 2)
+        checktype(commonPrefix, 3, "string")
+        edgeCountLimit = (edgeCountLimit ~= nil) and edgeCountLimit or math.huge
+        checktype(edgeCountLimit, 4, "number", 2)
+        checktype(printf, 5, "function", 2)
 
         local strip = function(fn)
             return (fn:sub(1, #commonPrefix) == commonPrefix) and
@@ -128,19 +138,34 @@ api.InclusionGraph = class
         printf("strict digraph %s {", quote(title))
         printf("rankdir=LR")
 
+        local qs = function(fn)
+            return quote(strip(fn))
+        end
+
         -- Nodes.
         for i, filename in self:iFileNames() do
-            printf('%s [shape=box];', quote(strip(filename)))
+            printf('%s [shape=box];', qs(filename))
         end
 
         printf('')
 
         -- Edges.
         for _, filename in self:iFileNames() do
-            for _, filename2 in self:getNode(filename):iEdges() do
-                local left = (not reverse) and filename or filename2
-                local right = (not reverse) and filename2 or filename
-                printf('%s -> %s;', quote(strip(left)), quote(strip(right)))
+            local node = self:getNode(filename)
+            local edgeCount = node:getEdgeCount()
+
+            if (edgeCount > edgeCountLimit) then
+                assert(not reverse)
+                local placeholderNodeName = string.format(
+                    '"(%d edges from %s)"', edgeCount, dot_quote(strip(filename)))
+                printf('%s;', placeholderNodeName)
+                printf('%s -> %s;', qs(filename), placeholderNodeName)
+            else
+                for _, filename2 in node:iEdges() do
+                    local left = (not reverse) and filename or filename2
+                    local right = (not reverse) and filename2 or filename
+                    printf('%s -> %s;', qs(left), qs(right))
+                end
             end
         end
 

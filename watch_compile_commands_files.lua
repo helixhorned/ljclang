@@ -26,6 +26,7 @@ local pairs = pairs
 local print = print
 local require = require
 local tostring = tostring
+local tonumber = tonumber
 
 local arg = arg
 
@@ -58,21 +59,25 @@ local ErrorCode = {
     CompileCommandsJsonGeneratedEvent = 101,
 }
 
+local GlobalInclusionGraphRelation = "isIncludedBy"
+
 local function usage(hline)
     if (hline) then
         errprint("ERROR: "..hline.."\n")
     end
     local progname = arg[0]:match("([^/]+)$")
     errprint("Usage:\n  "..progname.." [options...] <compile_commands-file>\n")
-    errprint[[
+    errprintf([[
 Options:
   -m: Use machine interface / "command mode" (default: for human inspection)
   -g [includes|isIncludedBy]: Print inclusion graph as a DOT (of Graphviz) file to stdout and exit.
      Argument specifies the relation between graph nodes (which are file names).
      Must be used without -m.
+  -l <number>: edge count limit for the graph produced by -g %s.
+     If exceeded, a placeholder node is placed.
   -p: Disable color output.
   -x: exit immediately after parsing once.
-]]
+]], GlobalInclusionGraphRelation)
     os.exit(ErrorCode.CommandLine)
 end
 
@@ -81,6 +86,7 @@ local parsecmdline = require("parsecmdline_pk")
 local opts_meta = {
     m = false,
     g = true,
+    l = true,
     p = false,
     x = false,
 }
@@ -89,6 +95,7 @@ local opts, args = parsecmdline.getopts(opts_meta, arg, usage)
 
 local commandMode = opts.m
 local printGraphMode = opts.g
+local edgeCountLimit = tonumber(opts.l)
 local plainMode = opts.p
 local exitImmediately = opts.x
 
@@ -110,6 +117,12 @@ if (printGraphMode ~= nil) then
     end
     if (commandMode) then
         abort("Option -g must be used without option -m")
+    end
+end
+
+if (edgeCountLimit ~= nil) then
+    if (printGraphMode ~= GlobalInclusionGraphRelation) then
+        abort("Option -l can only be used with -g being %s", GlobalInclusionGraphRelation)
     end
 end
 
@@ -173,7 +186,7 @@ local function checkAndGetRealName(file)
     return realName
 end
 
-local InclusionGraph_ProcessTU = function(graph, tu)
+local function InclusionGraph_ProcessTU(graph, tu)
     local callback = function(includedFile, stack)
         if (#stack == 0) then
             return
@@ -191,7 +204,13 @@ local InclusionGraph_ProcessTU = function(graph, tu)
         if (not includedFile:isSystemHeader()) then
             local fromRealName = checkAndGetRealName(fromFile)
             local toRealName = checkAndGetRealName(includedFile)
-            graph:addInclusion(fromRealName, toRealName)
+
+            -- NOTE: graph is constructed with edges going
+            --  from the file being '#include'd
+            --  to the file containing the '#include'd
+            -- That is, it models the "isIncludedBy" relation.
+            -- KEEPINSYNC 'GlobalInclusionGraphRelation'.
+            graph:addInclusion(toRealName, fromRealName)
         end
     end
 
@@ -262,8 +281,8 @@ local function PrintInclusionGraphAsGraphvizDot()
     local titleSuffix = (commonPrefix == "") and "" or format(" under '%s'", commonPrefix)
     local title = format("Inclusions (%s) for '%s'%s",
                          printGraphMode, compileCommandsFile, titleSuffix)
-    local reverse = (printGraphMode == "isIncludedBy")
-    initialGlobalInclusionGraph:printAsGraphvizDot(title, reverse, commonPrefix, printf)
+    local reverse = (printGraphMode ~= GlobalInclusionGraphRelation)
+    initialGlobalInclusionGraph:printAsGraphvizDot(title, reverse, commonPrefix, edgeCountLimit, printf)
 end
 
 local function GetAffectedCompileCommandIndexes(eventFileName)
