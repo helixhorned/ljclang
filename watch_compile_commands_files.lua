@@ -202,6 +202,14 @@ end
 local function ProcessCompileCommands(cmds, callback)
     for i, cmd in ipairs(cmds) do
         local args = compile_commands_util.sanitize_args(cmd.arguments, cmd.directory)
+
+        -- HACKS so that certain system includes are found.
+        -- TODO: use insert/remove in other places
+        table.insert(args, 1, "-isystem")
+        table.insert(args, 2, "/usr/lib/llvm-7/lib/clang/7.0.1/include/")  -- fixes luajit
+        table.insert(args, 1, "-isystem")
+        table.insert(args, 2, "/usr/lib/llvm-7/include/c++/v1")  -- fixes conky. TODO: include only with C++
+
         local tu, errorCode = index:parse("", args, {"KeepGoing"})
         callback(i, tu, errorCode)
     end
