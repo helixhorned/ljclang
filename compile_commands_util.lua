@@ -7,38 +7,6 @@ local type = type
 
 local api = {}
 
-local function stripArgs(args, pattern, num)
-    assert(args[0] == nil)
-    local numArgs = #args
-
-    for i=1,numArgs do
-        assert(type(args[i]) == "string")
-    end
-
-    for i=1,numArgs do
-        if (args[i] and args[i]:find(pattern)) then
-            for j=0,num-1 do
-                args[i+j] = nil
-            end
-        end
-    end
-
-    local newargs = {}
-    for i=1,numArgs do
-        if (args[i] ~= nil) then
-            newargs[#newargs+1] = args[i]
-        end
-    end
-    return newargs
-end
-
--- Strip "-c" and "-o <file>" options from args.
-local function strip_c_and_o(args)
-    local argsWithoutC = stripArgs(args, "^-c$", 1)
-    local argsWithoutCAndO = stripArgs(argsWithoutC, "^-o$", 2)
-    return argsWithoutCAndO
-end
-
 function api.absify(filename, directory)
     local isAbsolute = (filename:sub(1,1) == "/")  -- XXX: Windows
     return isAbsolute and filename or directory.."/"..filename
@@ -68,8 +36,7 @@ function api.sanitize_args(args, directory)
         localArgs[i] = args[i]
     end
 
-    local strippedArgs = strip_c_and_o(localArgs)
-    return absifyIncludeOptions(strippedArgs, directory)
+    return absifyIncludeOptions(localArgs, directory)
 end
 
 return api
