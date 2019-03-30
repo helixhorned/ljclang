@@ -258,6 +258,20 @@ local function PrintInclusionGraphAsGraphvizDot()
     initialGlobalInclusionGraph:printAsGraphvizDot(title, reverse, commonPrefix, printf)
 end
 
+local function GetAffectedCompileCommandIndexes(eventFileName)
+    local indexes = {}
+
+    for i = 1, #compileCommands do
+        local graph = compileCommandInclusionGraphs[i]
+
+        if (graph:getNode(eventFileName) ~= nil) then
+            indexes[#indexes + 1] = i
+        end
+    end
+
+    return indexes
+end
+
 local function humanModeMain()
     -- One formatted DiagnosticSet per compile command in `cmds`.
     local formattedDiagSets = {}
@@ -341,7 +355,12 @@ local function humanModeMain()
         assert(eventFileName ~= nil)
 
         -- Determine the set of compile commands to reparse.
-        -- TODO
+
+        local affectedCompileCommandIndexes = GetAffectedCompileCommandIndexes(eventFileName)
+        info("Need reparsing %d compile commands", #affectedCompileCommandIndexes)
+
+        -- TODO: update
+
         -- Later: handle special case of a change of compile_commands.json, too.
     until (false)
 end
