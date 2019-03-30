@@ -130,7 +130,7 @@ if (compileCommands == nil) then
 end
 
 if (#compileCommands == 0) then
-    errprintf("ERROR: '%s' contains zero compile commands", compileCommandsFile)
+    errprintf("ERROR: '%s' contains zero entries", compileCommandsFile)
     os.exit(ErrorCode.CompilationDatabaseEmpty)
 end
 
@@ -220,6 +220,10 @@ local compileCommandInclusionGraphs = {}
 
 ---------- HUMAN MODE ----------
 
+local function info(fmt, ...)
+    printf("%s: "..fmt, colorize("INFO", Col.Green), ...)
+end
+
 local function GetDiagnosticsForTU(tu)
     local lines = {}
 
@@ -261,7 +265,7 @@ local function humanModeMain()
     ProcessCompileCommands(compileCommands, function(i, tu, errorCode)
         if (tu == nil) then
             -- TODO: Extend in verbosity and/or handling?
-            formattedDiagSets[i] = "ERROR: index:parse() failed: "..tostring(errorCode)
+            formattedDiagSets[i] = "ERROR: index:parse() failed: "..tostring(errorCode).."\n"
         else
             formattedDiagSets[i] = GetDiagnosticsForTU(tu)
 
@@ -292,6 +296,9 @@ local function humanModeMain()
     end
 
     local compileCommandsWd = notifier:add_watch(compileCommandsFile, WATCH_FLAGS)
+
+    info("Have %d compile commands, watching %d files", #compileCommands,
+         initialGlobalInclusionGraph:getNodeCount() + 1)
 
     -- TODO: build *per-compile-command* include graphs. Use each one to decide whether a
     -- file change affects a compile command. Note: only the nodes (file names) are needed.
