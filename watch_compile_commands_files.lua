@@ -147,6 +147,30 @@ if (#compileCommands == 0) then
     os.exit(ErrorCode.CompilationDatabaseEmpty)
 end
 
+local function getCompileCommandFileCounts()
+    local counts = {}
+    for _, cmd in ipairs(compileCommands) do
+        counts[cmd.file] = (counts[cmd.file] ~= nil) and counts[cmd.file] + 1 or 1
+    end
+    return counts
+end
+
+local ccFileCounts = getCompileCommandFileCounts()
+
+local function getFileOrdinal(ccIndex)
+    local fileName = compileCommands[ccIndex].file
+    assert(ccFileCounts[fileName] ~= nil)
+
+    local ord = 0
+
+    for i = 1, ccIndex do
+        if (compileCommands[i].file == fileName) then
+            ord = ord + 1
+        end
+    end
+
+    return ord
+end
 
 -- Initial parse of all compilation commands in the project given by the compilation
 -- database.
@@ -367,6 +391,15 @@ local function range(n)
     return t
 end
 
+local function getFileOrdinalText(cmd, i)
+    local fileCount = ccFileCounts[cmd.file]
+    local ord = (fileCount > 1) and getFileOrdinal(i) or nil
+    return (ord ~= nil)
+        and colorize(string.format("[%d/%d] ", ord, fileCount),
+                     Col.Bold..Col.Yellow)
+        or ""
+end
+
 local function humanModeMain()
     local ccIndexes = range(#compileCommands)
     local startTime = os.time()
@@ -402,8 +435,10 @@ local function humanModeMain()
 
             if (#formattedDiagSets[i] > 0) then
                 local prefix = format("Command #%d:", i)
-                errprintf("%s %s",
+                local middle = getFileOrdinalText(cmd, i)
+                errprintf("%s %s%s",
                           colorize(prefix, Col.Bold..Col.Uline..Col.Green),
+                          middle,
                           colorize(cmd.file, Col.Bold..Col.Green))
                 errprintf("%s", formattedDiagSets[i])
             end
