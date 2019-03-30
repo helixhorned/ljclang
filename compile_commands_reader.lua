@@ -20,7 +20,9 @@ local type = type
 local api = {}
 
 local function tweak_json_string_for_load_as_lua_table(str)
-    -- replace leading/trailing '[]' with '{}'
+    -- replace a lone '[]' with '{}' so that an empty compile_commands.json is handled
+    str = str:gsub("^%[%]", "{}")
+    -- replace leading/trailing matching '[ (...) ]' with '{ (...) }'
     str = str:gsub("^%[\n", "{\n"):gsub("\n%]\n?$", "\n}")
     -- replace any other '[]' (expected: of 'arguments' key, if present)
     str = str:gsub(": %[\n", ": {\n"):gsub("%], *\n", "},\n")
