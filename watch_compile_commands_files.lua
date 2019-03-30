@@ -42,6 +42,7 @@ end
 
 local function errprintf(fmt, ...)
     errprint(format(fmt, ...))
+    return true
 end
 
 local function abort(str)
@@ -57,6 +58,8 @@ local ErrorCode = {
 
     WatchedFileMovedOrDeleted = 100,
     CompileCommandsJsonGeneratedEvent = 101,
+
+    Internal = 255,
 }
 
 local GlobalInclusionGraphRelation = "isIncludedBy"
@@ -249,21 +252,15 @@ local function InclusionGraph_ProcessTU(graph, tu)
     return graph
 end
 
-local function ProcessCompileCommands(ccIndexes, callback)
-    for _, i in ipairs(ccIndexes) do
-        local cmd = compileCommands[i]
-        local args = compile_commands_util.sanitize_args(cmd.arguments, cmd.directory)
+local function ProcessCompileCommand(cmd, additionalSystemInclude)
+    local args = compile_commands_util.sanitize_args(cmd.arguments, cmd.directory)
 
-        -- HACKS so that certain system includes are found.
-        -- TODO: use insert/remove in other places
+    if (additionalSystemInclude ~= nil) then
         table.insert(args, 1, "-isystem")
-        table.insert(args, 2, "/usr/lib/llvm-7/lib/clang/7.0.1/include/")  -- fixes luajit
-        table.insert(args, 1, "-isystem")
-        table.insert(args, 2, "/usr/lib/llvm-7/include/c++/v1")  -- fixes conky. TODO: include only with C++
-
-        local tu, errorCode = index:parse("", args, {"KeepGoing"})
-        callback(i, tu, errorCode)
+        table.insert(args, 2, additionalSystemInclude)
     end
+
+    return index:parse("", args, {"KeepGoing"})
 end
 
 local notifier = inotify.init()
@@ -306,20 +303,86 @@ local function GetDiagnosticsForTU(tu)
     return table.concat(lines, '\n')
 end
 
-local function DoProcessCompileCommands(ccIndexes, formattedDiagSets, isInitial)
-    ProcessCompileCommands(ccIndexes, function(i, tu, errorCode)
-        if (tu == nil) then
-            -- TODO: Extend in verbosity and/or handling?
-            formattedDiagSets[i] = "ERROR: index:parse() failed: "..tostring(errorCode).."\n"
-        else
-            formattedDiagSets[i] = GetDiagnosticsForTU(tu)
+local function tryGetLanguage(cmd)
+    -- Minimalistic, since only needed for a hack.
 
+    if (cmd.file:sub(-2) == ".c") then
+        return "c"
+    end
+
+    for _, arg in ipairs(cmd.arguments) do
+        if (arg:sub(1,8) == "-std=c++") then
+            return "c++"
+        end
+    end
+end
+
+local function CheckForIncludeError(tu, formattedDiagSet, cmd, additionalIncludeTab)
+    if (additionalIncludeTab[1] ~= nil) then
+        return
+    end
+
+    local haveIncludeErrors =
+        -- NOTE: careful: we must not match over potential color code boundaries :-/.
+        (formattedDiagSet:match("fatal ") ~= nil) and
+        (formattedDiagSet:match("error:") ~= nil) and
+        (formattedDiagSet:match("'.*' file not found") ~= nil)
+    assert(not haveIncludeErrors or (tu ~= nil))
+
+    if (haveIncludeErrors) then
+        -- HACK so that certain system includes are found.
+        local language = tryGetLanguage(cmd)
+
+        additionalIncludeTab[1] =
+            -- Fixes LuaJIT:
+            (language == "c") and "/usr/lib/llvm-7/lib/clang/7.0.1/include" or
+            -- Fixes conky, but breaks EP (personal project of author):
+            (language == "c++") and "/usr/lib/llvm-7/include/c++/v1" or
+            -- Bail out.
+            errprintf("INTERNAL ERROR: don't know how to attempt fixing includes"..
+                      " for language that was not determined automatically")
+                and os.exit(ErrorCode.Internal)
+        return true
+    end
+end
+
+local function ProcessCompileCommands(ccIndexes, formattedDiagSets, isInitial)
+    local hadSomeSystemIncludesAdded = false
+
+    for _, i in ipairs(ccIndexes) do
+        local tu, errorCode
+        local additionalIncludeTab = {}
+        local count = 0
+
+        repeat
+            count = count + 1
+            assert(count <= 2)
+
+            tu, errorCode = ProcessCompileCommand(compileCommands[i], additionalIncludeTab[1])
+
+            if (tu == nil) then
+                -- TODO: Extend in verbosity and/or handling?
+                formattedDiagSets[i] = "ERROR: index:parse() failed: "..tostring(errorCode).."\n"
+            else
+                formattedDiagSets[i] = GetDiagnosticsForTU(tu)
+            end
+
+            local retry = CheckForIncludeError(
+                tu, formattedDiagSets[i], compileCommands[i], additionalIncludeTab)
+            hadSomeSystemIncludesAdded = hadSomeSystemIncludesAdded or retry
+        until (not retry)
+
+        if (tu ~= nil) then
             if (isInitial) then
                 InclusionGraph_ProcessTU(initialGlobalInclusionGraph, tu)
             end
             compileCommandInclusionGraphs[i] = InclusionGraph_ProcessTU(InclusionGraph(), tu)
         end
-    end)
+    end
+
+    if (hadSomeSystemIncludesAdded) then
+        return "For some compile commands, system include directories were automatically added."
+    end
 end
 
 local function PrintInclusionGraphAsGraphvizDot()
@@ -414,7 +477,8 @@ local function humanModeMain()
     -- One formatted DiagnosticSet per compile command in `compileCommands`.
     local formattedDiagSets = {}
 
-    DoProcessCompileCommands(ccIndexes, formattedDiagSets, true)
+    local pccInfo
+    pccInfo = ProcessCompileCommands(ccIndexes, formattedDiagSets, true)
 
     -- TODO: move to separate application
     if (printGraphMode ~= nil) then
@@ -455,6 +519,9 @@ local function humanModeMain()
             break
         end
 
+        if (pccInfo) then
+            info("%s", pccInfo)
+        end
         info_underline("Processed %d compile commands in %d seconds.",
                        #ccIndexes, os.difftime(os.time(), startTime))
         printf("")
@@ -475,7 +542,7 @@ local function humanModeMain()
              eventFileName, #ccIndexes)
 
         -- Finally, re-process them.
-        DoProcessCompileCommands(ccIndexes, formattedDiagSets)
+        pccInfo = ProcessCompileCommands(ccIndexes, formattedDiagSets)
     until (false)
 end
 
