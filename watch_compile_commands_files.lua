@@ -45,7 +45,7 @@ local function errprintf(fmt, ...)
 end
 
 local function abort(str)
-    errprint(str.."\n")
+    errprint("ERROR: "..str.."\n")
     os.exit(1)
 end
 
@@ -203,7 +203,7 @@ local function checkAndGetRealName(file)
     local realName = file:realPathName()
 
     if (realName == nil) then
-        errprintf("Could not obtain the real path name of '%s'", file:name())
+        errprintf("ERROR: Could not obtain the real path name of '%s'", file:name())
         os.exit(ErrorCode.RealPathName)
     end
 
