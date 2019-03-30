@@ -280,6 +280,42 @@ local function GetAffectedCompileCommandIndexes(eventFileName)
     return indexes
 end
 
+local function AddFileWatches()
+    -- Initial setup of inotify to monitor all files that directly named by any compile
+    -- command or reached by #include, as well as the compile_commands.json file itself.
+
+    local fileNameOfWd = {}
+
+    for _, filename in initialGlobalInclusionGraph:iFileNames() do
+        local wd = notifier:add_watch(filename, WATCH_FLAGS)
+
+        -- Assert one-to-oneness. (Should be given by us having passed the file names
+        -- through realPathName() earlier.)
+        --
+        -- TODO: this does not need to hold in the presence of hard links though. Test.
+        assert(fileNameOfWd[wd] == nil or fileNameOfWd[wd] == filename)
+
+        fileNameOfWd[wd] = filename
+    end
+
+    local compileCommandsWd = notifier:add_watch(compileCommandsFile, WATCH_FLAGS)
+
+    return fileNameOfWd, compileCommandsWd
+end
+
+local function CheckForNotHandledEvents(event, compileCommandsWd)
+    if (bit.band(event.mask, MOVE_OR_DELETE) ~= 0) then
+        errprintf("Exiting: a watched file was moved or deleted. (Handling not implemented.)")
+        os.exit(ErrorCode.WatchedFileMovedOrDeleted)
+    end
+
+    if (event.wd == compileCommandsWd) then
+        errprintf("Exiting: an event was generated for '%s'. (Handling not implemented.)",
+                  compileCommandsFile)
+        os.exit(ErrorCode.CompileCommandsJsonGeneratedEvent)
+    end
+end
+
 local function humanModeMain()
     -- One formatted DiagnosticSet per compile command in `cmds`.
     local formattedDiagSets = {}
@@ -302,24 +338,7 @@ local function humanModeMain()
         os.exit(0)
     end
 
-    -- Initial setup of inotify to monitor all files that directly named by any compile
-    -- command or reached by #include, as well as the compile_commands.json file itself.
-
-    local fileNameOfWd = {}
-
-    for _, filename in initialGlobalInclusionGraph:iFileNames() do
-        local wd = notifier:add_watch(filename, WATCH_FLAGS)
-
-        -- Assert one-to-oneness. (Should be given by us having passed the file names
-        -- through realPathName() earlier.)
-        --
-        -- TODO: this does not need to hold in the presence of hard links though. Test.
-        assert(fileNameOfWd[wd] == nil or fileNameOfWd[wd] == filename)
-
-        fileNameOfWd[wd] = filename
-    end
-
-    local compileCommandsWd = notifier:add_watch(compileCommandsFile, WATCH_FLAGS)
+    local fileNameOfWd, compileCommandsWd = AddFileWatches()
 
     info("Have %d compile commands, watching %d files", #compileCommands,
          initialGlobalInclusionGraph:getNodeCount() + 1)
@@ -348,16 +367,7 @@ local function humanModeMain()
         -- Wait for any changes to watched files.
         local event = notifier:check_(printf)
 
-        if (bit.band(event.mask, MOVE_OR_DELETE) ~= 0) then
-            errprintf("Exiting: a watched file was moved or deleted. (Handling not implemented.)")
-            os.exit(ErrorCode.WatchedFileMovedOrDeleted)
-        end
-
-        if (event.wd == compileCommandsWd) then
-            errprintf("Exiting: an event was generated for '%s'. (Handling not implemented.)",
-                      compileCommandsFile)
-            os.exit(ErrorCode.CompileCommandsJsonGeneratedEvent)
-        end
+        CheckForNotHandledEvents(event, compileCommandsWd)
 
         local eventFileName = fileNameOfWd[event.wd]
         assert(eventFileName ~= nil)
