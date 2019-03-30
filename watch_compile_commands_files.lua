@@ -218,8 +218,9 @@ local function InclusionGraph_ProcessTU(graph, tu)
     return graph
 end
 
-local function ProcessCompileCommands(cmds, callback)
-    for i, cmd in ipairs(cmds) do
+local function ProcessCompileCommands(ccIndexes, callback)
+    for _, i in ipairs(ccIndexes) do
+        local cmd = compileCommands[i]
         local args = compile_commands_util.sanitize_args(cmd.arguments, cmd.directory)
 
         -- HACKS so that certain system includes are found.
@@ -251,6 +252,13 @@ local function info(fmt, ...)
     printf("%s: "..fmt, colorize("INFO", Col.Green), ...)
 end
 
+local function info_underline(fmt, ...)
+    local text = string.format(fmt, ...)
+    printf("%s%s",
+           colorize("INFO", Col.Uline..Col.Green),
+           colorize(": "..text, Col.Uline..Col.White))
+end
+
 local function GetDiagnosticsForTU(tu)
     local lines = {}
 
@@ -265,6 +273,22 @@ local function GetDiagnosticsForTU(tu)
     -- Format diagnostics immediately to not keep the TU around.
     diagnostics_util.PrintDiags(tu:diagnosticSet(), not plainMode, callbacks)
     return table.concat(lines, '\n')
+end
+
+local function DoProcessCompileCommands(ccIndexes, formattedDiagSets, isInitial)
+    ProcessCompileCommands(ccIndexes, function(i, tu, errorCode)
+        if (tu == nil) then
+            -- TODO: Extend in verbosity and/or handling?
+            formattedDiagSets[i] = "ERROR: index:parse() failed: "..tostring(errorCode).."\n"
+        else
+            formattedDiagSets[i] = GetDiagnosticsForTU(tu)
+
+            if (isInitial) then
+                InclusionGraph_ProcessTU(initialGlobalInclusionGraph, tu)
+            end
+            compileCommandInclusionGraphs[i] = InclusionGraph_ProcessTU(InclusionGraph(), tu)
+        end
+    end)
 end
 
 local function PrintInclusionGraphAsGraphvizDot()
@@ -291,7 +315,7 @@ local function GetAffectedCompileCommandIndexes(eventFileName)
     for i = 1, #compileCommands do
         local graph = compileCommandInclusionGraphs[i]
 
-        if (graph:getNode(eventFileName) ~= nil) then
+        if (graph ~= nil and graph:getNode(eventFileName) ~= nil) then
             indexes[#indexes + 1] = i
         end
     end
@@ -335,21 +359,22 @@ local function CheckForNotHandledEvents(event, compileCommandsWd)
     end
 end
 
+local function range(n)
+    local t = {}
+    for i = 1, n do
+        t[i] = i
+    end
+    return t
+end
+
 local function humanModeMain()
-    -- One formatted DiagnosticSet per compile command in `cmds`.
+    local ccIndexes = range(#compileCommands)
+    local startTime = os.time()
+
+    -- One formatted DiagnosticSet per compile command in `compileCommands`.
     local formattedDiagSets = {}
 
-    ProcessCompileCommands(compileCommands, function(i, tu, errorCode)
-        if (tu == nil) then
-            -- TODO: Extend in verbosity and/or handling?
-            formattedDiagSets[i] = "ERROR: index:parse() failed: "..tostring(errorCode).."\n"
-        else
-            formattedDiagSets[i] = GetDiagnosticsForTU(tu)
-
-            InclusionGraph_ProcessTU(initialGlobalInclusionGraph, tu)
-            compileCommandInclusionGraphs[i] = InclusionGraph_ProcessTU(InclusionGraph(), tu)
-        end
-    end)
+    DoProcessCompileCommands(ccIndexes, formattedDiagSets, true)
 
     -- TODO: move to separate application
     if (printGraphMode ~= nil) then
@@ -359,22 +384,27 @@ local function humanModeMain()
 
     local fileNameOfWd, compileCommandsWd = AddFileWatches()
 
-    info("Have %d compile commands, watching %d files", #compileCommands,
-         initialGlobalInclusionGraph:getNodeCount() + 1)
+    info("Watching %d files.", initialGlobalInclusionGraph:getNodeCount() + 1)
 
     repeat
+        local headerLineLength = 0
+
         -- Print current diagnostics.
         -- TODO: think about handling case when files change more properly.
         -- TODO: in particular, moves and deletions. (Have common logic with compile_commands.json change?)
         -- Later: handle special case of a change of compile_commands.json, too.
 
-        for i, cmd in ipairs(compileCommands) do
+        for _, i in ipairs(ccIndexes) do
             -- TODO (prettiness): inform when a file name appears more than once?
             -- TODO (prettiness): print header line (or part of it) in different colors if
             -- compilation succeeded/failed?
+            local cmd = compileCommands[i]
+
             if (#formattedDiagSets[i] > 0) then
-                local string = format("Command #%d: %s", i, cmd.file)
-                errprintf("%s", colorize(string, Col.Bold..Col.Uline..Col.Green))
+                local prefix = format("Command #%d:", i)
+                errprintf("%s %s",
+                          colorize(prefix, Col.Bold..Col.Uline..Col.Green),
+                          colorize(cmd.file, Col.Bold..Col.Green))
                 errprintf("%s", formattedDiagSets[i])
             end
         end
@@ -383,20 +413,27 @@ local function humanModeMain()
             break
         end
 
+        info_underline("Processed %d compile commands in %d seconds.",
+                       #ccIndexes, os.difftime(os.time(), startTime))
+        printf("")
+
         -- Wait for any changes to watched files.
         local event = notifier:check_(printf)
+        startTime = os.time()
 
         CheckForNotHandledEvents(event, compileCommandsWd)
 
         local eventFileName = fileNameOfWd[event.wd]
         assert(eventFileName ~= nil)
 
-        -- Determine the set of compile commands to reparse.
+        -- Determine the set of compile commands to re-process.
+        ccIndexes = GetAffectedCompileCommandIndexes(eventFileName)
 
-        local affectedCompileCommandIndexes = GetAffectedCompileCommandIndexes(eventFileName)
-        info("Need reparsing %d compile commands", #affectedCompileCommandIndexes)
+        info("Detected modification of %s. Need re-processing %d compile commands.",
+             eventFileName, #ccIndexes)
 
-        -- TODO: update
+        -- Finally, re-process them.
+        DoProcessCompileCommands(ccIndexes, formattedDiagSets)
     until (false)
 end
 
