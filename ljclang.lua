@@ -133,26 +133,6 @@ end
 -------------------------- CompilationDatabase --------------------------
 -------------------------------------------------------------------------
 
--- newargs = api.stripArgs(args, pattern, num)
-function api.stripArgs(args, pattern, num)
-    assert(args[0] == nil)
-    local numArgs = #args
-
-    for i=1,numArgs do
-        if (args[i] and args[i]:find(pattern)) then
-            for j=0,num-1 do
-                args[i+j] = nil
-            end
-        end
-    end
-
-    local newargs = {}
-    for i=1,numArgs do
-        newargs[#newargs+1] = args[i]
-    end
-    return newargs
-end
-
 local CompileCommand_t = class
 {
     "CXCompileCommand _ptr;"..
