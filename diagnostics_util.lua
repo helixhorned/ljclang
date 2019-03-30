@@ -31,6 +31,10 @@ local function FormatDiagnostic(diag, useColors, printCategory)
     local text = diag:format()
 
     if (useColors) then
+        text = text:gsub("(.*)(fatal error: )(.*)", ColorizeErrorFunc)
+        -- NOTE: in the presence of a fatal error, the following will colorize the 'error'
+        -- redundantly again, and these control codes do not nest. However, this is
+        -- harmless.
         text = text:gsub("(.*)(error: )(.*)", ColorizeErrorFunc)
         text = text:gsub("(.*)(warning: )(.*)", ColorizeWarningFunc)
         text = text:gsub("(.*)(note: )(.*)", ColorizeNoteFunc)
@@ -94,9 +98,26 @@ local function PrintDiags(diags, useColors, callbacks, startIndex, indentation)
                    innerStartIndex, indentation + 2)
 
         onDiagEnd(i, indentation)
+
+        local isFatal = (diag:severity() == "fatal")
+
+        if (isFatal) then
+            assert(indentation == 0)
+
+            if (i < #diags) then
+                onNewTextLine("%s: omitting %d diagnostics.",
+                              useColors and colorize("LJClang", Col.Bold..Col.Blue) or "LJClang",
+                              #diags - i)
+            end
+        end
+
         if (indentation == 0) then
             -- Add a newline.
             onNewTextLine("")
+        end
+
+        if (isFatal) then
+            break
         end
     end
 end
