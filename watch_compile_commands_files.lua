@@ -70,6 +70,8 @@ local function usage(hline)
     errprintf([[
 Options:
   -m: Use machine interface / "command mode" (default: for human inspection)
+
+Human mode options:
   -g [includes|isIncludedBy]: Print inclusion graph as a DOT (of Graphviz) file to stdout and exit.
      Argument specifies the relation between graph nodes (which are file names).
      Must be used without -m.
@@ -108,7 +110,12 @@ local function colorize(...)
 end
 
 if (commandMode) then
-    abort("Command mode not yet implemented!")
+    for key, _ in pairs(opts_meta) do
+        if key ~= 'm' and opts[key] then
+            errprintf("ERROR: Option -%s only available without -m", key)
+            os.exit(ErrorCode.CommandLine)
+        end
+    end
 end
 
 if (printGraphMode ~= nil) then
