@@ -697,6 +697,13 @@ class
 --------------------------------- Cursor --------------------------------
 -------------------------------------------------------------------------
 
+local LanguageEnumToString = {
+    [tonumber(C.CXLanguage_Invalid)] = "invalid",
+    [tonumber(C.CXLanguage_C)] = "c",
+    [tonumber(C.CXLanguage_ObjC)] = "objc",
+    [tonumber(C.CXLanguage_CPlusPlus)] = "c++",
+}
+
 local function getType(cxtyp)
     return (cxtyp.kind ~= 'CXType_Invalid') and Type_t(cxtyp) or nil
 end
@@ -835,6 +842,11 @@ class
         local kindnum = tonumber(self:kindnum())
         local kindstr = g_CursorKindName[kindnum]
         return kindstr or "Unknown"
+    end,
+
+    language = function(self)
+        local cxlanguagekind = clang.clang_getCursorLanguage(self._cur)
+        return LanguageEnumToString[tonumber(cxlanguagekind)]
     end,
 
     templateKind = function(self)
