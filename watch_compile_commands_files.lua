@@ -13,7 +13,6 @@ local util = require("util")
 local InclusionGraph = require("inclusion_graph").InclusionGraph
 
 local Col = require("terminal_colors")
-local colorize = Col.colorize
 
 local checktype = require("error_util").checktype
 
@@ -71,6 +70,8 @@ Options:
   -g [includes|isIncludedBy]: Print inclusion graph as a DOT (of Graphviz) file to stdout and exit.
      Argument specifies the relation between graph nodes (which are file names).
      Must be used without -m.
+  -p: Disable color output.
+  -x: exit immediately after parsing once.
 ]]
     os.exit(ErrorCode.CommandLine)
 end
@@ -80,12 +81,24 @@ local parsecmdline = require("parsecmdline_pk")
 local opts_meta = {
     m = false,
     g = true,
+    p = false,
+    x = false,
 }
 
 local opts, args = parsecmdline.getopts(opts_meta, arg, usage)
 
 local commandMode = opts.m
 local printGraphMode = opts.g
+local plainMode = opts.p
+local exitImmediately = opts.x
+
+local function colorize(...)
+    if (plainMode) then
+        return ...
+    else
+        return Col.colorize(...)
+    end
+end
 
 if (commandMode) then
     abort("Command mode not yet implemented!")
@@ -219,7 +232,7 @@ local function GetDiagnosticsForTU(tu)
     }
 
     -- Format diagnostics immediately to not keep the TU around.
-    diagnostics_util.PrintDiags(tu:diagnosticSet(), true, callbacks)
+    diagnostics_util.PrintDiags(tu:diagnosticSet(), not plainMode, callbacks)
     return table.concat(lines, '\n')
 end
 
@@ -292,9 +305,15 @@ local function humanModeMain()
             -- TODO (prettiness): inform when a file name appears more than once?
             -- TODO (prettiness): print header line (or part of it) in different colors if
             -- compilation succeeded/failed?
-            local string = format("Command #%d: %s", i, cmd.file)
-            errprintf("%s", colorize(string, Col.Bold..Col.Uline..Col.Green))
-            errprintf("%s", formattedDiagSets[i])
+            if (#formattedDiagSets[i] > 0) then
+                local string = format("Command #%d: %s", i, cmd.file)
+                errprintf("%s", colorize(string, Col.Bold..Col.Uline..Col.Green))
+                errprintf("%s", formattedDiagSets[i])
+            end
+        end
+
+        if (exitImmediately) then
+            break
         end
 
         -- Wait for any changes to watched files.
