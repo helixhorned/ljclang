@@ -266,16 +266,16 @@ local function humanModeMain()
     -- Initial setup of inotify to monitor all files that directly named by any compile
     -- command or reached by #include, as well as the compile_commands.json file itself.
 
-    local wdFilename = {}
+    local fileNameOfWd = {}
 
     for _, filename in initialGlobalInclusionGraph:iFileNames() do
         local wd = notifier:add_watch(filename, WATCH_FLAGS)
 
         -- Assert one-to-oneness. (Should be given by us having passed the file names
         -- through realPathName() earlier.)
-        assert(wdFilename[wd] == nil or wdFilename[wd] == filename)
+        assert(fileNameOfWd[wd] == nil or fileNameOfWd[wd] == filename)
 
-        wdFilename[wd] = filename
+        fileNameOfWd[wd] = filename
     end
 
     local compileCommandsWd = notifier:add_watch(compileCommandsFile, WATCH_FLAGS)
@@ -310,6 +310,9 @@ local function humanModeMain()
                       compileCommandsFile)
             os.exit(ErrorCode.CompileCommandsJsonGeneratedEvent)
         end
+
+        local eventFileName = fileNameOfWd[event.wd]
+        assert(eventFileName ~= nil)
 
         -- Determine the set of compile commands to reparse.
         -- TODO
