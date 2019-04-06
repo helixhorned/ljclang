@@ -2,16 +2,11 @@
 OS := $(shell uname -s)
 THIS_DIR := $(abspath $(dir $(lastword $(MAKEFILE_LIST))))
 
-# Directory to install scripts (referencing THIS_DIR, i.e. the development directory).
-BINDIR ?= /usr/local/bin
+# User configuration
+include config.make
 
-LLVM_CONFIG ?= llvm-config
 llvm-config := $(shell which $(LLVM_CONFIG))
 
-luajit := luajit
-
-# Will use this Markdown processor for .md -> .html if it is found:
-MARKDOWN := cmark
 markdown := $(shell which $(MARKDOWN))
 
 ifeq ($(llvm-config),)
