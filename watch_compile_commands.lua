@@ -474,6 +474,8 @@ local function humanModeMain()
     -- One formatted DiagnosticSet per compile command in `compileCommands`.
     local formattedDiagSets = {}
 
+    info("Processing %d compile commands.", #ccIndexes)
+
     local pccInfo
     pccInfo = ProcessCompileCommands(ccIndexes, formattedDiagSets, true,
                                      printGraphMode and {"SkipFunctionBodies", "Incomplete"} or {})
