@@ -249,7 +249,7 @@ local function InclusionGraph_ProcessTU(graph, tu)
     return graph
 end
 
-local function ProcessCompileCommand(cmd, additionalSystemInclude)
+local function ProcessCompileCommand(cmd, additionalSystemInclude, parseOptions)
     local args = compile_commands_util.sanitize_args(cmd.arguments, cmd.directory)
 
     if (additionalSystemInclude ~= nil) then
@@ -257,7 +257,7 @@ local function ProcessCompileCommand(cmd, additionalSystemInclude)
         table.insert(args, 2, additionalSystemInclude)
     end
 
-    return index:parse("", args, {"KeepGoing"})
+    return index:parse("", args, parseOptions)
 end
 
 local notifier = inotify.init()
@@ -343,7 +343,7 @@ local function CheckForIncludeError(tu, formattedDiagSet, cmd, additionalInclude
     end
 end
 
-local function ProcessCompileCommands(ccIndexes, formattedDiagSets, isInitial)
+local function ProcessCompileCommands(ccIndexes, formattedDiagSets, isInitial, parseOptions)
     local hadSomeSystemIncludesAdded = false
 
     for _, i in ipairs(ccIndexes) do
@@ -355,7 +355,8 @@ local function ProcessCompileCommands(ccIndexes, formattedDiagSets, isInitial)
             count = count + 1
             assert(count <= 2)
 
-            tu, errorCode = ProcessCompileCommand(compileCommands[i], additionalIncludeTab[1])
+            tu, errorCode = ProcessCompileCommand(
+                compileCommands[i], additionalIncludeTab[1], parseOptions)
 
             if (tu == nil) then
                 -- TODO: Extend in verbosity and/or handling?
@@ -475,11 +476,14 @@ local function humanModeMain()
     local formattedDiagSets = {}
 
     local pccInfo
-    pccInfo = ProcessCompileCommands(ccIndexes, formattedDiagSets, true)
+    pccInfo = ProcessCompileCommands(ccIndexes, formattedDiagSets, true,
+                                     printGraphMode and {"SkipFunctionBodies", "Incomplete"} or {})
 
     -- TODO: move to separate application
     if (printGraphMode ~= nil) then
         PrintInclusionGraphAsGraphvizDot()
+        -- TODO: see if there were errors, actually. After all, there may have been
+        -- #include errors!
         os.exit(0)
     end
 

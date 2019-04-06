@@ -70,7 +70,7 @@ function api.handleTableOfOptionStrings(lib, prefix, opts)
         for i=1,#opts do
             optflags[i] = lib[prefix..opts[i]]  -- look up the enum
         end
-        opts = bit.bor(unpack(optflags))
+        opts = (#opts > 0) and bit.bor(unpack(optflags)) or 0
     end
 
     return opts
