@@ -3,7 +3,7 @@ OS := $(shell uname -s)
 THIS_DIR := $(abspath $(dir $(lastword $(MAKEFILE_LIST))))
 
 # Directory to install scripts (referencing THIS_DIR, i.e. the development directory).
-BINDIR ?= /usr/local
+BINDIR ?= /usr/local/bin
 
 LLVM_CONFIG ?= llvm-config
 llvm-config := $(shell which $(LLVM_CONFIG))
@@ -139,9 +139,13 @@ endif
 test: $(LJCLANG_SUPPORT_SO) $(GENERATED_FILES_STAGE_2)
 	LLVM_LIBDIR="$(libdir)" $(SHELL) ./run_tests.sh
 
-install: $(LJCLANG_SUPPORT_SO) $(GENERATED_FILES_STAGE_2)
-	sed "s|LJCLANG_DEV_DIR|$(THIS_DIR)|g; s|LLVM_LIBDIR|$(libdir)|g;" ./mgrep.sh.in > $(BINDIR)/mgrep
+sed_common_commands := s|LJCLANG_DEV_DIR|$(THIS_DIR)|g; s|LLVM_LIBDIR|$(libdir)|g;
+
+install: $(LJCLANG_SUPPORT_SO) $(GENERATED_FILES_STAGE_2) $(inotify_decls_lua)
+	sed "$(sed_common_commands) s|APPLICATION|mgrep|g" ./app.sh.in > $(BINDIR)/mgrep
+	sed "$(sed_common_commands) s|APPLICATION|watch_compile_commands|g" ./app.sh.in > $(BINDIR)/watch_compile_commands
 	chmod +x $(BINDIR)/mgrep
+	chmod +x $(BINDIR)/watch_compile_commands
 
 # This target is merely there to create compile_commands.json entries for the test
 # source files in case we are invoked with 'bear'.
