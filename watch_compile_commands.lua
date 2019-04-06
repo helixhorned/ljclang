@@ -53,8 +53,7 @@ end
 local ErrorCode = {
     CommandLine = 1,
     CompilationDatabaseLoad = 2,
-    CompilationDatabaseEmpty = 3,
-    RealPathName = 4,
+    RealPathName = 3,
 
     WatchedFileMovedOrDeleted = 100,
     CompileCommandsJsonGeneratedEvent = 101,
@@ -112,6 +111,10 @@ local function colorize(...)
     end
 end
 
+local function info(fmt, ...)
+    printf("%s: "..fmt, colorize("INFO", Col.Green), ...)
+end
+
 if (commandMode) then
     for key, _ in pairs(opts_meta) do
         if key ~= 'm' and opts[key] then
@@ -150,8 +153,8 @@ if (compileCommands == nil) then
 end
 
 if (#compileCommands == 0) then
-    errprintf("ERROR: '%s' contains zero entries", compileCommandsFile)
-    os.exit(ErrorCode.CompilationDatabaseEmpty)
+    info("'%s' contains zero entries.", compileCommandsFile)
+    os.exit(0)
 end
 
 local function getCompileCommandFileCounts()
@@ -272,10 +275,6 @@ local initialGlobalInclusionGraph = InclusionGraph()
 local compileCommandInclusionGraphs = {}
 
 ---------- HUMAN MODE ----------
-
-local function info(fmt, ...)
-    printf("%s: "..fmt, colorize("INFO", Col.Green), ...)
-end
 
 local function info_underline(fmt, ...)
     local text = string.format(fmt, ...)
