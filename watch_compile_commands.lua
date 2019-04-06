@@ -125,9 +125,6 @@ if (printGraphMode ~= nil) then
     if (printGraphMode ~= "includes" and printGraphMode ~= "isIncludedBy") then
         abort("Argument to option -g must be 'includes' or 'isIncludedBy'")
     end
-    if (commandMode) then
-        abort("Option -g must be used without option -m")
-    end
 end
 
 if (edgeCountLimit ~= nil) then
