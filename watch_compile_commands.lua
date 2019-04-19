@@ -5,6 +5,7 @@ local string = require("string")
 local table = require("table")
 
 local cl = require("ljclang")
+local class = require("class").class
 local compile_commands_reader = require("compile_commands_reader")
 local compile_commands_util = require("compile_commands_util")
 local diagnostics_util = require("diagnostics_util")
@@ -14,6 +15,7 @@ local InclusionGraph = require("inclusion_graph").InclusionGraph
 
 local Col = require("terminal_colors")
 
+local check = require("error_util").check
 local checktype = require("error_util").checktype
 
 local inotify = require("inotify")
@@ -80,7 +82,7 @@ Human mode options:
   -l <number>: edge count limit for the graph produced by -g %s.
      If exceeded, a placeholder node is placed.
   -p: Disable color output.
-  -x: exit immediately after parsing once.
+  -x: exit after parsing and displaying diagnostics once.
 ]], GlobalInclusionGraphRelation)
     os.exit(ErrorCode.CommandLine)
 end
@@ -101,7 +103,7 @@ local commandMode = opts.m
 local printGraphMode = opts.g
 local edgeCountLimit = tonumber(opts.l)
 local plainMode = opts.p
-local exitImmediately = opts.x
+local exitImmediately = opts.x or printGraphMode
 
 local function colorize(...)
     if (plainMode) then
@@ -190,8 +192,6 @@ end
 --  1. diagnostics for each compilation command
 --  2. a DAG of the #include relation for the whole project
 
-local index = cl.createIndex(true, false)
-
 ---------- Common to both human and command mode ----------
 
 local function getSite(location)
@@ -253,7 +253,7 @@ local function InclusionGraph_ProcessTU(graph, tu)
     return graph
 end
 
-local function ProcessCompileCommand(cmd, additionalSystemInclude, parseOptions)
+local function DoProcessCompileCommand(cmd, additionalSystemInclude, parseOptions)
     local args = compile_commands_util.sanitize_args(cmd.arguments, cmd.directory)
 
     if (additionalSystemInclude ~= nil) then
@@ -261,16 +261,13 @@ local function ProcessCompileCommand(cmd, additionalSystemInclude, parseOptions)
         table.insert(args, 2, additionalSystemInclude)
     end
 
+    local index = cl.createIndex(true, false)
+
     return index:parse("", args, parseOptions)
 end
 
-local notifier = inotify.init()
 local MOVE_OR_DELETE = bit.bor(IN.MOVE_SELF, IN.DELETE_SELF)
 local WATCH_FLAGS = bit.bor(IN.CLOSE_WRITE, MOVE_OR_DELETE)
-
--- The inclusion graph for the whole project ("global") initial configuration.
--- Will not be updated on updates to individual files.
-local initialGlobalInclusionGraph = InclusionGraph()
 
 -- Inclusion graphs for each compile command.
 local compileCommandInclusionGraphs = {}
@@ -344,47 +341,95 @@ local function CheckForIncludeError(tu, formattedDiagSet, cmd, additionalInclude
     end
 end
 
-local function ProcessCompileCommands(ccIndexes, formattedDiagSets, isInitial, parseOptions)
+local function ProcessCompileCommand(ccIndex, parseOptions, successCallback)
+    local tu, errorCode
+    local additionalIncludeTab = {}
+    local count = 0
+
+    local formattedDiagSet
     local hadSomeSystemIncludesAdded = false
 
-    for _, i in ipairs(ccIndexes) do
-        local tu, errorCode
-        local additionalIncludeTab = {}
-        local count = 0
+    repeat
+        count = count + 1
+        assert(count <= 2)
 
-        repeat
-            count = count + 1
-            assert(count <= 2)
+        tu, errorCode = DoProcessCompileCommand(
+            compileCommands[ccIndex], additionalIncludeTab[1], parseOptions)
 
-            tu, errorCode = ProcessCompileCommand(
-                compileCommands[i], additionalIncludeTab[1], parseOptions)
-
-            if (tu == nil) then
-                -- TODO: Extend in verbosity and/or handling?
-                formattedDiagSets[i] = "ERROR: index:parse() failed: "..tostring(errorCode).."\n"
-            else
-                formattedDiagSets[i] = GetDiagnosticsForTU(tu)
-            end
-
-            local retry = CheckForIncludeError(
-                tu, formattedDiagSets[i], compileCommands[i], additionalIncludeTab)
-            hadSomeSystemIncludesAdded = hadSomeSystemIncludesAdded or retry
-        until (not retry)
-
-        if (tu ~= nil) then
-            if (isInitial) then
-                InclusionGraph_ProcessTU(initialGlobalInclusionGraph, tu)
-            end
-            compileCommandInclusionGraphs[i] = InclusionGraph_ProcessTU(InclusionGraph(), tu)
+        if (tu == nil) then
+            -- TODO: Extend in verbosity and/or handling?
+            formattedDiagSet = "ERROR: index:parse() failed: "..tostring(errorCode).."\n"
+        else
+            formattedDiagSet = GetDiagnosticsForTU(tu)
         end
+
+        local retry = CheckForIncludeError(
+            tu, formattedDiagSet, compileCommands[ccIndex], additionalIncludeTab)
+        hadSomeSystemIncludesAdded = hadSomeSystemIncludesAdded or retry
+    until (not retry)
+
+    if (tu ~= nil) then
+        if (successCallback ~= nil) then
+            successCallback(tu)
+        end
+        compileCommandInclusionGraphs[ccIndex] = InclusionGraph_ProcessTU(InclusionGraph(), tu)
     end
 
-    if (hadSomeSystemIncludesAdded) then
-        return "For some compile commands, system include directories were automatically added."
-    end
+    return formattedDiagSet, hadSomeSystemIncludesAdded
 end
 
-local function PrintInclusionGraphAsGraphvizDot()
+local OnDemandParser = class
+{
+    function(ccIndexes, parseOptions, successCallback)
+        return {
+            ccIndexes = ccIndexes,
+            parseOptions = parseOptions,
+            successCallback = successCallback,
+
+            formattedDiagSets = {},
+            hadSomeSystemIncludesAdded = false,
+        }
+    end,
+
+    getCount = function(self)
+        return #self.ccIndexes
+    end,
+
+    getFormattedDiagSet = function(self, i)
+        checktype(i, 1, "number", 2)
+        check(i >= 1 and i <= self:getCount(), "argument #1 must be in [1, self:getCount()]", 2)
+
+        local tus, errorCodes = self.tus, self.errorCodes
+
+        if (self.formattedDiagSets[i] == nil) then
+            local tmp
+            self.formattedDiagSets[i], tmp = ProcessCompileCommand(
+                self.ccIndexes[i], self.parseOptions, self.successCallback)
+            self.hadSomeSystemIncludesAdded = self.hadSomeSystemIncludesAdded or tmp
+        end
+
+        return self.formattedDiagSets[i]
+    end,
+
+    iterate = function(self)
+        local next = function(_, i)
+            i = i+1
+            if (i <= self:getCount()) then
+                return i, self:getFormattedDiagSet(i), self.ccIndexes[i]
+            end
+        end
+
+        return next, nil, 0
+    end,
+
+    getAdditionalInfo = function(self)
+        if (self.hadSomeSystemIncludesAdded) then
+            return "For some compile commands, system include directories were automatically added."
+        end
+    end,
+}
+
+local function PrintInclusionGraphAsGraphvizDot(graph)
     local directoryName = compileCommands[1].file:match("^.*/")
 
     -- Obtain the common prefix of all files named by any compile command and strip that
@@ -399,7 +444,7 @@ local function PrintInclusionGraphAsGraphvizDot()
     local title = format("Inclusions (%s) for '%s'%s",
                          printGraphMode, compileCommandsFile, titleSuffix)
     local reverse = (printGraphMode ~= GlobalInclusionGraphRelation)
-    initialGlobalInclusionGraph:printAsGraphvizDot(title, reverse, commonPrefix, edgeCountLimit, printf)
+    graph:printAsGraphvizDot(title, reverse, commonPrefix, edgeCountLimit, printf)
 end
 
 local function GetAffectedCompileCommandIndexes(eventFileName)
@@ -416,13 +461,14 @@ local function GetAffectedCompileCommandIndexes(eventFileName)
     return indexes
 end
 
-local function AddFileWatches()
+local function AddFileWatches(initialGraph)
     -- Initial setup of inotify to monitor all files that directly named by any compile
     -- command or reached by #include, as well as the compile_commands.json file itself.
 
+    local notifier = inotify.init()
     local fileNameOfWd = {}
 
-    for _, filename in initialGlobalInclusionGraph:iFileNames() do
+    for _, filename in initialGraph:iFileNames() do
         local wd = notifier:add_watch(filename, WATCH_FLAGS)
 
         -- Assert one-to-oneness. (Should be the case due to us having passed the file names
@@ -436,7 +482,7 @@ local function AddFileWatches()
 
     local compileCommandsWd = notifier:add_watch(compileCommandsFile, WATCH_FLAGS)
 
-    return fileNameOfWd, compileCommandsWd
+    return notifier, fileNameOfWd, compileCommandsWd
 end
 
 local function CheckForNotHandledEvents(event, compileCommandsWd)
@@ -469,66 +515,73 @@ local function getFileOrdinalText(cmd, i)
         or ""
 end
 
+local function printFormattedDiagSet(formattedDiagSet, ccIndex)
+    if (#formattedDiagSet > 0) then
+        local cmd = compileCommands[ccIndex]
+
+        local prefix = format("Command #%d:", ccIndex)
+        local middle = getFileOrdinalText(cmd, ccIndex)
+
+        errprintf("%s %s%s",
+                  colorize(prefix, Col.Bold..Col.Uline..Col.Green),
+                  middle,
+                  colorize(cmd.file, Col.Bold..Col.Green))
+        errprintf("%s", formattedDiagSet)
+        return true
+    end
+end
+
 local function humanModeMain()
-    local ccIndexes = range(#compileCommands)
+    info("Processing %d compile commands.", #compileCommands)
+
+    -- The inclusion graph for the whole project ("global") initial configuration.
+    -- Will not be updated on changes to individual files.
+    local initialGlobalInclusionGraph = InclusionGraph()
+
     local startTime = os.time()
 
-    -- One formatted DiagnosticSet per compile command in `compileCommands`.
-    local formattedDiagSets = {}
-
-    info("Processing %d compile commands.", #ccIndexes)
-
-    local pccInfo
-    pccInfo = ProcessCompileCommands(ccIndexes, formattedDiagSets, true,
-                                     printGraphMode and {"SkipFunctionBodies", "Incomplete"} or {})
-
-    -- TODO: move to separate application
-    if (printGraphMode ~= nil) then
-        PrintInclusionGraphAsGraphvizDot()
-        -- TODO: see if there were errors, actually. After all, there may have been
-        -- #include errors!
-        os.exit(0)
+    local parserOpts = printGraphMode and {"SkipFunctionBodies", "Incomplete"} or {}
+    local successCallback = function(tu)
+        InclusionGraph_ProcessTU(initialGlobalInclusionGraph, tu)
     end
 
-    local fileNameOfWd, compileCommandsWd = AddFileWatches()
+    local onDemandParser = OnDemandParser(range(#compileCommands), parserOpts, successCallback)
 
-    info("Watching %d files.", initialGlobalInclusionGraph:getNodeCount() + 1)
+    local notifier, fileNameOfWd, compileCommandsWd
 
     repeat
-        local headerLineLength = 0
-
         -- Print current diagnostics.
         -- TODO: think about handling case when files change more properly.
         -- TODO: in particular, moves and deletions. (Have common logic with compile_commands.json change?)
         -- Later: handle special case of a change of compile_commands.json, too.
 
-        for _, i in ipairs(ccIndexes) do
-            -- TODO (prettiness): inform when a file name appears more than once?
-            -- TODO (prettiness): print header line (or part of it) in different colors if
-            -- compilation succeeded/failed?
-            local cmd = compileCommands[i]
-
-            if (#formattedDiagSets[i] > 0) then
-                local prefix = format("Command #%d:", i)
-                local middle = getFileOrdinalText(cmd, i)
-                errprintf("%s %s%s",
-                          colorize(prefix, Col.Bold..Col.Uline..Col.Green),
-                          middle,
-                          colorize(cmd.file, Col.Bold..Col.Green))
-                errprintf("%s", formattedDiagSets[i])
-            end
+        for i, formattedDiagSet, ccIndex in onDemandParser:iterate() do
+            local printedDiag = printFormattedDiagSet(formattedDiagSet, ccIndex)
         end
+
+        -- TODO: move to separate application
+        if (printGraphMode ~= nil) then
+            PrintInclusionGraphAsGraphvizDot(initialGlobalInclusionGraph)
+            -- TODO: see if there were errors, actually. After all, there may have been
+            -- #include errors!
+        end
+
+        if (notifier == nil and not exitImmediately) then
+            notifier, fileNameOfWd, compileCommandsWd =
+                AddFileWatches(initialGlobalInclusionGraph)
+            info("Watching %d files.", initialGlobalInclusionGraph:getNodeCount() + 1)
+        end
+
+        if (onDemandParser:getAdditionalInfo() ~= nil) then
+            info("%s", onDemandParser:getAdditionalInfo())
+        end
+        info_underline("Processed %d compile commands in %d seconds.",
+                       onDemandParser:getCount(), os.difftime(os.time(), startTime))
+        printf("")
 
         if (exitImmediately) then
             break
         end
-
-        if (pccInfo) then
-            info("%s", pccInfo)
-        end
-        info_underline("Processed %d compile commands in %d seconds.",
-                       #ccIndexes, os.difftime(os.time(), startTime))
-        printf("")
 
         -- Wait for any changes to watched files.
         local event = notifier:check_(printf)
@@ -540,13 +593,13 @@ local function humanModeMain()
         assert(eventFileName ~= nil)
 
         -- Determine the set of compile commands to re-process.
-        ccIndexes = GetAffectedCompileCommandIndexes(eventFileName)
+        local ccIndexes = GetAffectedCompileCommandIndexes(eventFileName)
 
         info("Detected modification of %s. Need re-processing %d compile commands.",
-             eventFileName, #ccIndexes)
+             colorize(eventFileName, Col.Bold..Col.White), #ccIndexes)
 
         -- Finally, re-process them.
-        pccInfo = ProcessCompileCommands(ccIndexes, formattedDiagSets)
+        onDemandParser = OnDemandParser(ccIndexes, parserOpts)
     until (false)
 end
 
