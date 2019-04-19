@@ -112,7 +112,8 @@ local function colorize(...)
 end
 
 local function info(fmt, ...)
-    printf("%s: "..fmt, colorize("INFO", Col.Green), ...)
+    local func = printGraphMode and errprintf or printf
+    func("%s: "..fmt, colorize("INFO", Col.Green), ...)
 end
 
 if (commandMode) then
@@ -278,9 +279,10 @@ local compileCommandInclusionGraphs = {}
 
 local function info_underline(fmt, ...)
     local text = string.format(fmt, ...)
-    printf("%s%s",
-           colorize("INFO", Col.Uline..Col.Green),
-           colorize(": "..text, Col.Uline..Col.White))
+    local func = printGraphMode and errprintf or printf
+    func("%s%s",
+         colorize("INFO", Col.Uline..Col.Green),
+         colorize(": "..text, Col.Uline..Col.White))
 end
 
 local function GetDiagnosticsForTU(tu)
