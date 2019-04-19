@@ -18,8 +18,11 @@ function api.class(tab)
     check(type(tab) == "table", "argument must be a table", 2)
 
     -- The generated metatable
-    local mt = { __metatable=true }
+    local mt = { __metatable="class" }
     local ctor
+
+    -- Whether we have "plain" string keys, that is, ones not starting with two underscores.
+    local havePlainKeys = false
 
     -- check tab contents
     for k,v in pairs(tab) do
@@ -31,24 +34,34 @@ function api.class(tab)
                   "tab[1] must be a function, string or ctype", 2)
             ctor = v
         elseif (type(k) == "string") then
-            check(#k > 0, "tab.<string> must not be empty", 2)
             check(type(v) == "function" or type(v) == "string",
                   "tab[<string>] must be a function or a string", 2)
             if (k:sub(1,2) == "__") then
-                if (k == "__index" and mt.__index ~= nil) then
-                    error("tab has both __index and convenience __index entries", 2)
+                if (k == "__index") then
+                    check(type(v) == "function", "tab.__index must be a function", 2)
                 end
             else
-                if (mt.__index == nil) then
-                    mt.__index = {}
-                end
+                havePlainKeys = true
             end
         else
             error("tab can contain entries at [1], or string keys", 2)
         end
     end
 
-    check(ctor ~= nil, "tab[1] must be a constructor function or a cdecl")
+    local __index_tab = {}
+    local __index_func = tab.__index
+
+    if (__index_func ~= nil and havePlainKeys) then
+        -- The case where 'tab' has both key '__index' (which then must be a function, as
+        -- checked above), as well as convenience string keys.
+        error("tab has both __index and convenience __index entries", 2)
+    elseif (havePlainKeys) then
+        mt.__index = __index_tab
+    elseif (__index_func ~= nil) then
+        mt.__index = __index_func
+    end
+
+    check(ctor ~= nil, "must provide a constructor in tab[1]")
     tab[1] = nil
 
     -- Create the metatable by taking over the contents of the one passed to us.
@@ -60,9 +73,11 @@ function api.class(tab)
         end
 
         if (k:sub(1,2) == "__") then
-            mt[k] = v
+            if (k ~= "__index") then
+                mt[k] = v
+            end
         else
-            mt.__index[k] = v
+            __index_tab[k] = v
         end
     end
 
