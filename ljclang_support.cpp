@@ -2,8 +2,9 @@
  * (Mostly C callbacks with pass-by-value compound arguments/results.) */
 
 #include <cstdint>
+#include <ctime>
+
 #include <type_traits>
-#include <time.h>
 
 #include <clang-c/Index.h>
 
