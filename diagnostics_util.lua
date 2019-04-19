@@ -99,12 +99,13 @@ local function PrintDiags(diags, useColors, callbacks, startIndex, indentation)
 
         onDiagEnd(i, indentation)
 
-        local isFatal = (diag:severity() == "fatal")
+        local omitFollowing = (diag:severity() == "fatal" or diag:category() == "Parse Issue")
 
-        if (isFatal) then
+        if (omitFollowing) then
             assert(indentation == 0)
 
             if (i < #diags) then
+                onNewTextLine("")
                 onNewTextLine("%s: omitting %d diagnostics.",
                               useColors and colorize("LJClang", Col.Bold..Col.Blue) or "LJClang",
                               #diags - i)
@@ -116,7 +117,7 @@ local function PrintDiags(diags, useColors, callbacks, startIndex, indentation)
             onNewTextLine("")
         end
 
-        if (isFatal) then
+        if (omitFollowing) then
             break
         end
     end
