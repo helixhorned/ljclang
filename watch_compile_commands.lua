@@ -425,7 +425,7 @@ local function AddFileWatches()
     for _, filename in initialGlobalInclusionGraph:iFileNames() do
         local wd = notifier:add_watch(filename, WATCH_FLAGS)
 
-        -- Assert one-to-oneness. (Should be given by us having passed the file names
+        -- Assert one-to-oneness. (Should be the case due to us having passed the file names
         -- through realPathName() earlier.)
         --
         -- TODO: this does not need to hold in the presence of hard links though. Test.
