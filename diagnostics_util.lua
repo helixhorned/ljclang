@@ -1,11 +1,16 @@
 
 local string = require("string")
+local table = require("table")
+
+local format = string.format
 
 local assert = assert
+local ipairs = ipairs
 local type = type
 local unpack = unpack
 
 local checktype = require("error_util").checktype
+local class = require("class").class
 
 local Col = require("terminal_colors")
 local encode_color = Col.encode
@@ -34,8 +39,86 @@ local ColorSubstitutions = {
     { "(.*)(note: )(.*)", ColorizeNoteFunc },
 }
 
-local function FormatDiagnostic(diag, useColors, printCategory)
+-----===== Diagnostic formatting =====-----
+
+local function getIndented(indentation, str)
+    return format("%s%s", string.rep(" ", indentation), str)
+end
+
+
+local FormattedDiag = class
+{
+    function()
+        -- self: sequence table of lines constituting the diagnostic
+        return {}
+    end,
+
+    addIndentedLine = function(self, indentation, str)
+        self[#self + 1] = getIndented(indentation, str)
+    end,
+
+    getString = function(self)
+        return table.concat(self, '\n')
+    end,
+}
+
+local FormattedDiagSet = class
+{
+    function(useColors)
+        checktype(useColors, 1, "boolean", 2)
+
+        return {
+            diags = {},  -- list of FormattedDiag objects
+            info = nil,
+
+            usingColors = useColors,
+        }
+    end,
+
+    isEmpty = function(self)
+        return (#self:getDiags() == 0 and self:getInfo() == nil)
+    end,
+
+    getDiags = function(self)
+        return self.diags
+    end,
+
+    getInfo = function(self)
+        return self.info
+    end,
+
+    appendDiag = function(self, fDiag)
+        self.diags[#self.diags + 1] = fDiag
+    end,
+
+    setInfo = function(self, info)
+        checktype(info, 1, "string", 2)
+        self.info = info
+    end,
+
+    getString = function(self, keepColorsIfPresent)
+        checktype(keepColorsIfPresent, 1, "boolean", 2)
+
+        local fDiags = {}
+
+        for _, fDiag in ipairs(self.diags) do
+            fDiags[#fDiags + 1] = fDiag:getString()
+        end
+
+        local str = table.concat(fDiags, '\n\n') ..
+            (self.info ~= nil and '\n'..self.info or "")
+
+        return
+            (not self.usingColors) and str or
+            keepColorsIfPresent and Col.colorize(str) or
+            Col.strip(str)
+    end,
+}
+
+local function FormatDiagnostic(diag, useColors, indentation,
+                                --[[out--]] fDiag)
     local text = diag:format()
+    local printCategory = (indentation == 0)
 
     if (useColors) then
         for i = 1, #ColorSubstitutions do
@@ -50,15 +133,21 @@ local function FormatDiagnostic(diag, useColors, printCategory)
     end
 
     local category = diag:category()
-    return text .. ((printCategory and #category > 0) and " ["..category.."]" or "")
+
+    local textWithMaybeCategory =
+        text .. ((printCategory and #category > 0) and " ["..category.."]" or "")
+    fDiag:addIndentedLine(indentation, textWithMaybeCategory)
 end
 
-local function PrintPrefixDiagnostics(diags, onNewTextLine, indentation)
+-----
+
+local function PrintPrefixDiagnostics(diags, indentation,
+                                      --[[out--]] fDiag)
     for i = 1, #diags do
         local text = diags[i]:spelling()
 
         if (text:match("^in file included from ")) then
-            onNewTextLine("%s%s", string.rep(" ", indentation), "In"..text:sub(3))
+            fDiag:addIndentedLine(indentation, "In"..text:sub(3))
         else
             return i
         end
@@ -67,21 +156,8 @@ local function PrintPrefixDiagnostics(diags, onNewTextLine, indentation)
     return #diags + 1
 end
 
--- <callbacks>: table { <onDiagBegin>, <onNewTextLine> [, <onDiagEnd>] }
---  <onNewTextLine> gets passed (fmt, ...) for each line of text that is emitted. Note:
---  `fmt` is not newline-terminated -- <onNewTextLine> is supposed to do that itself.
-local function PrintDiags(diags, useColors, callbacks, startIndex, indentation)
-    checktype(diags, 1, "table", 2)
-    checktype(useColors, 2, "boolean", 2)
-    checktype(callbacks, 3, "table", 3)
-
-    local localCallbacks = { unpack(callbacks) }
-    if (localCallbacks[3] == nil) then
-        localCallbacks[3] = function() end
-    end
-
-    local onDiagBegin, onNewTextLine, onDiagEnd = unpack(localCallbacks, 1, 3)
-
+local function PrintDiagsImpl(diags, useColors,
+                              startIndex, indentation, currentFDiag)
     if (startIndex == nil) then
         startIndex = 1
     end
@@ -89,24 +165,20 @@ local function PrintDiags(diags, useColors, callbacks, startIndex, indentation)
         indentation = 0
     end
 
-    checktype(startIndex, 4, "number")
-    checktype(indentation, 5, "number")
+    local formattedDiags = FormattedDiagSet(useColors)
 
     for i = startIndex, #diags do
-        onDiagBegin(i, indentation)
+        local fDiag = (currentFDiag ~= nil) and currentFDiag or FormattedDiag()
 
         local diag = diags[i]
         local childDiags = diag:childDiagnostics()
 
-        local innerStartIndex = PrintPrefixDiagnostics(childDiags, onNewTextLine, indentation)
-        local formattedDiag = FormatDiagnostic(diag, useColors, indentation == 0)
-        onNewTextLine("%s%s", string.rep(" ", indentation), formattedDiag)
+        local innerStartIndex = PrintPrefixDiagnostics(childDiags, indentation, fDiag)
+        FormatDiagnostic(diag, useColors, indentation, fDiag)
 
         -- Recurse. We expect only at most two levels in total (but do not check for that).
-        PrintDiags(diag:childDiagnostics(), useColors, localCallbacks,
-                   innerStartIndex, indentation + 2)
-
-        onDiagEnd(i, indentation)
+        PrintDiagsImpl(diag:childDiagnostics(), useColors,
+                       innerStartIndex, indentation + 2, fDiag)
 
         local omitFollowing = (diag:severity() == "fatal" or diag:category() == "Parse Issue")
 
@@ -114,25 +186,31 @@ local function PrintDiags(diags, useColors, callbacks, startIndex, indentation)
             assert(indentation == 0)
 
             if (i < #diags) then
-                onNewTextLine("")
-                onNewTextLine("%s: omitting %d diagnostics.",
-                              useColors and encode_color("LJClang", Col.Bold..Col.Blue) or "LJClang",
-                              #diags - i)
+                local info = format("%s: omitting %d following diagnostics.",
+                                    useColors and encode_color("LJClang", Col.Bold..Col.Blue) or "LJClang",
+                                    #diags - i)
+                formattedDiags:setInfo(info)
             end
         end
 
-        if (indentation == 0) then
-            -- Add a newline.
-            onNewTextLine("")
-        end
+        formattedDiags:appendDiag(fDiag)
 
         if (omitFollowing) then
             break
         end
     end
+
+    return formattedDiags
 end
 
-api.PrintDiags = PrintDiags
+api.FormattedDiagSet = FormattedDiagSet
+
+function api.GetDiags(diags, useColors)
+    checktype(diags, 1, "table", 2)
+    checktype(useColors, 2, "boolean", 2)
+
+    return PrintDiagsImpl(diags, useColors)
+end
 
 -- Done!
 return api

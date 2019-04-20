@@ -283,22 +283,6 @@ local function info_underline(fmt, ...)
          colorize(": "..text, Col.Uline..Col.White))
 end
 
-local function GetDiagnosticsForTU(tu)
-    local lines = {}
-
-    local callbacks = {
-        function() end,
-
-        function(fmt, ...)
-            lines[#lines+1] = format(fmt, ...)
-        end,
-    }
-
-    -- Format diagnostics immediately to not keep the TU around.
-    diagnostics_util.PrintDiags(tu:diagnosticSet(), not plainMode, callbacks)
-    return table.concat(lines, '\n')
-end
-
 local function tryGetLanguage(cmd)
     -- Minimalistic, since only needed for a hack.
 
@@ -318,11 +302,11 @@ local function CheckForIncludeError(tu, formattedDiagSet, cmd, additionalInclude
         return
     end
 
-    local plainFormattedDiagSet = Col.strip(formattedDiagSet)
+    local plainFormattedDiags = formattedDiagSet:getString(false)
 
     local haveIncludeErrors =
-        (plainFormattedDiagSet:match("fatal error: ") ~= nil) and
-        (plainFormattedDiagSet:match("'.*' file not found") ~= nil)
+        (plainFormattedDiags:match("fatal error: ") ~= nil) and
+        (plainFormattedDiags:match("'.*' file not found") ~= nil)
     assert(not haveIncludeErrors or (tu ~= nil))
 
     if (haveIncludeErrors) then
@@ -358,10 +342,11 @@ local function ProcessCompileCommand(ccIndex, parseOptions, successCallback)
             compileCommands[ccIndex], additionalIncludeTab[1], parseOptions)
 
         if (tu == nil) then
+            formattedDiagSet = diagnostics_util.FormattedDiagSet(not plainMode)
             -- TODO: Extend in verbosity and/or handling?
-            formattedDiagSet = "ERROR: index:parse() failed: "..tostring(errorCode).."\n"
+            formattedDiagSet:setInfo("ERROR: index:parse() failed: "..tostring(errorCode))
         else
-            formattedDiagSet = GetDiagnosticsForTU(tu)
+            formattedDiagSet = diagnostics_util.GetDiags(tu:diagnosticSet(), not plainMode)
         end
 
         local retry = CheckForIncludeError(
@@ -376,11 +361,7 @@ local function ProcessCompileCommand(ccIndex, parseOptions, successCallback)
         compileCommandInclusionGraphs[ccIndex] = InclusionGraph_ProcessTU(InclusionGraph(), tu)
     end
 
-    local displayFormattedDiagSet = plainMode and
-        Col.strip(formattedDiagSet) or
-        Col.colorize(formattedDiagSet)
-
-    return displayFormattedDiagSet, hadSomeSystemIncludesAdded
+    return formattedDiagSet, hadSomeSystemIncludesAdded
 end
 
 local OnDemandParser = class
@@ -521,7 +502,7 @@ local function getFileOrdinalText(cmd, i)
 end
 
 local function printFormattedDiagSet(formattedDiagSet, ccIndex)
-    if (#formattedDiagSet > 0) then
+    if (not formattedDiagSet:isEmpty()) then
         local cmd = compileCommands[ccIndex]
 
         local prefix = format("Command #%d:", ccIndex)
@@ -531,7 +512,7 @@ local function printFormattedDiagSet(formattedDiagSet, ccIndex)
                   colorize(prefix, Col.Bold..Col.Uline..Col.Green),
                   middle,
                   colorize(cmd.file, Col.Bold..Col.Green))
-        errprintf("%s", formattedDiagSet)
+        errprintf("%s\n", formattedDiagSet:getString(true))
         return true
     end
 end
