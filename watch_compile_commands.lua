@@ -342,7 +342,7 @@ local function ProcessCompileCommand(ccIndex, parseOptions, successCallback)
             compileCommands[ccIndex], additionalIncludeTab[1], parseOptions)
 
         if (tu == nil) then
-            formattedDiagSet = diagnostics_util.FormattedDiagSet()
+            formattedDiagSet = diagnostics_util.FormattedDiagSet(not plainMode)
             -- TODO: Extend in verbosity and/or handling?
             formattedDiagSet:setInfo("ERROR: index:parse() failed: "..tostring(errorCode))
         else

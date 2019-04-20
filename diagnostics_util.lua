@@ -48,8 +48,6 @@ end
 local FormattedDiag = class
 {
     function(useColors)
-        checktype(useColors, 1, "boolean", 2)
-
         -- self: sequence table of lines constituting the diagnostic
         return {
             usingColors = useColors,
@@ -74,10 +72,12 @@ local FormattedDiag = class
 
 local FormattedDiagSet = class
 {
-    function()
+    function(useColors)
         return {
             diags = {},  -- list of FormattedDiag objects
             info = nil,
+
+            usingColors = useColors,
         }
     end,
 
@@ -93,13 +93,19 @@ local FormattedDiagSet = class
         return self.info
     end,
 
+    newDiag = function(self)
+        return FormattedDiag(self.usingColors)
+    end,
+
     appendDiag = function(self, fDiag)
         self.diags[#self.diags + 1] = fDiag
     end,
 
     setInfo = function(self, info)
         checktype(info, 1, "string", 2)
-        self.info = info
+
+        self.info = self:newDiag()
+        self.info:addIndentedLine(0, info)
     end,
 
     getString = function(self, keepColorsIfPresent)
@@ -112,7 +118,7 @@ local FormattedDiagSet = class
         end
 
         return table.concat(fDiags, '\n\n') ..
-            (self.info ~= nil and '\n'..self.info or "")
+            (self.info ~= nil and '\n'..self.info:getString(keepColorsIfPresent) or "")
     end,
 }
 
@@ -166,10 +172,10 @@ local function PrintDiagsImpl(diags, useColors,
         indentation = 0
     end
 
-    local formattedDiags = FormattedDiagSet()
+    local formattedDiags = FormattedDiagSet(useColors)
 
     for i = startIndex, #diags do
-        local fDiag = (currentFDiag ~= nil) and currentFDiag or FormattedDiag(useColors)
+        local fDiag = (currentFDiag ~= nil) and currentFDiag or formattedDiags:newDiag()
 
         local diag = diags[i]
         local childDiags = diag:childDiagnostics()
