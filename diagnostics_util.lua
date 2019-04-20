@@ -194,7 +194,7 @@ local function PrintDiagsImpl(diags, useColors,
 
             if (i < #diags) then
                 local info = format("%s: omitting %d following diagnostics.",
-                                    useColors and encode_color("LJClang", Col.Bold..Col.Blue) or "LJClang",
+                                    useColors and encode_color("NOTE", Col.Bold..Col.Blue) or "NOTE",
                                     #diags - i)
                 formattedDiags:setInfo(info)
             end

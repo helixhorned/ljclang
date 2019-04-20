@@ -276,7 +276,7 @@ local compileCommandInclusionGraphs = {}
 ---------- HUMAN MODE ----------
 
 local function info_underline(fmt, ...)
-    local text = string.format(fmt, ...)
+    local text = format(fmt, ...)
     local func = printGraphMode and errprintf or printf
     func("%s%s",
          colorize("INFO", Col.Uline..Col.Green),
@@ -496,15 +496,62 @@ local function getFileOrdinalText(cmd, i)
     local fileCount = ccFileCounts[cmd.file]
     local ord = (fileCount > 1) and getFileOrdinal(i) or nil
     return (ord ~= nil)
-        and colorize(string.format("[%d/%d] ", ord, fileCount),
+        and colorize(format("[%d/%d] ", ord, fileCount),
                      Col.Bold..Col.Yellow)
         or ""
+end
+
+local function getNormalizedDiag(diagStr)
+    -- TODO: inform user about the number of different sites that the diagnostics came from.
+    return diagStr:gsub("In file included from [^\n]*\n", "")
+end
+
+local function pluralize(count, noun)
+    return format("%d %s%s", count, noun, count > 1 and 's' or "")
 end
 
 local FormattedDiagSetPrinter = class
 {
     function()
-        return {}
+        return {
+            seenDiags = {},
+        }
+    end,
+
+    printDiags_ = function(self, formattedDiagSet)
+        local newSeenDiags = {}
+        local omittedDiagCount = 0
+        local omittedLastDiag = false
+
+        local fDiags = formattedDiagSet:getDiags()
+
+        for i, fDiag in ipairs(fDiags) do
+            local str = fDiag:getString(true)
+            local normStr = getNormalizedDiag(str)
+
+            if (not self.seenDiags[normStr]) then
+                newSeenDiags[#newSeenDiags + 1] = normStr
+                errprintf("%s%s", (i == 1) and "" or "\n", str)
+            else
+                omittedDiagCount = omittedDiagCount + 1
+                omittedLastDiag = (i == #fDiags)
+            end
+        end
+
+        for _, newSeenDiag in ipairs(newSeenDiags) do
+            self.seenDiags[newSeenDiag] = true
+        end
+
+        if (omittedDiagCount > 0) then
+            errprintf("%s: omitted %s already seen in earlier commands.",
+                      colorize("NOTE", Col.Bold..Col.Blue),
+                      pluralize(omittedDiagCount, "diagnostic"))
+        end
+
+        local info = formattedDiagSet:getInfo()
+        if (info ~= nil and not omittedLastDiag) then
+            errprintf("%s", info:getString(true))
+        end
     end,
 
     print = function(self, formattedDiagSet, ccIndex)
@@ -518,8 +565,9 @@ local FormattedDiagSetPrinter = class
                       colorize(prefix, Col.Bold..Col.Uline..Col.Green),
                       middle,
                       colorize(cmd.file, Col.Bold..Col.Green))
-            errprintf("%s\n", formattedDiagSet:getString(true))
-            return true
+
+            self:printDiags_(formattedDiagSet)
+            errprintf("")
         end
     end,
 }
