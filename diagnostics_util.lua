@@ -8,7 +8,7 @@ local unpack = unpack
 local checktype = require("error_util").checktype
 
 local Col = require("terminal_colors")
-local colorize = Col.colorize
+local encode_color = Col.encode
 
 ----------
 
@@ -17,9 +17,9 @@ local api = {}
 local function GetColorizeTripleFunc(severityTextColor, colorizeMainText)
     return function(pre, tag, post)
         return
-            colorize(pre, Col.Bold..Col.White)..
-            colorize(tag, Col.Bold..severityTextColor)..
-            (colorizeMainText and colorize(post, Col.Bold..Col.White) or post)
+            encode_color(pre, Col.Bold..Col.White)..
+            encode_color(tag, Col.Bold..severityTextColor)..
+            (colorizeMainText and encode_color(post, Col.Bold..Col.White) or post)
     end
 end
 
@@ -27,17 +27,26 @@ local ColorizeErrorFunc = GetColorizeTripleFunc(Col.Red, true)
 local ColorizeWarningFunc = GetColorizeTripleFunc(Col.Purple, true)
 local ColorizeNoteFunc = GetColorizeTripleFunc(Col.Black, false)
 
+local ColorSubstitutions = {
+    { "(.*)(fatal error: )(.*)", ColorizeErrorFunc },
+    { "(.*)(error: )(.*)", ColorizeErrorFunc },
+    { "(.*)(warning: )(.*)", ColorizeWarningFunc },
+    { "(.*)(note: )(.*)", ColorizeNoteFunc },
+}
+
 local function FormatDiagnostic(diag, useColors, printCategory)
     local text = diag:format()
 
     if (useColors) then
-        text = text:gsub("(.*)(fatal error: )(.*)", ColorizeErrorFunc)
-        -- NOTE: in the presence of a fatal error, the following will colorize the 'error'
-        -- redundantly again, and these control codes do not nest. However, this is
-        -- harmless.
-        text = text:gsub("(.*)(error: )(.*)", ColorizeErrorFunc)
-        text = text:gsub("(.*)(warning: )(.*)", ColorizeWarningFunc)
-        text = text:gsub("(.*)(note: )(.*)", ColorizeNoteFunc)
+        for i = 1, #ColorSubstitutions do
+            local matchCount
+            local subst = ColorSubstitutions[i]
+            text, matchCount = text:gsub(subst[1], subst[2])
+
+            if (matchCount > 0) then
+                break
+            end
+        end
     end
 
     local category = diag:category()
@@ -107,7 +116,7 @@ local function PrintDiags(diags, useColors, callbacks, startIndex, indentation)
             if (i < #diags) then
                 onNewTextLine("")
                 onNewTextLine("%s: omitting %d diagnostics.",
-                              useColors and colorize("LJClang", Col.Bold..Col.Blue) or "LJClang",
+                              useColors and encode_color("LJClang", Col.Bold..Col.Blue) or "LJClang",
                               #diags - i)
             end
         end

@@ -109,7 +109,8 @@ local function colorize(...)
     if (plainMode) then
         return ...
     else
-        return Col.colorize(...)
+        local encoded_string = Col.encode(...)
+        return Col.colorize(encoded_string)
     end
 end
 
@@ -317,11 +318,11 @@ local function CheckForIncludeError(tu, formattedDiagSet, cmd, additionalInclude
         return
     end
 
+    local plainFormattedDiagSet = Col.strip(formattedDiagSet)
+
     local haveIncludeErrors =
-        -- NOTE: careful: we must not match over potential color code boundaries :-/.
-        (formattedDiagSet:match("fatal ") ~= nil) and
-        (formattedDiagSet:match("error:") ~= nil) and
-        (formattedDiagSet:match("'.*' file not found") ~= nil)
+        (plainFormattedDiagSet:match("fatal error: ") ~= nil) and
+        (plainFormattedDiagSet:match("'.*' file not found") ~= nil)
     assert(not haveIncludeErrors or (tu ~= nil))
 
     if (haveIncludeErrors) then
@@ -375,7 +376,11 @@ local function ProcessCompileCommand(ccIndex, parseOptions, successCallback)
         compileCommandInclusionGraphs[ccIndex] = InclusionGraph_ProcessTU(InclusionGraph(), tu)
     end
 
-    return formattedDiagSet, hadSomeSystemIncludesAdded
+    local displayFormattedDiagSet = plainMode and
+        Col.strip(formattedDiagSet) or
+        Col.colorize(formattedDiagSet)
+
+    return displayFormattedDiagSet, hadSomeSystemIncludesAdded
 end
 
 local OnDemandParser = class

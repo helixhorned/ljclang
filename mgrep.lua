@@ -169,7 +169,6 @@ end)
 --------------------
 
 local Col = require("terminal_colors")
-local colorize = Col.colorize
 
 local SourceFile = class
 {
@@ -274,7 +273,8 @@ local function colorizeResult(str, colBegEnds)
         local e = colBegEnds[i+1]
 
         strtab[#strtab+1] = str:sub(a,b-1)
-        strtab[#strtab+1] = colorize(str:sub(b,e-1), Col.Bold..Col.Red)
+        local encoded_string = Col.encode_color(str:sub(b,e-1), Col.Bold..Col.Red)
+        strtab[#strtab+1] = Col.colorize(encoded_string)
         a = e
     end
     strtab[#strtab+1] = str:sub(a)
