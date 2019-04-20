@@ -342,7 +342,7 @@ local function ProcessCompileCommand(ccIndex, parseOptions, successCallback)
             compileCommands[ccIndex], additionalIncludeTab[1], parseOptions)
 
         if (tu == nil) then
-            formattedDiagSet = diagnostics_util.FormattedDiagSet(not plainMode)
+            formattedDiagSet = diagnostics_util.FormattedDiagSet()
             -- TODO: Extend in verbosity and/or handling?
             formattedDiagSet:setInfo("ERROR: index:parse() failed: "..tostring(errorCode))
         else
@@ -501,20 +501,30 @@ local function getFileOrdinalText(cmd, i)
         or ""
 end
 
+local FormattedDiagSetPrinter = class
+{
+    function()
+        return {}
+    end,
+
+    print = function(self, formattedDiagSet, ccIndex)
+        if (not formattedDiagSet:isEmpty()) then
+            local cmd = compileCommands[ccIndex]
+
+            local prefix = format("Command #%d:", ccIndex)
+            local middle = getFileOrdinalText(cmd, ccIndex)
+
+            errprintf("%s %s%s",
+                      colorize(prefix, Col.Bold..Col.Uline..Col.Green),
+                      middle,
+                      colorize(cmd.file, Col.Bold..Col.Green))
+            errprintf("%s\n", formattedDiagSet:getString(true))
+            return true
+        end
+    end,
+}
+
 local function printFormattedDiagSet(formattedDiagSet, ccIndex)
-    if (not formattedDiagSet:isEmpty()) then
-        local cmd = compileCommands[ccIndex]
-
-        local prefix = format("Command #%d:", ccIndex)
-        local middle = getFileOrdinalText(cmd, ccIndex)
-
-        errprintf("%s %s%s",
-                  colorize(prefix, Col.Bold..Col.Uline..Col.Green),
-                  middle,
-                  colorize(cmd.file, Col.Bold..Col.Green))
-        errprintf("%s\n", formattedDiagSet:getString(true))
-        return true
-    end
 end
 
 local function humanModeMain()
@@ -534,6 +544,7 @@ local function humanModeMain()
     local onDemandParser = OnDemandParser(range(#compileCommands), parserOpts, successCallback)
 
     local notifier, fileNameOfWd, compileCommandsWd
+    local printer = FormattedDiagSetPrinter()
 
     repeat
         -- Print current diagnostics.
@@ -542,7 +553,7 @@ local function humanModeMain()
         -- Later: handle special case of a change of compile_commands.json, too.
 
         for i, formattedDiagSet, ccIndex in onDemandParser:iterate() do
-            local printedDiag = printFormattedDiagSet(formattedDiagSet, ccIndex)
+            printer:print(formattedDiagSet, ccIndex)
         end
 
         -- TODO: move to separate application

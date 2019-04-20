@@ -45,33 +45,39 @@ local function getIndented(indentation, str)
     return format("%s%s", string.rep(" ", indentation), str)
 end
 
-
 local FormattedDiag = class
 {
-    function()
+    function(useColors)
+        checktype(useColors, 1, "boolean", 2)
+
         -- self: sequence table of lines constituting the diagnostic
-        return {}
+        return {
+            usingColors = useColors,
+        }
     end,
 
     addIndentedLine = function(self, indentation, str)
         self[#self + 1] = getIndented(indentation, str)
     end,
 
-    getString = function(self)
-        return table.concat(self, '\n')
+    getString = function(self, keepColorsIfPresent)
+        checktype(keepColorsIfPresent, 1, "boolean", 2)
+
+        local str = table.concat(self, '\n')
+
+        return
+            (not self.usingColors) and str or
+            keepColorsIfPresent and Col.colorize(str) or
+            Col.strip(str)
     end,
 }
 
 local FormattedDiagSet = class
 {
-    function(useColors)
-        checktype(useColors, 1, "boolean", 2)
-
+    function()
         return {
             diags = {},  -- list of FormattedDiag objects
             info = nil,
-
-            usingColors = useColors,
         }
     end,
 
@@ -102,16 +108,11 @@ local FormattedDiagSet = class
         local fDiags = {}
 
         for _, fDiag in ipairs(self.diags) do
-            fDiags[#fDiags + 1] = fDiag:getString()
+            fDiags[#fDiags + 1] = fDiag:getString(keepColorsIfPresent)
         end
 
-        local str = table.concat(fDiags, '\n\n') ..
+        return table.concat(fDiags, '\n\n') ..
             (self.info ~= nil and '\n'..self.info or "")
-
-        return
-            (not self.usingColors) and str or
-            keepColorsIfPresent and Col.colorize(str) or
-            Col.strip(str)
     end,
 }
 
@@ -165,10 +166,10 @@ local function PrintDiagsImpl(diags, useColors,
         indentation = 0
     end
 
-    local formattedDiags = FormattedDiagSet(useColors)
+    local formattedDiags = FormattedDiagSet()
 
     for i = startIndex, #diags do
-        local fDiag = (currentFDiag ~= nil) and currentFDiag or FormattedDiag()
+        local fDiag = (currentFDiag ~= nil) and currentFDiag or FormattedDiag(useColors)
 
         local diag = diags[i]
         local childDiags = diag:childDiagnostics()
