@@ -81,7 +81,8 @@ Human mode options:
      Must be used without -m.
   -l <number>: edge count limit for the graph produced by -g %s.
      If exceeded, a placeholder node is placed.
-  -p: Disable color output.
+  -N: Disable omission of repeated diagnostics.
+  -P: Disable color output.
   -x: exit after parsing and displaying diagnostics once.
 ]], GlobalInclusionGraphRelation)
     os.exit(ErrorCode.CommandLine)
@@ -93,7 +94,8 @@ local opts_meta = {
     m = false,
     g = true,
     l = true,
-    p = false,
+    N = false,
+    P = false,
     x = false,
 }
 
@@ -102,7 +104,8 @@ local opts, args = parsecmdline.getopts(opts_meta, arg, usage)
 local commandMode = opts.m
 local printGraphMode = opts.g
 local edgeCountLimit = tonumber(opts.l)
-local plainMode = opts.p
+local printAllDiags = opts.N
+local plainMode = opts.P
 local exitImmediately = opts.x or printGraphMode
 
 local function colorize(...)
@@ -515,12 +518,21 @@ local FormattedDiagSetPrinter = class
     function()
         return {
             seenDiags = {},
+            numCommandsWithOmittedDiags = 0,
+            totalOmittedDiagCount = 0,
         }
     end,
 
-    printDiags_ = function(self, formattedDiagSet)
+    getStringsToPrint_ = function(self, formattedDiagSet)
+        local toPrint = {
+            omittedDiagCount = 0,
+        }
+
+        if (formattedDiagSet:isEmpty()) then
+            return toPrint
+        end
+
         local newSeenDiags = {}
-        local omittedDiagCount = 0
         local omittedLastDiag = false
 
         local fDiags = formattedDiagSet:getDiags()
@@ -529,11 +541,11 @@ local FormattedDiagSetPrinter = class
             local str = fDiag:getString(true)
             local normStr = getNormalizedDiag(str)
 
-            if (not self.seenDiags[normStr]) then
+            if (printAllDiags or not self.seenDiags[normStr]) then
                 newSeenDiags[#newSeenDiags + 1] = normStr
-                errprintf("%s%s", (i == 1) and "" or "\n", str)
+                toPrint[#toPrint+1] = format("%s%s", (i == 1) and "" or "\n", str)
             else
-                omittedDiagCount = omittedDiagCount + 1
+                toPrint.omittedDiagCount = toPrint.omittedDiagCount + 1
                 omittedLastDiag = (i == #fDiags)
             end
         end
@@ -542,20 +554,18 @@ local FormattedDiagSetPrinter = class
             self.seenDiags[newSeenDiag] = true
         end
 
-        if (omittedDiagCount > 0) then
-            errprintf("%s: omitted %s already seen in earlier commands.",
-                      colorize("NOTE", Col.Bold..Col.Blue),
-                      pluralize(omittedDiagCount, "diagnostic"))
-        end
-
         local info = formattedDiagSet:getInfo()
         if (info ~= nil and not omittedLastDiag) then
-            errprintf("%s", info:getString(true))
+            toPrint[#toPrint+1] = format("%s", info:getString(true))
         end
+
+        return toPrint
     end,
 
     print = function(self, formattedDiagSet, ccIndex)
-        if (not formattedDiagSet:isEmpty()) then
+        local toPrint = self:getStringsToPrint_(formattedDiagSet)
+
+        if (#toPrint > 0) then
             local cmd = compileCommands[ccIndex]
 
             local prefix = format("Command #%d:", ccIndex)
@@ -566,8 +576,22 @@ local FormattedDiagSetPrinter = class
                       middle,
                       colorize(cmd.file, Col.Bold..Col.Green))
 
-            self:printDiags_(formattedDiagSet)
-            errprintf("")
+            errprintf("%s\n", table.concat(toPrint, '\n'))
+        end
+
+        if (toPrint.omittedDiagCount > 0) then
+            self.numCommandsWithOmittedDiags = self.numCommandsWithOmittedDiags + 1
+            self.totalOmittedDiagCount = self.totalOmittedDiagCount + toPrint.omittedDiagCount
+        end
+    end,
+
+    printTrailingInfo = function(self)
+        if (self.numCommandsWithOmittedDiags > 0) then
+            errprintf(
+                "%s: omitted %s from %s.",
+                colorize("NOTE", Col.Bold..Col.Blue),
+                pluralize(self.totalOmittedDiagCount, "repeated diagnostic"),
+                pluralize(self.numCommandsWithOmittedDiags, "command"))
         end
     end,
 }
@@ -603,6 +627,8 @@ local function humanModeMain()
         for i, formattedDiagSet, ccIndex in onDemandParser:iterate() do
             printer:print(formattedDiagSet, ccIndex)
         end
+
+        printer:printTrailingInfo()
 
         -- TODO: move to separate application
         if (printGraphMode ~= nil) then
