@@ -1,9 +1,19 @@
-/* Support library for LJClang, for cases the LuaJIT FFI doesn't handle.
- * (Mostly C callbacks with pass-by-value compound arguments/results.) */
+// Support library for LJClang.
+// Copyright (C) 2013-2019 Philipp Kutin
+// See LICENSE for license information.
 
+#define LJCLANG_USE_POSIX 1
+
+#if LJCLANG_USE_POSIX
+# include <sys/types.h>
+# include <poll.h>
+#endif
+
+#include <cstddef>
 #include <cstdint>
 #include <ctime>
 
+#include <string>
 #include <type_traits>
 
 #include <clang-c/Index.h>
@@ -18,26 +28,52 @@ const char *ljclang_getLLVMVersion()
 
 namespace
 {
-    static_assert(std::is_integral<time_t>::value);
-    static_assert(sizeof(time_t) == 4 || sizeof(time_t) == 8);
+    template <typename T> struct TypeString {};
 
-    template <typename T> struct TimeType {};
-
-    template <> struct TimeType<int32_t> { static constexpr const char *String = "int32_t"; };
-    template <> struct TimeType<int64_t> { static constexpr const char *String = "int64_t"; };
-    template <> struct TimeType<uint32_t> { static constexpr const char *String = "uint32_t"; };
-    template <> struct TimeType<uint64_t> { static constexpr const char *String = "uint64_t"; };
+    template <> struct TypeString<int32_t> { static constexpr const char *value = "int32_t"; };
+    template <> struct TypeString<int64_t> { static constexpr const char *value = "int64_t"; };
+    template <> struct TypeString<uint32_t> { static constexpr const char *value = "uint32_t"; };
+    template <> struct TypeString<uint64_t> { static constexpr const char *value = "uint64_t"; };
 
     constexpr bool LongIntIsInt64 = std::is_same_v<int64_t, long int>;
     struct DummyType {};
     using LongInt = std::conditional_t<LongIntIsInt64, DummyType, long int>;
-    template <> struct TimeType<LongInt> { static constexpr const char *String = "long int"; };
+    template <> struct TypeString<LongInt> { static constexpr const char *value = "long int"; };
 }
 
+#define TypeDef(typeName) \
+    std::string{"typedef "} + TypeString<time_t>::value + " " + #typeName + ";"
+
 extern "C"
-const char *ljclang_getTimeTypeString()
+const char *ljclang_getTypeDefs()
 {
-    return TimeType<time_t>::String;
+    static const std::string s =
+        TypeDef(time_t)
+#if LJCLANG_USE_POSIX
+        + TypeDef(blkcnt_t)
+        + TypeDef(blksize_t)
+        + TypeDef(clock_t)
+        + TypeDef(clockid_t)
+        + TypeDef(dev_t)
+        + TypeDef(fsblkcnt_t)
+        + TypeDef(fsfilcnt_t)
+        + TypeDef(gid_t)
+        + TypeDef(id_t)
+        + TypeDef(ino_t)
+        + TypeDef(mode_t)
+        + TypeDef(nlink_t)
+        + TypeDef(off_t)
+        + TypeDef(pid_t)
+        + TypeDef(ssize_t)
+        + TypeDef(suseconds_t)
+        + TypeDef(timer_t)
+        + TypeDef(uid_t)
+        // poll.h
+        + TypeDef(nfds_t)
+#endif
+        ;
+
+    return s.c_str();
 }
 
 /* Our cursor visitor takes the CXCursor objects by pointer. */

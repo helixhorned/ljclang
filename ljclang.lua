@@ -35,10 +35,10 @@ local support = ffi.load(lib"ljclang_support")
 
 ffi.cdef[[
 const char *ljclang_getLLVMVersion();
-const char *ljclang_getTimeTypeString();
+const char *ljclang_getTypeDefs();
 ]]
 
-ffi.cdef("typedef " .. ffi.string(support.ljclang_getTimeTypeString()) .. " time_t;")
+ffi.cdef(ffi.string(support.ljclang_getTypeDefs()))
 local supportLLVMVersion = ffi.string(support.ljclang_getLLVMVersion())
 
 require("ljclang_Index_h")
