@@ -258,6 +258,14 @@ local function InclusionGraph_ProcessTU(graph, tu)
     return graph
 end
 
+local MOVE_OR_DELETE = bit.bor(IN.MOVE_SELF, IN.DELETE_SELF)
+local WATCH_FLAGS = bit.bor(IN.CLOSE_WRITE, MOVE_OR_DELETE)
+
+---------- HUMAN MODE ----------
+
+-- Inclusion graphs for each compile command.
+local compileCommandInclusionGraphs = {}
+
 local function DoProcessCompileCommand(cmd, additionalSystemInclude, parseOptions)
     local args = compile_commands_util.sanitize_args(cmd.arguments, cmd.directory)
 
@@ -267,17 +275,8 @@ local function DoProcessCompileCommand(cmd, additionalSystemInclude, parseOption
     end
 
     local index = cl.createIndex(true, false)
-
     return index:parse("", args, parseOptions)
 end
-
-local MOVE_OR_DELETE = bit.bor(IN.MOVE_SELF, IN.DELETE_SELF)
-local WATCH_FLAGS = bit.bor(IN.CLOSE_WRITE, MOVE_OR_DELETE)
-
--- Inclusion graphs for each compile command.
-local compileCommandInclusionGraphs = {}
-
----------- HUMAN MODE ----------
 
 local function info_underline(fmt, ...)
     local text = format(fmt, ...)
