@@ -11,6 +11,7 @@ local string = require("string")
 local table = require("table")
 
 local cl = require("ljclang")
+local hacks = require("hacks")
 local util = require("util")
 
 local assert = assert
@@ -144,8 +145,11 @@ for _, additionalArg in ipairs(additionalArgs) do
     args[#args + 1] = additionalArg
 end
 
+hacks.addSystemInclude(args, "c")
+
 local index = cl.createIndex(true, false)
 local tu, errorCode = index:parse("", args, tuOptions)
+
 if (tu == nil) then
     errprintf("ERROR: Failed parsing %s (%s)", filename, errorCode)
     os.exit(1)

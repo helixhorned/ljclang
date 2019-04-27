@@ -9,6 +9,7 @@ local class = require("class").class
 local compile_commands_reader = require("compile_commands_reader")
 local compile_commands_util = require("compile_commands_util")
 local diagnostics_util = require("diagnostics_util")
+local hacks = require("hacks")
 local util = require("util")
 
 local InclusionGraph = require("inclusion_graph").InclusionGraph
@@ -316,15 +317,15 @@ local function CheckForIncludeError(tu, formattedDiagSet, cmd, additionalInclude
         -- HACK so that certain system includes are found.
         local language = tryGetLanguage(cmd)
 
-        additionalIncludeTab[1] =
-            -- Fixes LuaJIT:
-            (language == "c") and "/usr/lib/llvm-7/lib/clang/7.0.1/include" or
-            -- Fixes conky, but breaks EP (personal project of author):
-            (language == "c++") and "/usr/lib/llvm-7/include/c++/v1" or
-            -- Bail out.
+        if (language == "c" or language == "c++") then
+            hacks.addSystemInclude(additionalIncludeTab, language)
+        else
+            -- Bail out. TODO: do not.
             errprintf("INTERNAL ERROR: don't know how to attempt fixing includes"..
                       " for language that was not determined automatically")
-                and os.exit(ErrorCode.Internal)
+            os.exit(ErrorCode.Internal)
+        end
+
         return true
     end
 end
@@ -342,7 +343,7 @@ local function ProcessCompileCommand(ccIndex, parseOptions, successCallback)
         assert(count <= 2)
 
         tu, errorCode = DoProcessCompileCommand(
-            compileCommands[ccIndex], additionalIncludeTab[1], parseOptions)
+            compileCommands[ccIndex], additionalIncludeTab[2], parseOptions)
 
         if (tu == nil) then
             formattedDiagSet = diagnostics_util.FormattedDiagSet(not plainMode)
