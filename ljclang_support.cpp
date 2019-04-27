@@ -87,6 +87,18 @@ const char *ljclang_getTypeDefs()
     return s.c_str();
 }
 
+#if LJCLANG_USE_POSIX
+// Check that the 'struct pollfd' on our system (which we want to expose) includes *only*
+// the three members specified by POSIX.
+static_assert(sizeof(pollfd) == sizeof(int) + 2 * sizeof(short));
+
+extern "C"
+void ljclang_setSigintHandlingToDefault()
+{
+    signal(SIGINT, SIG_DFL);
+}
+#endif
+
 /* Our cursor visitor takes the CXCursor objects by pointer. */
 using LJCX_CursorVisitor = CXChildVisitResult (*)(
     CXCursor *cursor, CXCursor *parent, CXClientData client_data);

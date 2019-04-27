@@ -1,5 +1,6 @@
 local bit = require("bit")
 local io = require("io")
+local math = require("math")
 local os = require("os")
 local string = require("string")
 local table = require("table")
@@ -10,7 +11,10 @@ local compile_commands_reader = require("compile_commands_reader")
 local compile_commands_util = require("compile_commands_util")
 local diagnostics_util = require("diagnostics_util")
 local hacks = require("hacks")
+local posix = require("posix")
 local util = require("util")
+
+local POLL = posix.POLL
 
 local InclusionGraph = require("inclusion_graph").InclusionGraph
 
@@ -26,10 +30,13 @@ local assert = assert
 local format = string.format
 local ipairs = ipairs
 local pairs = pairs
+local pcall = pcall
 local print = print
 local require = require
 local tostring = tostring
 local tonumber = tonumber
+local type = type
+local unpack = unpack
 
 local arg = arg
 
@@ -77,9 +84,12 @@ Options:
   -m: Use machine interface / "command mode" (default: for human inspection)
 
 Human mode options:
+  -c <concurrency>: set number of parallel parser invocations.
+     0 means do everything serially (do not fork),
+     'auto' means use hardware concurrency (the default).
   -g [includes|isIncludedBy]: Print inclusion graph as a DOT (of Graphviz) file to stdout and exit.
      Argument specifies the relation between graph nodes (which are file names).
-     Must be used without -m.
+     Forces concurrency to 0.
   -l <number>: edge count limit for the graph produced by -g %s.
      If exceeded, a placeholder node is placed.
   -N: Disable omission of repeated diagnostics.
@@ -92,6 +102,7 @@ end
 local parsecmdline = require("parsecmdline_pk")
 
 local opts_meta = {
+    c = true,
     m = false,
     g = true,
     l = true,
@@ -102,6 +113,7 @@ local opts_meta = {
 
 local opts, args = parsecmdline.getopts(opts_meta, arg, usage)
 
+local concurrencyOpt = opts.c or "auto"
 local commandMode = opts.m
 local printGraphMode = opts.g
 local edgeCountLimit = tonumber(opts.l)
@@ -132,10 +144,35 @@ if (commandMode) then
     end
 end
 
+local function getUsedConcurrency()
+    if (concurrencyOpt == "auto") then
+        return cl.hardwareConcurrency()
+    else
+        if (concurrencyOpt ~= "0" and not concurrencyOpt:match("[1-9][0-9]*")) then
+            abort("Argument to option -c must be 'auto' or an integral number")
+        end
+
+        local c = tonumber(concurrencyOpt)
+        assert(c ~= nil)
+
+        if (not (c >= 0)) then
+            abort("Argument to option -c must be at least 0 if a number")
+        end
+
+        return c
+    end
+end
+
+local usedConcurrency = getUsedConcurrency()
+
 if (printGraphMode ~= nil) then
-    if (printGraphMode ~= "includes" and printGraphMode ~= "isIncludedBy") then
+    if (concurrencyOpt ~= "auto" and concurrencyOpt ~= 0) then
+        abort("With graph printing, concurrency ('-c') must be 0 or 'auto'")
+    elseif (printGraphMode ~= "includes" and printGraphMode ~= "isIncludedBy") then
         abort("Argument to option -g must be 'includes' or 'isIncludedBy'")
     end
+
+    usedConcurrency = 0
 end
 
 if (edgeCountLimit ~= nil) then
@@ -370,6 +407,9 @@ end
 local OnDemandParser = class
 {
     function(ccIndexes, parseOptions, successCallback)
+        checktype(ccIndexes, 1, "table", 2)
+        checktype(parseOptions, 1, "table", 2)
+
         return {
             ccIndexes = ccIndexes,
             parseOptions = parseOptions,
@@ -509,8 +549,9 @@ local function getNormalizedDiag(diagStr)
     return diagStr:gsub("In file included from [^\n]*\n", "")
 end
 
-local function pluralize(count, noun)
-    return format("%d %s%s", count, noun, count > 1 and 's' or "")
+local function pluralize(count, noun, pluralSuffix)
+    pluralSuffix = pluralSuffix or 's'
+    return format("%d %s%s", count, noun, count > 1 and pluralSuffix or "")
 end
 
 local FormattedDiagSetPrinter = class
@@ -596,11 +637,324 @@ local FormattedDiagSetPrinter = class
     end,
 }
 
-local function printFormattedDiagSet(formattedDiagSet, ccIndex)
-end
+-- For clearer exposition only.
+local FdPair = class
+{
+    function(readFd, writeFd, extraFd)
+        return {
+            r = readFd,
+            w = writeFd,
+
+            _extra = extraFd,
+        }
+    end,
+}
+
+local PipePair = class
+{
+    function()
+        return {
+            toParent = posix.pipe(),
+            toChild = posix.pipe(),
+        }
+    end,
+
+    getUsedEnds = function(self, whoami)
+        assert(whoami == "child" or whoami == "parent")
+
+        if (whoami == "child") then
+            self.toParent.r:close()
+            self.toChild.w:close()
+            return FdPair(self.toChild.r, self.toParent.w)
+        else
+            -- NOTE: deliberately keep open the write end of the 'child -> parent'
+            -- connection in the parent so that we never get POLL.HUP from poll().
+            --[[self.toParent.w:close()--]]
+            self.toChild.r:close()
+            return FdPair(self.toParent.r, self.toChild.w,
+                          self.toParent.w)
+        end
+    end,
+}
+
+local Message = {
+    Ready = "R",  -- 1: child -> parent
+    Clear = "C",  -- 2: parent -> child
+    Done  = "D",  -- 3: child -> parent
+}
+
+local Controller = class
+{
+    function(...)
+        return {
+            onDemandParserArgs = { ... },
+
+            -- If concurrency is requested, will be 'child' or 'parent' after forking:
+            whoami = "unforked",
+
+            -- Child or unforked will have:
+            parser = nil,  -- OnDemandParser
+            printer = nil,  -- FormattedDiagSetPrinter
+
+            -- Child will have:
+            connection = nil,  -- FdPair
+
+            --== Parent will have:
+            -- Table of FdPair elements with possible holes. Indexed by the 'connection index'.
+            connections = nil,
+            -- Table (read file descriptor -> index into self.connections[]).
+            readFdToConnIdx = nil,
+            -- Contiguous sequence table as argument to posix.poll().
+            pendingFds = nil,
+        }
+    end,
+
+    is = function(self, who)
+        return (self.whoami == who)
+    end,
+
+    --== Child only ==--
+
+    send = function(self, str)
+        assert(#str == 1)
+        return self.connection.w:write(str)
+    end,
+
+    receive = function(self)
+        local str = self.connection.r:read(1)
+        -- NOTE: (quoting from POSIX):
+        --  "If no process has the pipe open for writing, read() shall return 0 to indicate
+        --  end-of-file."
+        assert(#str == 1)
+        return str
+    end,
+
+    onBeforePrint = function(self)
+        assert(not self:is("parent"))
+
+        if (self:is("child")) then
+            self:send(Message.Ready)
+            local msg = self:receive()
+            assert(msg == Message.Clear)
+        end
+    end,
+
+    onAfterPrint = function(self)
+        assert(not self:is("parent"))
+
+        if (self:is("child")) then
+            self:send(Message.Done)
+        end
+    end,
+
+    --== Unforked or parent ==--
+
+    setupParserAndPrinter = function(self, ...)
+        self.parser = OnDemandParser(...)
+        self.onDemandParserArgs = nil
+        self.printer = FormattedDiagSetPrinter()
+    end,
+
+    getAdditionalInfo = function(self)
+        if (self:is("unforked")) then
+            return self.parser:getAdditionalInfo()
+        end
+    end,
+
+    --== Parent only ==--
+
+    sendTo = function(self, connIdx, str)
+        assert(#str == 1)
+        local conn = self.connections[connIdx]
+        return conn.w:write(str)
+    end,
+
+    receiveFrom = function(self, connIdx)
+        local conn = self.connections[connIdx]
+        local str = conn.r:read(1)
+        assert(#str == 1)
+        return str
+    end,
+
+    closeConnection = function(self, connIdx)
+        local conn = self.connections[connIdx]
+        local readFd = conn.r.fd
+
+        conn.r:close()
+        conn.w:close()
+
+        assert(self.readFdToConnIdx[readFd] == connIdx)
+        self.readFdToConnIdx[readFd] = nil
+
+        self.connections[connIdx] = nil
+
+        -- Remove entry from self.pendingFds[].
+        local removed = false
+
+        for i, eventFd in ipairs(self.pendingFds) do
+            if (eventFd == readFd) then
+                assert(not removed)
+                table.remove(self.pendingFds, i)
+                removed = true
+            end
+        end
+
+        assert(removed)
+    end,
+
+    haveActiveChildren = function(self)
+        return (#self.pendingFds > 0)
+    end,
+
+    spawnChild = function(self, ccIdx)
+        assert(not self:is("child"))
+
+        local pipes = PipePair()
+
+        self.whoami = posix.fork()
+
+        local connection = pipes:getUsedEnds(self.whoami)
+
+        if (self:is("child")) then
+            self.connection = connection
+            self:setupParserAndPrinter({ccIdx}, unpack(self.onDemandParserArgs, 2))
+            return true
+        end
+
+        -- Set up and/or update the child-tracking state in the parent.
+
+        local connections = self.connections or {}
+        local connIdx = #connections + 1
+        connections[connIdx] = connection
+        self.connections = connections
+
+        local readFdToConnIdx = self.readFdToConnIdx or {}
+        local readFd = connection.r.fd
+        assert(readFdToConnIdx[readFd] == nil)
+        readFdToConnIdx[readFd] = connIdx
+        self.readFdToConnIdx = readFdToConnIdx
+
+        local pendingFds = self.pendingFds or { events=POLL.IN }
+        pendingFds[#pendingFds + 1] = readFd
+        self.pendingFds = pendingFds
+    end,
+
+    -- TODO: watch inotify descriptor, too.
+    wait = function(self)
+        assert(self:is("parent"))
+
+        local pollfds = posix.poll(self.pendingFds)
+        local connIdxs = {}
+
+        for i = 1, #pollfds do
+            -- We should never get:
+            --  - POLL.HUP: we (the parent) keep the write end of the 'child -> parent'
+            --      connection open just so that the pipe is always connected.
+            --  - POLL.NVAL: we should always valid pipe file descriptors to poll().
+            --
+            -- TODO: deal with possible POLL.ERR?
+            assert(pollfds[i].revents == POLL.IN)
+
+            local connIdx = self.readFdToConnIdx[pollfds[i].fd]
+            assert(connIdx ~= nil)
+            connIdxs[i] = connIdx
+        end
+
+        return connIdxs
+    end,
+
+    --== Unforked only ==--
+
+    setupConcurrency = function(self)
+        local ccIdxs = self.onDemandParserArgs[1]
+        local localConcurrency = math.min(usedConcurrency, #ccIdxs)
+        local spawnCount = 0
+
+        -- Spawn the initial batch of children.
+        for ii = 1, localConcurrency do
+            spawnCount = spawnCount + 1
+            if (self:spawnChild(ccIdxs[ii])) then
+                return true
+            end
+        end
+
+        local ii = localConcurrency + 1
+
+        repeat
+            local connIdxs = self:wait()
+            local newChildCount = #connIdxs
+
+            -- To retain the requested concurrency, spawn as many new children as we were
+            -- informed are ready.
+            while (newChildCount > 0 and ii <= #ccIdxs) do
+                spawnCount = spawnCount + 1
+                if (self:spawnChild(ccIdxs[ii])) then
+                    return true
+                end
+
+                newChildCount = newChildCount - 1
+                ii = ii + 1
+            end
+
+            -- Now, for each ready child in turn, first inform it that it can go ahead
+            -- printing and then wait for it to complete that.
+            for _, connIdx in ipairs(connIdxs) do
+                local readyMsg = self:receiveFrom(connIdx)
+                assert(readyMsg == Message.Ready)
+
+                self:sendTo(connIdx, Message.Clear)
+
+                local doneMsg = self:receiveFrom(connIdx)
+                assert(doneMsg == Message.Done)
+
+                -- NOTE: may introduce holes in the (integer) key sequence of
+                -- self.connections[].
+                self:closeConnection(connIdx)
+            end
+        until (not self:haveActiveChildren())
+
+        assert(spawnCount == #ccIdxs)
+    end,
+
+    printDiagnostics = function(self)
+        local compileCommandCount = #self.onDemandParserArgs[1]
+
+        if (usedConcurrency == 0) then
+            self:setupParserAndPrinter(unpack(self.onDemandParserArgs))
+        else
+            if (not self:setupConcurrency()) then
+                return compileCommandCount
+            end
+        end
+
+        local firstIteration = true
+
+        for i, formattedDiagSet, ccIndex in self.parser:iterate() do
+            if (i == 1) then
+                assert(firstIteration)
+                self:onBeforePrint()
+                firstIteration = false
+            end
+            self.printer:print(formattedDiagSet, ccIndex)
+        end
+
+        assert(not firstIteration)
+
+        self.printer:printTrailingInfo()
+        self:onAfterPrint()
+
+        if (self:is("child")) then
+            os.exit(0)
+        end
+
+        return compileCommandCount
+    end,
+}
 
 local function humanModeMain()
-    info("Processing %d compile commands.", #compileCommands)
+    local suffix = (usedConcurrency > 0) and
+        format(" with %s", pluralize(usedConcurrency, "worker process", "es")) or ""
+    info("Processing %d compile commands%s.", #compileCommands, suffix)
 
     -- The inclusion graph for the whole project ("global") initial configuration.
     -- Will not be updated on changes to individual files.
@@ -613,10 +967,17 @@ local function humanModeMain()
         InclusionGraph_ProcessTU(initialGlobalInclusionGraph, tu)
     end
 
-    local onDemandParser = OnDemandParser(range(#compileCommands), parserOpts, successCallback)
+    if (usedConcurrency > 0) then
+        -- Set SIGINT handling to default (that is, to terminate the receiving process)
+        -- instead of the Lua debug hook set by LuaJIT in order to avoid being spammed
+        -- with backtraces from the child processes.
+        local SIG = posix.SIG
+        posix.signal(SIG.INT, SIG.DFL)
+    end
+
+    local control = Controller(range(#compileCommands), parserOpts, successCallback)
 
     local notifier, fileNameOfWd, compileCommandsWd
-    local printer = FormattedDiagSetPrinter()
 
     repeat
         -- Print current diagnostics.
@@ -624,11 +985,7 @@ local function humanModeMain()
         -- TODO: in particular, moves and deletions. (Have common logic with compile_commands.json change?)
         -- Later: handle special case of a change of compile_commands.json, too.
 
-        for i, formattedDiagSet, ccIndex in onDemandParser:iterate() do
-            printer:print(formattedDiagSet, ccIndex)
-        end
-
-        printer:printTrailingInfo()
+        local processedCommandCount = control:printDiagnostics()
 
         -- TODO: move to separate application
         if (printGraphMode ~= nil) then
@@ -637,19 +994,24 @@ local function humanModeMain()
             -- #include errors!
         end
 
-        if (notifier == nil and not exitImmediately) then
-            notifier, fileNameOfWd, compileCommandsWd =
-                AddFileWatches(initialGlobalInclusionGraph)
-            info("Watching %d files.", initialGlobalInclusionGraph:getNodeCount() + 1)
+        if (usedConcurrency == 0) then  -- TODO!!!
+            if (notifier == nil and not exitImmediately) then
+                notifier, fileNameOfWd, compileCommandsWd =
+                    AddFileWatches(initialGlobalInclusionGraph)
+                info("Watching %d files.", initialGlobalInclusionGraph:getNodeCount() + 1)
+            end
         end
 
-        if (onDemandParser:getAdditionalInfo() ~= nil) then
-            info("%s", onDemandParser:getAdditionalInfo())
+        if (control:getAdditionalInfo() ~= nil) then
+            info("%s", control:getAdditionalInfo())
         end
         info_underline("Processed %d compile commands in %d seconds.",
-                       onDemandParser:getCount(), os.difftime(os.time(), startTime))
+                       processedCommandCount, os.difftime(os.time(), startTime))
         printf("")
 
+        if (usedConcurrency > 0) then  -- TODO!!!
+            break
+        end
         if (exitImmediately) then
             break
         end
@@ -670,7 +1032,7 @@ local function humanModeMain()
              colorize(eventFileName, Col.Bold..Col.White), #ccIndexes)
 
         -- Finally, re-process them.
-        onDemandParser = OnDemandParser(ccIndexes, parserOpts)
+        control = Controller(ccIndexes, parserOpts)
     until (false)
 end
 
