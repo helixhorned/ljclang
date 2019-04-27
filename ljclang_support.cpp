@@ -15,6 +15,7 @@
 #include <ctime>
 
 #include <string>
+#include <thread>
 #include <type_traits>
 
 #include <clang-c/Index.h>
@@ -22,9 +23,16 @@
 // Returns the LLVM version obtained with "<llvm-config> --version" when
 // building us.
 extern "C"
+{
 const char *ljclang_getLLVMVersion()
 {
     return LJCLANG_LLVM_VERSION;
+}
+
+unsigned ljclang_getHardwareConcurrency()
+{
+    return std::thread::hardware_concurrency();
+}
 }
 
 namespace

@@ -36,6 +36,7 @@ local support = ffi.load("ljclang_support")
 ffi.cdef[[
 const char *ljclang_getLLVMVersion();
 const char *ljclang_getTypeDefs();
+unsigned ljclang_getHardwareConcurrency();
 ]]
 
 ffi.cdef(ffi.string(support.ljclang_getTypeDefs()))
@@ -52,6 +53,12 @@ ExtractedEnums.CursorKindName = nil
 
 -- The table of externally exposed elements, returned at the end.
 local api = ExtractedEnums
+
+api.hardwareConcurrency = function()
+    return support.ljclang_getHardwareConcurrency()
+end
+
+-----=====
 
 --[[
 local function debugf(fmt, ...)
