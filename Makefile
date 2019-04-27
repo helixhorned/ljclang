@@ -95,6 +95,8 @@ $(EXTRACTED_ENUMS_LUA): $(LJCLANG_SUPPORT_SO) $(GENERATED_FILES_STAGE_1) $(incdi
 	|| (printf "* \033[1;31mError\033[0m generating $@\n" && \
 	    mv $@ $@.reject && false)
 
+# Linux-specific functionality exposed to us
+
 inotify_h ?= /usr/include/x86_64-linux-gnu/sys/inotify.h
 inotify_decls_lua := inotify_decls.lua
 inotify_decls_lua_tmp := $(inotify_decls_lua).tmp
@@ -113,6 +115,32 @@ $(inotify_decls_lua): $(EXTRACTED_ENUMS_LUA) $(inotify_h)
 	@echo '}]]' >> $(inotify_decls_lua_tmp)
 	@mv $(inotify_decls_lua_tmp) $@
 	@($(CHECK_EXTRACTED_INOTIFY_CMD) && \
+	    printf "* \033[1mGenerated $@\033[0m\n") \
+	|| (printf "* \033[1;31mError\033[0m generating $@\n" && \
+	    mv $@ $@.reject && false)
+
+# POSIX functionality exposed to us
+
+poll_h ?= /usr/include/x86_64-linux-gnu/sys/poll.h
+signal_h ?= /usr/include/signal.h
+posix_decls_lua := posix_decls.lua
+posix_decls_lua_tmp := $(posix_decls_lua).tmp
+
+CHECK_EXTRACTED_POSIX_CMD := $(EXTRACT_CMD_ENV) $(luajit) \
+    -e "require'posix_decls'"
+
+$(posix_decls_lua): $(EXTRACTED_ENUMS_LUA) $(poll_h)
+	@echo 'local ffi=require"ffi"' > $(posix_decls_lua_tmp)
+	@echo 'return { POLL = ffi.new[[struct {' >> $(posix_decls_lua_tmp)
+	@$(EXTRACT_CMD_ENV) ./extractdecls.lua -w MacroDefinition -C -p '^POLLIN' -s '^POLL' $(poll_h) >> $(posix_decls_lua_tmp)
+	@echo '}]], ' >> $(posix_decls_lua_tmp)
+	@echo 'SIG = ffi.new[[struct {' >> $(posix_decls_lua_tmp)
+	@$(EXTRACT_CMD_ENV) ./extractdecls.lua -w MacroDefinition -C -p '^SIGINT' -s '^SIG' $(signal_h) >> $(posix_decls_lua_tmp)
+	@$(EXTRACT_CMD_ENV) ./extractdecls.lua -w MacroDefinition -C -p '^SIGPIPE' -s '^SIG' $(signal_h) >> $(posix_decls_lua_tmp)
+	@$(EXTRACT_CMD_ENV) ./extractdecls.lua -w MacroDefinition -C -p '^SIG_BLOCK' -s '^SIG_' $(signal_h) >> $(posix_decls_lua_tmp)
+	@echo '}]] }' >> $(posix_decls_lua_tmp)
+	@mv $(posix_decls_lua_tmp) $@
+	@($(CHECK_EXTRACTED_POSIX_CMD) && \
 	    printf "* \033[1mGenerated $@\033[0m\n") \
 	|| (printf "* \033[1;31mError\033[0m generating $@\n" && \
 	    mv $@ $@.reject && false)
@@ -136,7 +164,7 @@ test: $(LJCLANG_SUPPORT_SO) $(GENERATED_FILES_STAGE_2)
 
 sed_common_commands := s|LJCLANG_DEV_DIR|$(THIS_DIR)|g; s|LLVM_LIBDIR|$(libdir)|g;
 
-install: $(LJCLANG_SUPPORT_SO) $(GENERATED_FILES_STAGE_2) $(inotify_decls_lua)
+install: $(LJCLANG_SUPPORT_SO) $(GENERATED_FILES_STAGE_2) $(inotify_decls_lua) $(posix_decls_lua)
 	sed "$(sed_common_commands) s|APPLICATION|mgrep|g" ./app.sh.in > $(BINDIR)/mgrep
 	sed "$(sed_common_commands) s|APPLICATION|watch_compile_commands|g" ./app.sh.in > $(BINDIR)/watch_compile_commands
 	chmod +x $(BINDIR)/mgrep

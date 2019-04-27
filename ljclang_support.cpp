@@ -7,6 +7,7 @@
 #if LJCLANG_USE_POSIX
 # include <sys/types.h>
 # include <poll.h>
+# include <signal.h>
 #endif
 
 #include <cstddef>
@@ -70,6 +71,8 @@ const char *ljclang_getTypeDefs()
         + TypeDef(uid_t)
         // poll.h
         + TypeDef(nfds_t)
+        // signal.h
+        + TypeDef(sigset_t)
 #endif
         ;
 

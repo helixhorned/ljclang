@@ -31,7 +31,7 @@ local class = require("class").class
 local util = require("util")
 
 local clang = ffi.load(lib"clang")
-local support = ffi.load(lib"ljclang_support")
+local support = ffi.load("ljclang_support")
 
 ffi.cdef[[
 const char *ljclang_getLLVMVersion();

@@ -5,6 +5,7 @@ local IN = require("inotify_decls")
 
 local class = require("class").class
 local check = require("error_util").check
+local posix = require("posix")
 
 local assert = assert
 local error = error
@@ -14,11 +15,6 @@ local type = type
 ----------
 
 ffi.cdef[[
-size_t read(int, void *, size_t);
-int close(int);
-
-char *strerror(int);
-
 struct inotify_event {
     int      wd;
     uint32_t mask;
@@ -31,10 +27,7 @@ struct inotify_event {
 
 local api = { IN=IN }
 
-local function getErrnoString(errno)
-    local errmsgCStr = C.strerror(ffi.errno())
-    return (errmsgCStr ~= nil) and ffi.string(errmsgCStr) or "errno="..tostring(errno)
-end
+local getErrnoString = posix.getErrnoString
 
 local inotify_event_t = ffi.typeof("struct inotify_event")
 local sizeof_inotify_event = ffi.sizeof(inotify_event_t)
