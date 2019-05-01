@@ -356,7 +356,7 @@ local function CheckForIncludeError(tu, formattedDiagSet, cmd, additionalInclude
     end
 end
 
-local function ProcessCompileCommand(ccIndex, parseOptions, successCallback)
+local function ProcessCompileCommand(ccIndex, parseOptions)
     local tu, errorCode
     local additionalIncludeTab = {}
     local count = 0
@@ -387,9 +387,6 @@ local function ProcessCompileCommand(ccIndex, parseOptions, successCallback)
     local inclusionGraph
 
     if (tu ~= nil) then
-        if (successCallback ~= nil) then
-            successCallback(tu)
-        end
         inclusionGraph = InclusionGraph_ProcessTU(InclusionGraph(), tu)
     end
 
@@ -399,14 +396,13 @@ end
 
 local OnDemandParser = class
 {
-    function(ccIndexes, parseOptions, successCallback)
+    function(ccIndexes, parseOptions)
         checktype(ccIndexes, 1, "table", 2)
         checktype(parseOptions, 1, "table", 2)
 
         return {
             ccIndexes = ccIndexes,
             parseOptions = parseOptions,
-            successCallback = successCallback,
 
             formattedDiagSets = {},
             inclusionGraphs = {},
@@ -427,7 +423,7 @@ local OnDemandParser = class
         if (self.formattedDiagSets[i] == nil) then
             local tmp
             self.formattedDiagSets[i], self.inclusionGraphs[i], tmp =
-                ProcessCompileCommand(self.ccIndexes[i], self.parseOptions, self.successCallback)
+                ProcessCompileCommand(self.ccIndexes[i], self.parseOptions)
             self.hadSomeSystemIncludesAdded = self.hadSomeSystemIncludesAdded or tmp
         end
 
