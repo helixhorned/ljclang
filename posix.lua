@@ -107,18 +107,31 @@ api.Fd = class
 
     read = function(self, byteCount)
         checktype(byteCount, 1, "number", 2)
-        check(byteCount >= 1, "argument must be at least 1")
+        check(byteCount >= 1, "argument must be at least 1", 2)
         local buf = uint8_array_t(byteCount)
         local bytesRead = call("read", self.fd, buf, byteCount)
         assert(bytesRead <= byteCount)
         return ffi.string(buf, bytesRead)
     end,
 
-    write = function(self, str)
-        checktype(str, 1, "string", 2)
-        check(#str > 0, "argument must have non-zero length", 2)
-        local bytesWritten = call("write", self.fd, str, #str)
-        assert(bytesWritten <= #str)
+    readInto = function(self, obj)
+        checktype(obj, 1, "cdata", 2)
+        local length = ffi.sizeof(obj)
+        check(length ~= nil, "argument must have ffi.sizeof() ~= nil", 2)
+        check(length >= 1, "argument must have ffi.sizeof() >= 1", 2)
+        local bytesRead = call("read", self.fd, obj, length)
+        -- Partial reads not yet handled.
+        check(bytesRead == length, "partial read occurred")
+        return obj
+    end,
+
+    write = function(self, obj)
+        check(type(obj) == "string" or type(obj) == "cdata",
+              "argument #1 must be a string or cdata", 2)
+        local length = (type(obj) == "string") and #obj or ffi.sizeof(obj)
+        check(length > 0, "argument must have non-zero length", 2)
+        local bytesWritten = call("write", self.fd, obj, length)
+        assert(bytesWritten <= length)
         return bytesWritten
     end,
 

@@ -3,6 +3,7 @@ local error_util = require("error_util")
 local class = require("class").class
 local math = require("math")
 local string = require("string")
+local table = require("table")
 
 local check = error_util.check
 local checktype = error_util.checktype
@@ -88,7 +89,53 @@ end
 
 -- Public API
 
-api.InclusionGraph = class
+local function SerializeGraph(self)
+    local tab = {}
+
+    for _, filename in self:iFileNames() do
+        for _, otherFileName in self:getNode(filename):iEdges() do
+            -- TODO: could store 'filename' only once and have a count of edges.
+
+            assert(not (filename:find('%z') or otherFileName:find('%z')))
+            tab[#tab + 1] = filename..'\0'..otherFileName
+        end
+    end
+
+    return table.concat(tab, '\0\0')..'\0\0'
+end
+
+local InclusionGraph  -- "forward-declare"
+local InvalidStringMsg = "passed string that is not a graph serialization"
+
+api.Deserialize = function(graphStr)
+    checktype(graphStr, 1, "string", 2)
+    check(#graphStr >= 2, "argument #1 must have length of at least two")
+    check(graphStr:sub(-2) == "\0\0", InvalidStringMsg, 2)
+
+    local graph = InclusionGraph()
+
+    for filename, otherFileName in graphStr:gmatch("([^%z]+)%z([^%z]+)") do
+        graph:addInclusion(filename, otherFileName)
+    end
+
+    local totalEdgeCount = 0
+    local doubleZeroCount = 0
+
+    for _, filename in graph:iFileNames() do
+        totalEdgeCount = totalEdgeCount + graph:getNode(filename):getEdgeCount()
+    end
+
+    for _ in graphStr:gmatch("%z%z") do
+        doubleZeroCount = doubleZeroCount + 1
+    end
+
+    check(totalEdgeCount == doubleZeroCount - ((totalEdgeCount == 0) and 1 or 0),
+          InvalidStringMsg..", or INTERNAL ERROR", 2)
+
+    return graph
+end
+
+InclusionGraph = class
 {
     function()
         return {
@@ -101,6 +148,9 @@ api.InclusionGraph = class
     addInclusion = function(self, aFile, bFile)
         checktype(aFile, 1, "string", 2)
         checktype(bFile, 2, "string", 2)
+
+        check(not aFile:find('%z'), "argument #1 must not contain NUL bytes", 2)
+        check(not bFile:find('%z'), "argument #2 must not contain NUL bytes", 2)
 
         local aNode = addOrGetNode(self, aFile)
         local bNode = addOrGetNode(self, bFile)
@@ -127,6 +177,8 @@ api.InclusionGraph = class
             end
         end
     end,
+
+    serialize = SerializeGraph,
 
     printAsGraphvizDot = function(self, title, reverse, commonPrefix, edgeCountLimit, printf)
         checktype(title, 1, "string", 2)
@@ -180,6 +232,8 @@ api.InclusionGraph = class
         printf("}")
     end
 }
+
+api.InclusionGraph = InclusionGraph
 
 -- Done!
 return api

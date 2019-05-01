@@ -1,4 +1,5 @@
 local bit = require("bit")
+local ffi = require("ffi")
 local io = require("io")
 local math = require("math")
 local os = require("os")
@@ -16,7 +17,8 @@ local util = require("util")
 
 local POLL = posix.POLL
 
-local InclusionGraph = require("inclusion_graph").InclusionGraph
+local inclusion_graph = require("inclusion_graph")
+local InclusionGraph = inclusion_graph.InclusionGraph
 
 local Col = require("terminal_colors")
 
@@ -89,7 +91,6 @@ Human mode options:
      'auto' means use hardware concurrency (the default).
   -g [includes|isIncludedBy]: Print inclusion graph as a DOT (of Graphviz) file to stdout and exit.
      Argument specifies the relation between graph nodes (which are file names).
-     Forces concurrency to 0.
   -l <number>: edge count limit for the graph produced by -g %s.
      If exceeded, a placeholder node is placed.
   -N: Disable omission of repeated diagnostics.
@@ -166,13 +167,9 @@ end
 local usedConcurrency = getUsedConcurrency()
 
 if (printGraphMode ~= nil) then
-    if (concurrencyOpt ~= "auto" and concurrencyOpt ~= 0) then
-        abort("With graph printing, concurrency ('-c') must be 0 or 'auto'")
-    elseif (printGraphMode ~= "includes" and printGraphMode ~= "isIncludedBy") then
+    if (printGraphMode ~= "includes" and printGraphMode ~= "isIncludedBy") then
         abort("Argument to option -g must be 'includes' or 'isIncludedBy'")
     end
-
-    usedConcurrency = 0
 end
 
 if (edgeCountLimit ~= nil) then
@@ -384,13 +381,11 @@ local function ProcessCompileCommand(ccIndex, parseOptions)
         hadSomeSystemIncludesAdded = hadSomeSystemIncludesAdded or retry
     until (not retry)
 
-    local inclusionGraph
+    local inclusionGraph = (tu ~= nil) and
+        InclusionGraph_ProcessTU(InclusionGraph(), tu) or
+        InclusionGraph()
 
-    if (tu ~= nil) then
-        inclusionGraph = InclusionGraph_ProcessTU(InclusionGraph(), tu)
-    end
-
-    assert(formattedDiagSet ~= nil)
+    assert(formattedDiagSet ~= nil and inclusionGraph ~= nil)
     return formattedDiagSet, inclusionGraph, hadSomeSystemIncludesAdded
 end
 
@@ -467,13 +462,11 @@ local function PrintInclusionGraphAsGraphvizDot(graph)
     graph:printAsGraphvizDot(title, reverse, commonPrefix, edgeCountLimit, printf)
 end
 
-local function GetAffectedCompileCommandIndexes(eventFileName)
+local function GetAffectedCompileCommandIndexes(ccInclusionGraphs, eventFileName)
     local indexes = {}
 
     for i = 1, #compileCommands do
-        local graph = compileCommandInclusionGraphs[i]
-
-        if (graph ~= nil and graph:getNode(eventFileName) ~= nil) then
+        if (ccInclusionGraphs[i]:getNode(eventFileName) ~= nil) then
             indexes[#indexes + 1] = i
         end
     end
@@ -669,9 +662,28 @@ local PipePair = class
 }
 
 local Message = {
-    Ready = "R",  -- 1: child -> parent
-    Clear = "C",  -- 2: parent -> child
-    Done  = "D",  -- 3: child -> parent
+    Ready = "R",   -- 1: child -> parent
+    Clear = "C",   -- 2: parent -> child
+    Done = "Done", -- 3: child -> parent
+}
+
+local DoneHeader_t = class
+{
+    "char magic[4];"..
+    "uint32_t length;",
+
+    __new = function(ct, length)
+        -- NOTE: 'magic' deliberately not zero-terminated. See
+        -- http://lua-users.org/lists/lua-l/2011-01/msg01457.html
+        return ffi.new(ct, Message.Done, length)
+    end,
+
+    deserialize = function(self)
+        return {
+            magic = ffi.string(self.magic, 4),
+            length = tonumber(self.length),
+        }
+    end,
 }
 
 local Controller = class
@@ -706,9 +718,8 @@ local Controller = class
 
     --== Child only ==--
 
-    send = function(self, str)
-        assert(#str == 1)
-        return self.connection.w:write(str)
+    send = function(self, obj)
+        return self.connection.w:write(obj)
     end,
 
     receive = function(self)
@@ -730,11 +741,14 @@ local Controller = class
         end
     end,
 
-    onAfterPrint = function(self)
+    onAfterPrint = function(self, incGraph)
         assert(not self:is("parent"))
 
         if (self:is("child")) then
-            self:send(Message.Done)
+            local graphStr = incGraph:serialize()
+            local header = DoneHeader_t(#graphStr)
+            self:send(header)
+            self:send(graphStr)
         end
     end,
 
@@ -760,15 +774,21 @@ local Controller = class
         return conn.w:write(str)
     end,
 
-    receiveFrom = function(self, connIdx)
+    receiveString = function(self, connIdx, length)
         local conn = self.connections[connIdx]
-        local str = conn.r:read(1)
-        assert(#str == 1)
+        local str = conn.r:read(length)
+        assert(#str == length)
         return str
+    end,
+
+    receiveData = function(self, connIdx, cdata)
+        local conn = self.connections[connIdx]
+        return conn.r:readInto(cdata)
     end,
 
     closeConnection = function(self, connIdx)
         local conn = self.connections[connIdx]
+        local ccIdx = conn.compileCommandIndex
         local readFd = conn.r.fd
 
         conn.r:close()
@@ -791,6 +811,7 @@ local Controller = class
         end
 
         assert(removed)
+        return ccIdx
     end,
 
     haveActiveChildren = function(self)
@@ -813,6 +834,8 @@ local Controller = class
         end
 
         -- Set up and/or update the child-tracking state in the parent.
+
+        connection.compileCommandIndex = ccIdx
 
         local connections = self.connections or {}
         local connIdx = #connections + 1
@@ -856,7 +879,7 @@ local Controller = class
 
     --== Unforked only ==--
 
-    setupConcurrency = function(self)
+    setupConcurrency = function(self, ccInclusionGraphs)
         local ccIdxs = self.onDemandParserArgs[1]
         local localConcurrency = math.min(usedConcurrency, #ccIdxs)
         local spawnCount = 0
@@ -890,17 +913,21 @@ local Controller = class
             -- Now, for each ready child in turn, first inform it that it can go ahead
             -- printing and then wait for it to complete that.
             for _, connIdx in ipairs(connIdxs) do
-                local readyMsg = self:receiveFrom(connIdx)
+                local readyMsg = self:receiveString(connIdx, 1)
                 assert(readyMsg == Message.Ready)
 
                 self:sendTo(connIdx, Message.Clear)
 
-                local doneMsg = self:receiveFrom(connIdx)
-                assert(doneMsg == Message.Done)
+                local doneMsg = self:receiveData(connIdx, DoneHeader_t(0)):deserialize()
+                assert(doneMsg.magic == Message.Done)
+
+                local serializedGraph = self:receiveString(connIdx, doneMsg.length)
 
                 -- NOTE: may introduce holes in the (integer) key sequence of
                 -- self.connections[].
-                self:closeConnection(connIdx)
+                local ccIdx = self:closeConnection(connIdx)
+
+                ccInclusionGraphs[ccIdx] = inclusion_graph.Deserialize(serializedGraph)
             end
         until (not self:haveActiveChildren())
 
@@ -913,28 +940,33 @@ local Controller = class
         if (usedConcurrency == 0) then
             self:setupParserAndPrinter(unpack(self.onDemandParserArgs))
         else
-            if (not self:setupConcurrency()) then
+            if (not self:setupConcurrency(ccInclusionGraphs)) then
                 return compileCommandCount
             end
         end
 
-        local firstIteration = true
+        local iterationCount = 0
+        local inclusionGraph
 
         for i, ccIndex, fDiagSet, incGraph in self.parser:iterate() do
+            iterationCount = iterationCount + 1
+            assert((i == 1) == (iterationCount == 1))
+
             if (i == 1) then
-                assert(firstIteration)
                 self:onBeforePrint()
-                firstIteration = false
             end
+
             self.printer:print(fDiagSet, ccIndex)
-            -- TODO: if child, send the graph over the pipe.
+
+            inclusionGraph = incGraph
             ccInclusionGraphs[ccIndex] = incGraph
         end
 
-        assert(not firstIteration)
+        assert(iterationCount >= 1)
+        assert(not self:is("child") or iterationCount == 1)
 
         self.printer:printTrailingInfo()
-        self:onAfterPrint()
+        self:onAfterPrint(inclusionGraph)
 
         if (self:is("child")) then
             os.exit(0)
@@ -1001,12 +1033,10 @@ local function humanModeMain()
             -- #include errors!
         end
 
-        if (usedConcurrency == 0) then  -- TODO!!!
-            if (notifier == nil and not exitImmediately) then
-                local graph = GetGlobalInclusionGraph(#compileCommands, ccInclusionGraphs)
-                notifier, fileNameOfWd, compileCommandsWd = AddFileWatches(graph)
-                info("Watching %d files.", graph:getNodeCount() + 1)
-            end
+        if (notifier == nil and not exitImmediately) then
+            local graph = GetGlobalInclusionGraph(#compileCommands, ccInclusionGraphs)
+            notifier, fileNameOfWd, compileCommandsWd = AddFileWatches(graph)
+            info("Watching %d files.", graph:getNodeCount() + 1)
         end
 
         if (control:getAdditionalInfo() ~= nil) then
@@ -1017,9 +1047,6 @@ local function humanModeMain()
                        os.difftime(os.time(), startTime))
         printf("")
 
-        if (usedConcurrency > 0) then  -- TODO!!!
-            break
-        end
         if (exitImmediately) then
             break
         end
@@ -1034,7 +1061,8 @@ local function humanModeMain()
         assert(eventFileName ~= nil)
 
         -- Determine the set of compile commands to re-process.
-        local ccIndexes = GetAffectedCompileCommandIndexes(eventFileName)
+        local ccIndexes = GetAffectedCompileCommandIndexes(
+            ccInclusionGraphs, eventFileName)
 
         info("Detected modification of %s. Need re-processing %s.",
              colorize(eventFileName, Col.Bold..Col.White),
