@@ -227,13 +227,6 @@ local function getFileOrdinal(ccIndex)
     return ord
 end
 
--- Initial parse of all compilation commands in the project given by the compilation
--- database.
---
--- Outputs:
---  1. diagnostics for each compilation command
---  2. a DAG of the #include relation for the whole project
-
 ---------- Common to both human and command mode ----------
 
 local function getSite(location)

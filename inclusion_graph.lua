@@ -61,7 +61,7 @@ local Node = class
         return #self.edgeTo
     end,
 
-    iEdges = function(self, mapKey)
+    iEdges = function(self)
         return ipairs(self.edgeTo)
     end
 }
