@@ -148,7 +148,7 @@ local function getUsedConcurrency()
     if (concurrencyOpt == "auto") then
         return cl.hardwareConcurrency()
     else
-        if (concurrencyOpt ~= "0" and not concurrencyOpt:match("[1-9][0-9]*")) then
+        if (concurrencyOpt ~= "0" and not concurrencyOpt:match("^[1-9][0-9]*$")) then
             abort("Argument to option -c must be 'auto' or an integral number")
         end
 
