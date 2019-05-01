@@ -1005,8 +1005,9 @@ local function humanModeMain()
         if (control:getAdditionalInfo() ~= nil) then
             info("%s", control:getAdditionalInfo())
         end
-        info_underline("Processed %d compile commands in %d seconds.",
-                       processedCommandCount, os.difftime(os.time(), startTime))
+        info_underline("Processed %s in %d seconds.",
+                       pluralize(processedCommandCount, "compile command"),
+                       os.difftime(os.time(), startTime))
         printf("")
 
         if (usedConcurrency > 0) then  -- TODO!!!
@@ -1028,8 +1029,9 @@ local function humanModeMain()
         -- Determine the set of compile commands to re-process.
         local ccIndexes = GetAffectedCompileCommandIndexes(eventFileName)
 
-        info("Detected modification of %s. Need re-processing %d compile commands.",
-             colorize(eventFileName, Col.Bold..Col.White), #ccIndexes)
+        info("Detected modification of %s. Need re-processing %s.",
+             colorize(eventFileName, Col.Bold..Col.White),
+             pluralize(#ccIndexes, "compile command"))
 
         -- Finally, re-process them.
         control = Controller(ccIndexes, parserOpts)
