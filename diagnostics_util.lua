@@ -187,7 +187,9 @@ local function PrintDiagsImpl(diags, useColors,
         PrintDiagsImpl(diag:childDiagnostics(), useColors,
                        innerStartIndex, indentation + 2, fDiag)
 
-        local omitFollowing = (diag:severity() == "fatal" or diag:category() == "Parse Issue")
+        local isFatal = (diag:severity() == "fatal")
+        local isError = isFatal or diag:severity() == "error"
+        local omitFollowing = (isFatal or (isError and diag:category() == "Parse Issue"))
 
         if (omitFollowing) then
             assert(indentation == 0)

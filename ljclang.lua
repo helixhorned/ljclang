@@ -408,6 +408,7 @@ local DiagnosticSet
 --    an enum constant
 --  * tostring(<safe-enum-value>): returns suffix as string
 --  * to/from number?
+--  * relational comparison?
 local SeverityEnumToString = {
     [tonumber(C.CXDiagnostic_Ignored)] = "ignored",
     [tonumber(C.CXDiagnostic_Note)] = "note",
