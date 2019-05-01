@@ -293,9 +293,6 @@ local WATCH_FLAGS = bit.bor(IN.CLOSE_WRITE, MOVE_OR_DELETE)
 
 ---------- HUMAN MODE ----------
 
--- Inclusion graphs for each compile command.
-local compileCommandInclusionGraphs = {}
-
 local function DoProcessCompileCommand(cmd, additionalSystemInclude, parseOptions)
     local args = compile_commands_util.sanitize_args(cmd.arguments, cmd.directory)
 
@@ -387,14 +384,17 @@ local function ProcessCompileCommand(ccIndex, parseOptions, successCallback)
         hadSomeSystemIncludesAdded = hadSomeSystemIncludesAdded or retry
     until (not retry)
 
+    local inclusionGraph
+
     if (tu ~= nil) then
         if (successCallback ~= nil) then
             successCallback(tu)
         end
-        compileCommandInclusionGraphs[ccIndex] = InclusionGraph_ProcessTU(InclusionGraph(), tu)
+        inclusionGraph = InclusionGraph_ProcessTU(InclusionGraph(), tu)
     end
 
-    return formattedDiagSet, hadSomeSystemIncludesAdded
+    assert(formattedDiagSet ~= nil)
+    return formattedDiagSet, inclusionGraph, hadSomeSystemIncludesAdded
 end
 
 local OnDemandParser = class
@@ -409,6 +409,7 @@ local OnDemandParser = class
             successCallback = successCallback,
 
             formattedDiagSets = {},
+            inclusionGraphs = {},
             hadSomeSystemIncludesAdded = false,
         }
     end,
@@ -417,7 +418,7 @@ local OnDemandParser = class
         return #self.ccIndexes
     end,
 
-    getFormattedDiagSet = function(self, i)
+    getResults = function(self, i)
         checktype(i, 1, "number", 2)
         check(i >= 1 and i <= self:getCount(), "argument #1 must be in [1, self:getCount()]", 2)
 
@@ -425,19 +426,20 @@ local OnDemandParser = class
 
         if (self.formattedDiagSets[i] == nil) then
             local tmp
-            self.formattedDiagSets[i], tmp = ProcessCompileCommand(
-                self.ccIndexes[i], self.parseOptions, self.successCallback)
+            self.formattedDiagSets[i], self.inclusionGraphs[i], tmp =
+                ProcessCompileCommand(self.ccIndexes[i], self.parseOptions, self.successCallback)
             self.hadSomeSystemIncludesAdded = self.hadSomeSystemIncludesAdded or tmp
         end
 
-        return self.formattedDiagSets[i]
+        return self.formattedDiagSets[i], self.inclusionGraphs[i]
     end,
 
     iterate = function(self)
         local next = function(_, i)
             i = i+1
             if (i <= self:getCount()) then
-                return i, self:getFormattedDiagSet(i), self.ccIndexes[i]
+                -- NOTE: four return values.
+                return i, self.ccIndexes[i], self:getResults(i)
             end
         end
 
@@ -909,7 +911,7 @@ local Controller = class
         assert(spawnCount == #ccIdxs)
     end,
 
-    printDiagnostics = function(self)
+    printDiagnostics = function(self, ccInclusionGraphs)
         local compileCommandCount = #self.onDemandParserArgs[1]
 
         if (usedConcurrency == 0) then
@@ -922,13 +924,15 @@ local Controller = class
 
         local firstIteration = true
 
-        for i, formattedDiagSet, ccIndex in self.parser:iterate() do
+        for i, ccIndex, fDiagSet, incGraph in self.parser:iterate() do
             if (i == 1) then
                 assert(firstIteration)
                 self:onBeforePrint()
                 firstIteration = false
             end
-            self.printer:print(formattedDiagSet, ccIndex)
+            self.printer:print(fDiagSet, ccIndex)
+            -- TODO: if child, send the graph over the pipe.
+            ccInclusionGraphs[ccIndex] = incGraph
         end
 
         assert(not firstIteration)
@@ -944,22 +948,14 @@ local Controller = class
     end,
 }
 
-local function humanModeMain()
+local function PrintInitialInfo()
+    local prefix = pluralize(#compileCommands, "compile command")
     local suffix = (usedConcurrency > 0) and
         format(" with %s", pluralize(usedConcurrency, "worker process", "es")) or ""
-    info("Processing %d compile commands%s.", #compileCommands, suffix)
+    info("Processing %s%s.", prefix, suffix)
+end
 
-    -- The inclusion graph for the whole project ("global") initial configuration.
-    -- Will not be updated on changes to individual files.
-    local initialGlobalInclusionGraph = InclusionGraph()
-
-    local startTime = os.time()
-
-    local parserOpts = printGraphMode and {"SkipFunctionBodies", "Incomplete"} or {}
-    local successCallback = function(tu)
-        InclusionGraph_ProcessTU(initialGlobalInclusionGraph, tu)
-    end
-
+local function SetSigintHandler()
     if (usedConcurrency > 0) then
         -- Set SIGINT handling to default (that is, to terminate the receiving process)
         -- instead of the Lua debug hook set by LuaJIT in order to avoid being spammed
@@ -967,8 +963,29 @@ local function humanModeMain()
         local SIG = posix.SIG
         posix.signal(SIG.INT, SIG.DFL)
     end
+end
 
-    local control = Controller(range(#compileCommands), parserOpts, successCallback)
+local function GetGlobalInclusionGraph(compileCommandCount, ccInclusionGraphs)
+    local globalGraph = InclusionGraph()
+    for i = 1, compileCommandCount do
+        if (ccInclusionGraphs[i] ~= nil) then
+            globalGraph:merge(ccInclusionGraphs[i])
+        end
+    end
+    return globalGraph
+end
+
+local function humanModeMain()
+    PrintInitialInfo()
+    SetSigintHandler()
+
+    local startTime = os.time()
+
+    -- Inclusion graphs for each compile command.
+    local ccInclusionGraphs = {}
+
+    local parserOpts = printGraphMode and {"SkipFunctionBodies", "Incomplete"} or {}
+    local control = Controller(range(#compileCommands), parserOpts)
 
     local notifier, fileNameOfWd, compileCommandsWd
 
@@ -978,20 +995,21 @@ local function humanModeMain()
         -- TODO: in particular, moves and deletions. (Have common logic with compile_commands.json change?)
         -- Later: handle special case of a change of compile_commands.json, too.
 
-        local processedCommandCount = control:printDiagnostics()
+        local processedCommandCount = control:printDiagnostics(ccInclusionGraphs)
 
         -- TODO: move to separate application
         if (printGraphMode ~= nil) then
-            PrintInclusionGraphAsGraphvizDot(initialGlobalInclusionGraph)
+            local graph = GetGlobalInclusionGraph(#compileCommands, ccInclusionGraphs)
+            PrintInclusionGraphAsGraphvizDot(graph)
             -- TODO: see if there were errors, actually. After all, there may have been
             -- #include errors!
         end
 
         if (usedConcurrency == 0) then  -- TODO!!!
             if (notifier == nil and not exitImmediately) then
-                notifier, fileNameOfWd, compileCommandsWd =
-                    AddFileWatches(initialGlobalInclusionGraph)
-                info("Watching %d files.", initialGlobalInclusionGraph:getNodeCount() + 1)
+                local graph = GetGlobalInclusionGraph(#compileCommands, ccInclusionGraphs)
+                notifier, fileNameOfWd, compileCommandsWd = AddFileWatches(graph)
+                info("Watching %d files.", graph:getNodeCount() + 1)
             end
         end
 

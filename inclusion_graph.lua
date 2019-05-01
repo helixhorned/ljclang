@@ -120,6 +120,14 @@ api.InclusionGraph = class
         return ipairs(self._nodes)
     end,
 
+    merge = function(self, other)
+        for _, filename in other:iFileNames() do
+            for _, otherFileName in other:getNode(filename):iEdges() do
+                self:addInclusion(filename, otherFileName)
+            end
+        end
+    end,
+
     printAsGraphvizDot = function(self, title, reverse, commonPrefix, edgeCountLimit, printf)
         checktype(title, 1, "string", 2)
         reverse = (reverse ~= nil) and reverse or false
