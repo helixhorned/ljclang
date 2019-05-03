@@ -1,6 +1,6 @@
 
 # Directory to install scripts (referencing THIS_DIR, i.e. the development directory).
-BINDIR ?= /usr/local/bin
+BINDIR ?= $(HOME)/bin
 
 LLVM_CONFIG ?= llvm-config-7
 
