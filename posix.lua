@@ -170,7 +170,7 @@ api.poll = function(tab)
     for i = 0, #tab - 1 do
         if (pollfds[i].revents ~= 0) then
             local p = pollfds[i]
-            events[#events + 1] = pollfd_t(p) --{p.fd, p.events, p.revents}
+            events[#events + 1] = pollfd_t(p)
         end
     end
 
