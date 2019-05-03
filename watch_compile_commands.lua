@@ -386,7 +386,10 @@ local function ProcessCompileCommand(ccIndex, parseOptions)
         if (tu == nil) then
             formattedDiagSet = diagnostics_util.FormattedDiagSet(not plainMode)
             -- TODO: Extend in verbosity and/or handling?
-            formattedDiagSet:setInfo("ERROR: index:parse() failed: "..tostring(errorCode))
+            local info = format("%s: index:parse() failed: %s",
+                                colorize("ERROR", Col.Bold..Col.Red),
+                                errorCodeOrString)
+            formattedDiagSet:setInfo(info)
         else
             formattedDiagSet = diagnostics_util.GetDiags(tu:diagnosticSet(), not plainMode)
         end
