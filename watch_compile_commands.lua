@@ -164,8 +164,6 @@ local function getUsedConcurrency()
     end
 end
 
-local usedConcurrency = getUsedConcurrency()
-
 if (printGraphMode ~= nil) then
     if (printGraphMode ~= "includes" and printGraphMode ~= "isIncludedBy") then
         abort("Argument to option -g must be 'includes' or 'isIncludedBy'")
@@ -188,6 +186,8 @@ end
 
 local compileCommands, errorMessage =
     compile_commands_reader.read_compile_commands(compileCommandsFile)
+
+local usedConcurrency = math.min(getUsedConcurrency(), #compileCommands)
 
 if (compileCommands == nil) then
     errprintf("ERROR: failed loading '%s': %s", compileCommandsFile, errorMessage)
