@@ -290,7 +290,22 @@ local WATCH_FLAGS = bit.bor(IN.CLOSE_WRITE, MOVE_OR_DELETE)
 
 ---------- HUMAN MODE ----------
 
+local function exists(fileName)
+    local f, msg = io.open(fileName)
+    if (f ~= nil) then
+        f:close()
+        return true
+    end
+    -- LuaJIT always prepends the file name and ': ' if present. Strip it.
+    return false, msg:sub(1 + #fileName + 2)
+end
+
 local function DoProcessCompileCommand(cmd, additionalSystemInclude, parseOptions)
+    local fileExists, msg = exists(cmd.file)
+    if (not fileExists) then
+        return nil, msg
+    end
+
     local args = compile_commands_util.sanitize_args(cmd.arguments, cmd.directory)
 
     if (additionalSystemInclude ~= nil) then
@@ -354,7 +369,7 @@ local function CheckForIncludeError(tu, formattedDiagSet, cmd, additionalInclude
 end
 
 local function ProcessCompileCommand(ccIndex, parseOptions)
-    local tu, errorCode
+    local tu, errorCodeOrString
     local additionalIncludeTab = {}
     local count = 0
 
@@ -365,7 +380,7 @@ local function ProcessCompileCommand(ccIndex, parseOptions)
         count = count + 1
         assert(count <= 2)
 
-        tu, errorCode = DoProcessCompileCommand(
+        tu, errorCodeOrString = DoProcessCompileCommand(
             compileCommands[ccIndex], additionalIncludeTab[2], parseOptions)
 
         if (tu == nil) then
