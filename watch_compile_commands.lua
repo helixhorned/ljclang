@@ -97,12 +97,20 @@ Human mode options:
   -r c<commands>|<seconds>s: print progress after the specified number of
      processed compile commands or the given time interval.
   -s <selector>: Select compile command(s) to process.
-     Currently, the only supported specification for <selector> is a single file name,
-     which is compared with the suffix of the absolute file name in a compile command.
+     The following specifications for <selector> are supported:
+      - '@...' or '-@...': by index (see below).
+      - A single file name which is compared with the suffix of the absolute file name in a
+        compile command.
   -N: Disable omission of repeated diagnostics.
   -P: Disable color output.
   -x: exit after parsing and displaying diagnostics once.
-]], GlobalInclusionGraphRelation)
+
+  If the argument to option -s starts with '@' or '-@', it must have one of the following forms,
+  where the integral <number> starts with a digit distinct from zero:
+    - '@<number>': single compile command, or
+    - '@<number>-' or '-@<number>': range starting or ending with the specified index, or
+    - '@<number>-@<number>': inclusive range.]],
+GlobalInclusionGraphRelation)
     os.exit(ErrorCode.CommandLine)
 end
 
@@ -148,6 +156,11 @@ local NOTE = colorize("NOTE", Col.Bold..Col.Blue)
 local function info(fmt, ...)
     local func = printGraphMode and errprintf or printf
     func("%s: "..fmt, colorize("INFO", Col.Green), ...)
+end
+
+local function infoAndExit(fmt, ...)
+    info(fmt, ...)
+    os.exit(0)
 end
 
 if (commandMode) then
@@ -233,25 +246,57 @@ if (compileCommands == nil) then
 end
 
 if (#compileCommands == 0) then
-    info("'%s' contains zero entries.", compileCommandsFile)
-    os.exit(0)
+    infoAndExit("'%s' contains zero entries.", compileCommandsFile)
 end
 
-local originalCompileCommandCount = #compileCommands
+local compileCommandSelection = {
+    originalCount = #compileCommands,
+    -- [selected compile command index] = <original compile command index>
+}
 
 if (selectionSpec ~= nil) then
     local newCompileCommands = {}
 
-    for i, cmd in ipairs(compileCommands) do
-        if (#cmd.file >= #selectionSpec and
-            cmd.file:sub(-#selectionSpec) == selectionSpec) then
-            newCompileCommands[#newCompileCommands + 1] = cmd
-        end
+    local function selectCompileCommand(i)
+        local newIndex = #newCompileCommands + 1
+        newCompileCommands[newIndex] = compileCommands[i]
+        compileCommandSelection[newIndex] = i
     end
 
-    if (#newCompileCommands == 0) then
-        info("Found no compile commands with file '%s'.", selectionSpec)
-        os.exit(0)
+    if (selectionSpec:match("^-?@")) then
+        local startStr = selectionSpec:match("^@[1-9][0-9]*") or ""
+        local endStr = selectionSpec:match("@[1-9][0-9]*$") or ""
+        local startIndex = tonumber(startStr:sub(2)) or 1
+        local endIndex = tonumber(endStr:sub(2)) or #compileCommands
+
+        local isSingleIndex = (selectionSpec == startStr and selectionSpec == endStr)
+        local isRange = (selectionSpec == startStr..'-'..endStr)
+
+        if (not isSingleIndex and not isRange) then
+            abort("Invalid selection specification to argument '-s'.")
+        elseif (not (startIndex >= 1 and startIndex <= #compileCommands) or
+                not (endIndex >= 1 and endIndex <= #compileCommands)) then
+            abort("Compile command index for option '-s' out of range [1, %d]", #compileCommands)
+        end
+
+        for i = startIndex, endIndex do
+            selectCompileCommand(i)
+        end
+
+        if (#newCompileCommands == 0) then
+            infoAndExit("Selected empty range.")
+        end
+    else
+        local suffix = selectionSpec
+        for i, cmd in ipairs(compileCommands) do
+            if (#cmd.file >= #suffix and cmd.file:sub(-#suffix) == suffix) then
+                selectCompileCommand(i)
+            end
+        end
+
+        if (#newCompileCommands == 0) then
+            infoAndExit("Found no compile commands with file '%s'.", selectionSpec)
+        end
     end
 
     compileCommands = newCompileCommands
@@ -684,8 +729,9 @@ local FormattedDiagSetPrinter = class
 
         if (shouldPrint) then
             local cmd = compileCommands[ccIndex]
+            local originalCcIndex = compileCommandSelection[ccIndex] or ccIndex
 
-            local prefix = format("Command #%d:", ccIndex)
+            local prefix = format("Command #%d:", originalCcIndex)
             local middle = getFileOrdinalText(cmd, ccIndex)
             local suffix = (#toPrint > 0) and "" or " ["..colorize("progress", Col.Green).."]"
 
@@ -1070,7 +1116,7 @@ local Controller = class
 local function PrintInitialInfo()
     local prefix = pluralize(#compileCommands, "compile command")
     local middle = (selectionSpec ~= nil) and
-        format(" (of %d)", originalCompileCommandCount) or ""
+        format(" (of %d)", compileCommandSelection.originalCount) or ""
     local suffix = (usedConcurrency > 0) and
         format(" with %s", pluralize(usedConcurrency, "worker process", "es")) or ""
     info("Processing %s%s%s.", prefix, middle, suffix)
