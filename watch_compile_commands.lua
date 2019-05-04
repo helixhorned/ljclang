@@ -94,6 +94,8 @@ Human mode options:
   -l <number>: edge count limit for the graph produced by -g %s.
      If exceeded, a placeholder node is placed.
   -O: omit output for compile commands after the first one with errors.
+  -r c<commands>|<seconds>s: print progress after the specified number of
+     processed compile commands or the given time interval.
   -s <selector>: Select compile command(s) to process.
      Currently, the only supported specification for <selector> is a single file name,
      which is compared with the suffix of the absolute file name in a compile command.
@@ -112,6 +114,7 @@ local opts_meta = {
     g = true,
     l = true,
     O = false,
+    r = true,
     s = true,
     N = false,
     P = false,
@@ -125,6 +128,7 @@ local commandMode = opts.m
 local printGraphMode = opts.g
 local edgeCountLimit = tonumber(opts.l)
 local printOnlyFirstErrorCc = opts.O
+local progressSpec = opts.r
 local selectionSpec = opts.s
 local printAllDiags = opts.N
 local plainMode = opts.P
@@ -183,6 +187,32 @@ end
 if (edgeCountLimit ~= nil) then
     if (printGraphMode ~= GlobalInclusionGraphRelation) then
         abort("Option -l can only be used with -g being %s", GlobalInclusionGraphRelation)
+    end
+end
+
+local printProgressAfterSeconds = nil
+local printProgressAfterCcCount = nil
+
+if (progressSpec ~= nil) then
+    local isCountSpecified = (progressSpec:sub(1,1) == "c")
+    local isSecondsSpecified = (progressSpec:sub(-1) == "s")
+
+    if (not isCountSpecified and not isSecondsSpecified) then
+        abort("Argument passed to option -r must have the form 'c<count>' or '<seconds>s'")
+    end
+
+    local num =
+        isCountSpecified and tonumber(progressSpec:sub(2)) or
+        isSecondsSpecified and tonumber(progressSpec:sub(1,-2))
+
+    if (type(num) ~= "number" or not (num >= 0)) then
+        abort("Number passed to option -r must be zero or greater")
+    end
+
+    if (isCountSpecified) then
+        printProgressAfterCcCount = num
+    else
+        printProgressAfterSeconds = num
     end
 end
 
@@ -593,6 +623,8 @@ local FormattedDiagSetPrinter = class
             seenDiags = {},
             numCommandsWithOmittedDiags = 0,
             totalOmittedDiagCount = 0,
+            lastProgressPrintTime = os.time(),
+            lastProgressPrintCcIndex = 0,
         }
     end,
 
@@ -644,19 +676,31 @@ local FormattedDiagSetPrinter = class
         end
 
         local toPrint, haveError = self:getStringsToPrint_(formattedDiagSet)
+        local pSecs, pCount = printProgressAfterSeconds, printProgressAfterCcCount
 
-        if (#toPrint > 0) then
+        local shouldPrint = (#toPrint > 0) or
+            pSecs ~= nil and os.time() - self.lastProgressPrintTime >= pSecs or
+            pCount ~= nil and ccIndex - self.lastProgressPrintCcIndex >= pCount
+
+        if (shouldPrint) then
             local cmd = compileCommands[ccIndex]
 
             local prefix = format("Command #%d:", ccIndex)
             local middle = getFileOrdinalText(cmd, ccIndex)
+            local suffix = (#toPrint > 0) and "" or " ["..colorize("progress", Col.Green).."]"
 
-            errprintf("%s %s%s",
+            errprintf("%s %s%s%s",
                       colorize(prefix, Col.Bold..Col.Uline..Col.Green),
                       middle,
-                      colorize(cmd.file, Col.Bold..Col.Green))
+                      colorize(cmd.file, Col.Bold..Col.Green),
+                      suffix)
 
-            errprintf("%s\n", table.concat(toPrint, '\n'))
+            if (#toPrint > 0) then
+                errprintf("%s\n", table.concat(toPrint, '\n'))
+            end
+
+            self.lastProgressPrintTime = os.time()
+            self.lastProgressPrintCcIndex = ccIndex
 
             if (printOnlyFirstErrorCc and haveError) then
                 errprintf("%s: omitting all following diagnostics.", NOTE)
