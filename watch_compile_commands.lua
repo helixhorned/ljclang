@@ -659,7 +659,7 @@ local FormattedDiagSetPrinter = class
                 "%s: omitted %s from %s.",
                 colorize("NOTE", Col.Bold..Col.Blue),
                 pluralize(self.totalOmittedDiagCount, "repeated diagnostic"),
-                pluralize(self.numCommandsWithOmittedDiags, "command"))
+                pluralize(self.numCommandsWithOmittedDiags, "compile command"))
         end
     end,
 }
@@ -704,27 +704,23 @@ local PipePair = class
     end,
 }
 
-local Message = {
-    Ready = "R",   -- 1: child -> parent
-    Clear = "C",   -- 2: parent -> child
-    Done = "Done", -- 3: child -> parent
-}
-
 local DoneHeader_t = class
 {
     "char magic[4];"..
-    "uint32_t length;",
+    "uint32_t diagsStrLength;"..
+    "uint32_t graphStrLength;",
 
-    __new = function(ct, length)
+    __new = function(ct, length1, length2)
         -- NOTE: 'magic' deliberately not zero-terminated. See
         -- http://lua-users.org/lists/lua-l/2011-01/msg01457.html
-        return ffi.new(ct, Message.Done, length)
+        return ffi.new(ct, "Done", length1, length2)
     end,
 
     deserialize = function(self)
         return {
             magic = ffi.string(self.magic, 4),
-            length = tonumber(self.length),
+            diagsStrLength = tonumber(self.diagsStrLength),
+            graphStrLength = tonumber(self.graphStrLength),
         }
     end,
 }
@@ -774,25 +770,13 @@ local Controller = class
         return str
     end,
 
-    onBeforePrint = function(self)
-        assert(not self:is("parent"))
-
-        if (self:is("child")) then
-            self:send(Message.Ready)
-            local msg = self:receive()
-            assert(msg == Message.Clear)
-        end
-    end,
-
-    onAfterPrint = function(self, incGraph)
-        assert(not self:is("parent"))
-
-        if (self:is("child")) then
-            local graphStr = incGraph:serialize()
-            local header = DoneHeader_t(#graphStr)
-            self:send(header)
-            self:send(graphStr)
-        end
+    sendToParent = function(self, fDiagSet, incGraph)
+        local fDiagsStr = fDiagSet:serialize()
+        local graphStr = incGraph:serialize()
+        local header = DoneHeader_t(#fDiagsStr, #graphStr)
+        self:send(header)
+        self:send(fDiagsStr)
+        self:send(graphStr)
     end,
 
     --== Unforked or parent ==--
@@ -935,6 +919,9 @@ local Controller = class
             end
         end
 
+        assert(self.printer == nil)
+        self.printer = FormattedDiagSetPrinter()
+
         local ii = localConcurrency + 1
 
         repeat
@@ -956,23 +943,25 @@ local Controller = class
             -- Now, for each ready child in turn, first inform it that it can go ahead
             -- printing and then wait for it to complete that.
             for _, connIdx in ipairs(connIdxs) do
-                local readyMsg = self:receiveString(connIdx, 1)
-                assert(readyMsg == Message.Ready)
+                local doneMsg = self:receiveData(connIdx, DoneHeader_t(0, 0)):deserialize()
+                assert(doneMsg.magic == "Done")
 
-                self:sendTo(connIdx, Message.Clear)
-
-                local doneMsg = self:receiveData(connIdx, DoneHeader_t(0)):deserialize()
-                assert(doneMsg.magic == Message.Done)
-
-                local serializedGraph = self:receiveString(connIdx, doneMsg.length)
+                local serializedDiags = self:receiveString(connIdx, doneMsg.diagsStrLength)
+                local serializedGraph = self:receiveString(connIdx, doneMsg.graphStrLength)
 
                 -- NOTE: may introduce holes in the (integer) key sequence of
                 -- self.connections[].
                 local ccIdx = self:closeConnection(connIdx)
 
+                local fDiagSet = diagnostics_util.FormattedDiagSet_Deserialize(
+                    serializedDiags, not plainMode)
+                self.printer:print(fDiagSet, ccIdx)
+
                 ccInclusionGraphs[ccIdx] = inclusion_graph.Deserialize(serializedGraph)
             end
         until (not self:haveActiveChildren())
+
+        self.printer:printTrailingInfo()
 
         assert(spawnCount == #ccIdxs)
     end,
@@ -989,31 +978,25 @@ local Controller = class
         end
 
         local iterationCount = 0
-        local inclusionGraph
 
         for i, ccIndex, fDiagSet, incGraph in self.parser:iterate() do
             iterationCount = iterationCount + 1
             assert((i == 1) == (iterationCount == 1))
 
-            if (i == 1) then
-                self:onBeforePrint()
+            if (self:is("child")) then
+                self:sendToParent(fDiagSet, incGraph)
+            else
+                self.printer:print(fDiagSet, ccIndex)
+                ccInclusionGraphs[ccIndex] = incGraph
             end
-
-            self.printer:print(fDiagSet, ccIndex)
-
-            inclusionGraph = incGraph
-            ccInclusionGraphs[ccIndex] = incGraph
         end
-
-        assert(iterationCount >= 1)
-        assert(not self:is("child") or iterationCount == 1)
-
-        self.printer:printTrailingInfo()
-        self:onAfterPrint(inclusionGraph)
 
         if (self:is("child")) then
+            assert(iterationCount == 1)
             os.exit(0)
         end
+
+        self.printer:printTrailingInfo()
 
         return compileCommandCount
     end,

@@ -9,8 +9,11 @@ local ipairs = ipairs
 local type = type
 local unpack = unpack
 
-local checktype = require("error_util").checktype
 local class = require("class").class
+local error_util = require("error_util")
+
+local check = error_util.check
+local checktype = error_util.checktype
 
 local Col = require("terminal_colors")
 local encode_color = Col.encode
@@ -70,12 +73,87 @@ local FormattedDiag = class
     end,
 }
 
-local FormattedDiagSet = class
+-- Special separation characters that are disjoint with our encoding of color codes.
+-- (See terminal_colors.lua)
+local Sep = {
+    Diag = {
+        Value = '\0',
+        Pattern = '%z',
+    },
+    -- Octet values that cannot be part of a well-formed UTF-8-encoded string.
+    -- (See ISO/IEC 10646:2017 section 9.2)
+    Line = '\xFE',
+    EmptyInfo = '\xFD',
+}
+
+local SpecialCharsPattern = "[%z\xFE\xFD]"
+
+local function patternFor(sep)
+    return "([^"..sep.."]+)"..sep
+end
+
+local function FormattedDiagSet_Serialize(self)
+    local tab = {}
+
+    for _, diag in ipairs(self.diags) do
+        local innerTab = {}
+
+        for _, line in ipairs(diag) do
+            assert(not line:find(SpecialCharsPattern))
+            innerTab[#innerTab + 1] = line
+        end
+
+        tab[#tab + 1] = table.concat(innerTab, Sep.Line)..Sep.Line
+    end
+
+    if (self.info ~= nil) then
+        assert(#self.info == 1)
+        assert(not self.info[1]:find(SpecialCharsPattern))
+        tab[#tab + 1] = self.info[1]..Sep.Line
+    else
+        tab[#tab + 1] = Sep.EmptyInfo..Sep.Line
+    end
+
+    return table.concat(tab, Sep.Diag.Value)..Sep.Diag.Value
+end
+
+local FormattedDiagSet  -- "forward-declare"
+local InvalidStringMsg = "passed string that is not a formatted diagnostic serialization"
+
+function api.FormattedDiagSet_Deserialize(diagsStr, useColors)
+    checktype(diagsStr, 1, "string", 2)
+    checktype(useColors, 2, "boolean", 2)
+
+    local fDiagSet = FormattedDiagSet(useColors)
+
+    for diagStr in diagsStr:gmatch(patternFor(Sep.Diag.Pattern)) do
+        local fDiag = FormattedDiag(useColors)
+        for line in diagStr:gmatch(patternFor(Sep.Line)) do
+            fDiag[#fDiag + 1] = line
+        end
+        fDiagSet.diags[#fDiagSet.diags + 1] = fDiag
+    end
+
+    local lastDiag = fDiagSet.diags[#fDiagSet.diags]
+    fDiagSet.info = (lastDiag[1] ~= Sep.EmptyInfo) and lastDiag or nil
+    fDiagSet.diags[#fDiagSet.diags] = nil
+
+    if (fDiagSet.info ~= nil) then
+        local good = (#fDiagSet.info == 1 and not fDiagSet.info[1]:find(Sep.EmptyInfo))
+        check(good, InvalidStringMsg..", or INTERNAL ERROR", 2)
+    else
+        -- TODO: also have a check?
+    end
+
+    return fDiagSet
+end
+
+FormattedDiagSet = class
 {
     function(useColors)
         return {
             diags = {},  -- list of FormattedDiag objects
-            info = nil,
+            info = nil,  -- nil or a FormattedDiag with one line
 
             usingColors = useColors,
         }
@@ -120,6 +198,8 @@ local FormattedDiagSet = class
         return table.concat(fDiags, '\n\n') ..
             (self.info ~= nil and '\n'..self.info:getString(keepColorsIfPresent) or "")
     end,
+
+    serialize = FormattedDiagSet_Serialize,
 }
 
 local function FormatDiagnostic(diag, useColors, indentation,
