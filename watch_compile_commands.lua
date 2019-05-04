@@ -100,6 +100,7 @@ Human mode options:
   -s <selector>: Select compile command(s) to process.
      The following specifications for <selector> are supported:
       - '@...' or '-@...': by index (see below).
+      - '{<pattern>}': by Lua pattern matching the absolute file name in a compile command.
       - A single file name which is compared with the suffix of the absolute file name in a
         compile command.
   -N: Print all diagnostics. This disables omission of:
@@ -276,7 +277,7 @@ if (selectionSpec ~= nil) then
         local isRange = (selectionSpec == startStr..'-'..endStr)
 
         if (not isSingleIndex and not isRange) then
-            abort("Invalid selection specification to argument '-s'.")
+            abort("Invalid index selection specification to argument '-s'.")
         elseif (not (startIndex >= 1 and startIndex <= #compileCommands) or
                 not (endIndex >= 1 and endIndex <= #compileCommands)) then
             abort("Compile command index for option '-s' out of range [1, %d]", #compileCommands)
@@ -288,6 +289,25 @@ if (selectionSpec ~= nil) then
 
         if (#newCompileCommands == 0) then
             infoAndExit("Selected empty range.")
+        end
+    elseif (selectionSpec:sub(1,1) == '{') then
+        if (selectionSpec:sub(-1) ~= '}') then
+            abort("Invalid pattern selection specification to argument '-s'.")
+        end
+
+        local pattern = selectionSpec:sub(2,-2)
+
+        do
+            local ok, msg = pcall(function() return pattern:match(pattern) end)
+            if (not ok) then
+                abort("Invalid pattern to argument '-s': %s.", msg)
+            end
+        end
+
+        for i, cmd in ipairs(compileCommands) do
+            if (cmd.file:match(pattern)) then
+                selectCompileCommand(i)
+            end
         end
     else
         local suffix = selectionSpec
