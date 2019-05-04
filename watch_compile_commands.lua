@@ -96,6 +96,7 @@ Human mode options:
   -O: omit output for compile commands after the first one with errors.
   -r c<commands>|<seconds>s: print progress after the specified number of
      processed compile commands or the given time interval.
+     Specifying any of 'c0', 'c1' or '0s' effectively prints progress with each compile command.
   -s <selector>: Select compile command(s) to process.
      The following specifications for <selector> are supported:
       - '@...' or '-@...': by index (see below).
@@ -727,8 +728,9 @@ local FormattedDiagSetPrinter = class
         local pSecs, pCount = printProgressAfterSeconds, printProgressAfterCcCount
 
         local shouldPrint = (#toPrint > 0) or
-            pSecs ~= nil and os.time() - self.lastProgressPrintTime >= pSecs or
-            pCount ~= nil and ccIndex - self.lastProgressPrintCcIndex >= pCount
+            pSecs ~= nil and os.difftime(os.time(), self.lastProgressPrintTime) >= pSecs or
+            -- NOTE: pCount <= 1 because with concurrency, diagnostics may arrive out of order.
+            pCount ~= nil and (pCount <= 1 or ccIndex - self.lastProgressPrintCcIndex >= pCount)
 
         if (shouldPrint) then
             local cmd = compileCommands[ccIndex]
