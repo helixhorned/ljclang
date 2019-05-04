@@ -187,8 +187,6 @@ end
 local compileCommands, errorMessage =
     compile_commands_reader.read_compile_commands(compileCommandsFile)
 
-local usedConcurrency = math.min(getUsedConcurrency(), #compileCommands)
-
 if (compileCommands == nil) then
     errprintf("ERROR: failed loading '%s': %s", compileCommandsFile, errorMessage)
     os.exit(ErrorCode.CompilationDatabaseLoad)
@@ -198,6 +196,8 @@ if (#compileCommands == 0) then
     info("'%s' contains zero entries.", compileCommandsFile)
     os.exit(0)
 end
+
+local usedConcurrency = math.min(getUsedConcurrency(), #compileCommands)
 
 local function getCompileCommandFileCounts()
     local counts = {}
