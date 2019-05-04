@@ -881,6 +881,8 @@ local Controller = class
 
         conn.r:close()
         conn.w:close()
+        assert(conn._extra ~= nil)
+        conn._extra:close()
 
         assert(self.readFdToConnIdx[readFd] == connIdx)
         self.readFdToConnIdx[readFd] = nil
