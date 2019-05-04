@@ -93,6 +93,9 @@ Human mode options:
      Argument specifies the relation between graph nodes (which are file names).
   -l <number>: edge count limit for the graph produced by -g %s.
      If exceeded, a placeholder node is placed.
+  -s <selector>: Select compile command(s) to process.
+     Currently, the only supported specification for <selector> is a single file name,
+     which is compared with the suffix of the absolute file name in a compile command.
   -N: Disable omission of repeated diagnostics.
   -P: Disable color output.
   -x: exit after parsing and displaying diagnostics once.
@@ -107,6 +110,7 @@ local opts_meta = {
     m = false,
     g = true,
     l = true,
+    s = true,
     N = false,
     P = false,
     x = false,
@@ -118,6 +122,7 @@ local concurrencyOpt = opts.c or "auto"
 local commandMode = opts.m
 local printGraphMode = opts.g
 local edgeCountLimit = tonumber(opts.l)
+local selectionSpec = opts.s
 local printAllDiags = opts.N
 local plainMode = opts.P
 local exitImmediately = opts.x or printGraphMode
@@ -195,6 +200,26 @@ end
 if (#compileCommands == 0) then
     info("'%s' contains zero entries.", compileCommandsFile)
     os.exit(0)
+end
+
+local originalCompileCommandCount = #compileCommands
+
+if (selectionSpec ~= nil) then
+    local newCompileCommands = {}
+
+    for i, cmd in ipairs(compileCommands) do
+        if (#cmd.file >= #selectionSpec and
+            cmd.file:sub(-#selectionSpec) == selectionSpec) then
+            newCompileCommands[#newCompileCommands + 1] = cmd
+        end
+    end
+
+    if (#newCompileCommands == 0) then
+        info("Found no compile commands with file '%s'.", selectionSpec)
+        os.exit(0)
+    end
+
+    compileCommands = newCompileCommands
 end
 
 local usedConcurrency = math.min(getUsedConcurrency(), #compileCommands)
@@ -996,9 +1021,11 @@ local Controller = class
 
 local function PrintInitialInfo()
     local prefix = pluralize(#compileCommands, "compile command")
+    local middle = (selectionSpec ~= nil) and
+        format(" (of %d)", originalCompileCommandCount) or ""
     local suffix = (usedConcurrency > 0) and
         format(" with %s", pluralize(usedConcurrency, "worker process", "es")) or ""
-    info("Processing %s%s.", prefix, suffix)
+    info("Processing %s%s%s.", prefix, middle, suffix)
 end
 
 local function SetSigintHandler()
