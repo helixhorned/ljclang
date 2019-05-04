@@ -749,8 +749,7 @@ local FormattedDiagSetPrinter = class
 
         local shouldPrint = (#toPrint > 0) or
             pSecs ~= nil and os.difftime(os.time(), self.lastProgressPrintTime) >= pSecs or
-            -- NOTE: pCount <= 1 because with concurrency, diagnostics may arrive out of order.
-            pCount ~= nil and (pCount <= 1 or ccIndex - self.lastProgressPrintCcIndex >= pCount)
+            pCount ~= nil and ccIndex - self.lastProgressPrintCcIndex >= pCount
 
         if (shouldPrint) then
             local cmd = compileCommands[ccIndex]
@@ -1059,6 +1058,9 @@ local Controller = class
         local ii = localConcurrency + 1
         local haveErrorTab = { false }
 
+        local firstCcIdx = 1
+        local formattedDiagSets = {}
+
         repeat
             local connIdxs = self:wait()
             local newChildCount = #connIdxs
@@ -1088,11 +1090,24 @@ local Controller = class
                 -- self.connections[].
                 local ccIdx = self:closeConnection(connIdx)
 
-                local fDiagSet = diagnostics_util.FormattedDiagSet_Deserialize(
+                formattedDiagSets[ccIdx] = diagnostics_util.FormattedDiagSet_Deserialize(
                     serializedDiags, not plainMode)
-                self.printer:print(fDiagSet, ccIdx, haveErrorTab)
-
                 ccInclusionGraphs[ccIdx] = inclusion_graph.Deserialize(serializedGraph)
+            end
+
+            -- Print diagnostic sets in compile command order.
+            -- TODO: for command mode (where we might want to get results as soon as they
+            --  arrive), make this an option?
+            for ccIdx = firstCcIdx, #compileCommands do
+                local fDiagSet = formattedDiagSets[ccIdx]
+                formattedDiagSets[ccIdx] = nil
+
+                if (fDiagSet == nil) then
+                    break
+                else
+                    self.printer:print(fDiagSet, ccIdx, haveErrorTab)
+                    firstCcIdx = firstCcIdx + 1
+                end
             end
         until (not self:haveActiveChildren())
 
