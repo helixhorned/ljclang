@@ -387,7 +387,7 @@ for fi=1,#files do
     if (not quiet) then
         -- TODO
         assert(false)
-        diagnostics_util.GetDiags(tu:diagnosticSet(), useColors)
+        diagnostics_util.GetDiags(tu:diagnosticSet(), useColors, false)
     end
 
     if (not dryrun) then

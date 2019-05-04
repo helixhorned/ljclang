@@ -243,7 +243,7 @@ local function PrintPrefixDiagnostics(diags, indentation,
     return #diags + 1
 end
 
-local function PrintDiagsImpl(diags, useColors,
+local function PrintDiagsImpl(diags, useColors, allDiags,
                               startIndex, indentation, currentFDiag)
     if (startIndex == nil) then
         startIndex = 1
@@ -264,12 +264,12 @@ local function PrintDiagsImpl(diags, useColors,
         FormatDiagnostic(diag, useColors, indentation, fDiag)
 
         -- Recurse. We expect only at most two levels in total (but do not check for that).
-        PrintDiagsImpl(diag:childDiagnostics(), useColors,
+        PrintDiagsImpl(diag:childDiagnostics(), useColors, allDiags,
                        innerStartIndex, indentation + 2, fDiag)
 
         local isFatal = (diag:severity() == "fatal")
         local isError = isFatal or diag:severity() == "error"
-        local omitFollowing = (isFatal or (isError and diag:category() == "Parse Issue"))
+        local omitFollowing = not allDiags and (isFatal or (isError and diag:category() == "Parse Issue"))
 
         if (omitFollowing) then
             assert(indentation == 0)
@@ -294,11 +294,12 @@ end
 
 api.FormattedDiagSet = FormattedDiagSet
 
-function api.GetDiags(diags, useColors)
+function api.GetDiags(diags, useColors, allDiags)
     checktype(diags, 1, "table", 2)
     checktype(useColors, 2, "boolean", 2)
+    checktype(allDiags, 3, "boolean", 2)
 
-    return PrintDiagsImpl(diags, useColors)
+    return PrintDiagsImpl(diags, useColors, allDiags)
 end
 
 -- Done!

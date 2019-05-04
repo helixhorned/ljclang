@@ -101,7 +101,9 @@ Human mode options:
       - '@...' or '-@...': by index (see below).
       - A single file name which is compared with the suffix of the absolute file name in a
         compile command.
-  -N: Disable omission of repeated diagnostics.
+  -N: Print all diagnostics. This disables omission of:
+      - diagnostics that follow a Parse Issue error, and
+      - diagnostics that were seen in previous compile commands.
   -P: Disable color output.
   -x: exit after parsing and displaying diagnostics once.
 
@@ -138,7 +140,7 @@ local edgeCountLimit = tonumber(opts.l)
 local printOnlyFirstErrorCc = opts.O
 local progressSpec = opts.r
 local selectionSpec = opts.s
-local printAllDiags = opts.N
+local printAllDiags = opts.N or false
 local plainMode = opts.P
 local exitImmediately = opts.x or printGraphMode
 
@@ -496,7 +498,8 @@ local function ProcessCompileCommand(ccIndex, parseOptions)
                                 errorCodeOrString)
             formattedDiagSet:setInfo(info)
         else
-            formattedDiagSet = diagnostics_util.GetDiags(tu:diagnosticSet(), not plainMode)
+            formattedDiagSet = diagnostics_util.GetDiags(
+                tu:diagnosticSet(), not plainMode, printAllDiags)
         end
 
         local retry = CheckForIncludeError(
