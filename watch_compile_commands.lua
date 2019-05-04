@@ -93,6 +93,7 @@ Human mode options:
      Argument specifies the relation between graph nodes (which are file names).
   -l <number>: edge count limit for the graph produced by -g %s.
      If exceeded, a placeholder node is placed.
+  -O: omit output for compile commands after the first one with errors.
   -s <selector>: Select compile command(s) to process.
      Currently, the only supported specification for <selector> is a single file name,
      which is compared with the suffix of the absolute file name in a compile command.
@@ -110,6 +111,7 @@ local opts_meta = {
     m = false,
     g = true,
     l = true,
+    O = false,
     s = true,
     N = false,
     P = false,
@@ -122,6 +124,7 @@ local concurrencyOpt = opts.c or "auto"
 local commandMode = opts.m
 local printGraphMode = opts.g
 local edgeCountLimit = tonumber(opts.l)
+local printOnlyFirstErrorCc = opts.O
 local selectionSpec = opts.s
 local printAllDiags = opts.N
 local plainMode = opts.P
@@ -135,6 +138,8 @@ local function colorize(...)
         return Col.colorize(encoded_string)
     end
 end
+
+local NOTE = colorize("NOTE", Col.Bold..Col.Blue)
 
 local function info(fmt, ...)
     local func = printGraphMode and errprintf or printf
@@ -597,10 +602,11 @@ local FormattedDiagSetPrinter = class
         }
 
         if (formattedDiagSet:isEmpty()) then
-            return toPrint
+            return toPrint, false
         end
 
         local newSeenDiags = {}
+        local haveError = false
         local omittedLastDiag = false
 
         local fDiags = formattedDiagSet:getDiags()
@@ -612,6 +618,8 @@ local FormattedDiagSetPrinter = class
             if (printAllDiags or not self.seenDiags[normStr]) then
                 newSeenDiags[#newSeenDiags + 1] = normStr
                 toPrint[#toPrint+1] = format("%s%s", (i == 1) and "" or "\n", str)
+                -- TODO: this is somewhat brittle, make more robust?
+                haveError = haveError or str:find("error: ")
             else
                 toPrint.omittedDiagCount = toPrint.omittedDiagCount + 1
                 omittedLastDiag = (i == #fDiags)
@@ -627,11 +635,15 @@ local FormattedDiagSetPrinter = class
             toPrint[#toPrint+1] = format("%s", info:getString(true))
         end
 
-        return toPrint
+        return toPrint, haveError
     end,
 
-    print = function(self, formattedDiagSet, ccIndex)
-        local toPrint = self:getStringsToPrint_(formattedDiagSet)
+    print = function(self, formattedDiagSet, ccIndex, haveErrorTab)
+        if (haveErrorTab[1]) then
+            return
+        end
+
+        local toPrint, haveError = self:getStringsToPrint_(formattedDiagSet)
 
         if (#toPrint > 0) then
             local cmd = compileCommands[ccIndex]
@@ -645,7 +657,13 @@ local FormattedDiagSetPrinter = class
                       colorize(cmd.file, Col.Bold..Col.Green))
 
             errprintf("%s\n", table.concat(toPrint, '\n'))
+
+            if (printOnlyFirstErrorCc and haveError) then
+                errprintf("%s: omitting all following diagnostics.", NOTE)
+            end
         end
+
+        haveErrorTab[1] = printOnlyFirstErrorCc and haveError
 
         if (toPrint.omittedDiagCount > 0) then
             self.numCommandsWithOmittedDiags = self.numCommandsWithOmittedDiags + 1
@@ -656,8 +674,7 @@ local FormattedDiagSetPrinter = class
     printTrailingInfo = function(self)
         if (self.numCommandsWithOmittedDiags > 0) then
             errprintf(
-                "%s: omitted %s from %s.",
-                colorize("NOTE", Col.Bold..Col.Blue),
+                "%s: omitted %s from %s.", NOTE,
                 pluralize(self.totalOmittedDiagCount, "repeated diagnostic"),
                 pluralize(self.numCommandsWithOmittedDiags, "compile command"))
         end
@@ -923,6 +940,7 @@ local Controller = class
         self.printer = FormattedDiagSetPrinter()
 
         local ii = localConcurrency + 1
+        local haveErrorTab = { false }
 
         repeat
             local connIdxs = self:wait()
@@ -955,7 +973,7 @@ local Controller = class
 
                 local fDiagSet = diagnostics_util.FormattedDiagSet_Deserialize(
                     serializedDiags, not plainMode)
-                self.printer:print(fDiagSet, ccIdx)
+                self.printer:print(fDiagSet, ccIdx, haveErrorTab)
 
                 ccInclusionGraphs[ccIdx] = inclusion_graph.Deserialize(serializedGraph)
             end
@@ -978,6 +996,7 @@ local Controller = class
         end
 
         local iterationCount = 0
+        local haveErrorTab = { false }
 
         for i, ccIndex, fDiagSet, incGraph in self.parser:iterate() do
             iterationCount = iterationCount + 1
@@ -986,7 +1005,7 @@ local Controller = class
             if (self:is("child")) then
                 self:sendToParent(fDiagSet, incGraph)
             else
-                self.printer:print(fDiagSet, ccIndex)
+                self.printer:print(fDiagSet, ccIndex, haveErrorTab)
                 ccInclusionGraphs[ccIndex] = incGraph
             end
         end
