@@ -57,8 +57,8 @@ local function errprintf(fmt, ...)
     return true
 end
 
-local function abort(str)
-    errprint("ERROR: "..str.."\n")
+local function abort(fmt, ...)
+    errprintf("ERROR: "..fmt, ...)
     os.exit(1)
 end
 
