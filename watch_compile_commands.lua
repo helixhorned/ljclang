@@ -690,10 +690,53 @@ local function getNormalizedDiag(diagStr)
     return diagStr:gsub("In file included from [^\n]*\n", "")
 end
 
-local function pluralize(count, noun, pluralSuffix)
+local function pluralize(count, noun, pluralSuffix, color)
     pluralSuffix = pluralSuffix or 's'
-    return format("%d %s%s", count, noun, count > 1 and pluralSuffix or "")
+    noun = count > 1 and noun..pluralSuffix or noun
+    noun = (color ~= nil) and colorize(noun, color) or noun
+    return format("%d %s", count, noun)
 end
+
+local function getSeverityString(count, severity, color)
+    return count > 0 and pluralize(count, severity, 's', Col.Bold..color) or nil
+end
+
+local SeverityCounts = class
+{
+    function()
+        return {
+            fatals = 0,
+            errors = 0,
+            warnings = 0,
+            others = 0,
+        }
+    end,
+
+    increment = function(self, severity)
+        assert(self[severity] ~= nil)
+        self[severity] = self[severity] + 1
+    end,
+
+    add = function(self, other)
+        self.fatals = self.fatals + other.fatals
+        self.errors = self.errors + other.errors
+        self.warnings = self.warnings + other.warnings
+        self.others = self.others + other.others
+    end,
+
+    getTotal = function(self)
+        return self.fatals + self.errors + self.warnings + self.others
+    end,
+
+    getString = function(self)
+        local tab = {}
+        tab[#tab + 1] = getSeverityString(self.fatals, "fatal error", Col.Red)
+        tab[#tab + 1] = getSeverityString(self.errors, "error", Col.Red)
+        tab[#tab + 1] = getSeverityString(self.warnings, "warning", Col.Purple)
+        tab[#tab + 1] = getSeverityString(self.others, "other", Col.Black)
+        return table.concat(tab, ", ")
+    end,
+}
 
 local FormattedDiagSetPrinter = class
 {
@@ -701,7 +744,7 @@ local FormattedDiagSetPrinter = class
         return {
             seenDiags = {},
             numCommandsWithOmittedDiags = 0,
-            totalOmittedDiagCount = 0,
+            totalOmittedDiagCounts = SeverityCounts(),
             lastProgressPrintTime = os.time(),
             lastProgressPrintCcIndex = 0,
         }
@@ -709,7 +752,7 @@ local FormattedDiagSetPrinter = class
 
     getStringsToPrint_ = function(self, formattedDiagSet)
         local toPrint = {
-            omittedDiagCount = 0,
+            omittedDiagCounts = SeverityCounts()
         }
 
         if (formattedDiagSet:isEmpty()) then
@@ -732,7 +775,15 @@ local FormattedDiagSetPrinter = class
                 -- TODO: this is somewhat brittle, make more robust?
                 haveError = haveError or str:find("error: ")
             else
-                toPrint.omittedDiagCount = toPrint.omittedDiagCount + 1
+                -- TODO: also somewhat brittle, would be nice if we still had the
+                -- unformatted diagnostic.
+                local severity =
+                    str:find("fatal error: ") and "fatals" or
+                    str:find("error: ") and "errors" or
+                    str:find("warning: ") and "warnings" or
+                    "others"
+
+                toPrint.omittedDiagCounts:increment(severity)
                 omittedLastDiag = (i == #fDiags)
             end
         end
@@ -789,18 +840,19 @@ local FormattedDiagSetPrinter = class
 
         haveErrorTab[1] = printOnlyFirstErrorCc and haveError
 
-        if (toPrint.omittedDiagCount > 0) then
+        if (toPrint.omittedDiagCounts:getTotal() > 0) then
             self.numCommandsWithOmittedDiags = self.numCommandsWithOmittedDiags + 1
-            self.totalOmittedDiagCount = self.totalOmittedDiagCount + toPrint.omittedDiagCount
+            self.totalOmittedDiagCounts:add(toPrint.omittedDiagCounts)
         end
     end,
 
     printTrailingInfo = function(self)
         if (self.numCommandsWithOmittedDiags > 0) then
             errprintf(
-                "%s: omitted %s from %s.", NOTE,
-                pluralize(self.totalOmittedDiagCount, "repeated diagnostic"),
-                pluralize(self.numCommandsWithOmittedDiags, "compile command"))
+                "%s: from %s, omitted %s: %s.", NOTE,
+                pluralize(self.numCommandsWithOmittedDiags, "compile command"),
+                pluralize(self.totalOmittedDiagCounts:getTotal(), "repeated diagnostic"),
+                self.totalOmittedDiagCounts:getString())
         end
     end,
 }
