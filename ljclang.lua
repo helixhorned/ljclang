@@ -529,8 +529,8 @@ DiagnosticSet = class
 File = class
 {
     function(cxfile, parent)
-        assert(ffi.istype(CXFile, cxfile))
-        assert(cxfile ~= nil)
+        check(ffi.istype(CXFile, cxfile), "<cxfile> must be a CXFile object", 2)
+        assert(cxfile ~= nil) -- TODO: handle?
 
         -- XXX: ffi.istype(...) is not what we want: there is no anchoring then, after all!
         -- TODO: make them all into tables!

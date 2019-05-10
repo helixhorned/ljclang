@@ -367,7 +367,7 @@ local function getSite(location)
     assert(fileSite == spellingSite)
     assert(fileLco == spellingLco)
 
-    return fileSite, fileLco
+    return fileSite
 end
 
 local function checkAndGetRealName(file)
@@ -384,6 +384,16 @@ end
 local function InclusionGraph_ProcessTU(graph, tu)
     local callback = function(includedFile, stack)
         if (#stack == 0) then
+            return
+        end
+
+        -- Can happen if "-include" was passed to Clang:
+        local isFromPredefinesBuffer = (#stack == 1 and not stack[1]:isFromMainFile())
+
+        if (isFromPredefinesBuffer) then
+            -- TODO: handle?
+            -- The way it is now, if the (precompiled) header from "-include ..." is a user
+            -- header, we lose files in the include graph.
             return
         end
 
