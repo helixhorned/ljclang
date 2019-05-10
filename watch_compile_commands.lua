@@ -1058,7 +1058,7 @@ local Controller = class
         local ii = localConcurrency + 1
         local haveErrorTab = { false }
 
-        local firstCcIdx = 1
+        local firstIdx = 1
         local formattedDiagSets = {}
 
         repeat
@@ -1098,7 +1098,8 @@ local Controller = class
             -- Print diagnostic sets in compile command order.
             -- TODO: for command mode (where we might want to get results as soon as they
             --  arrive), make this an option?
-            for ccIdx = firstCcIdx, #compileCommands do
+            for idx = firstIdx, #ccIdxs do
+                local ccIdx = ccIdxs[idx]
                 local fDiagSet = formattedDiagSets[ccIdx]
                 formattedDiagSets[ccIdx] = nil
 
@@ -1106,7 +1107,7 @@ local Controller = class
                     break
                 else
                     self.printer:print(fDiagSet, ccIdx, haveErrorTab)
-                    firstCcIdx = firstCcIdx + 1
+                    firstIdx = firstIdx + 1
                 end
             end
         until (not self:haveActiveChildren())
