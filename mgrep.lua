@@ -327,6 +327,7 @@ if (useCompDb) then
     end
 
     local compDbDir = compDbName:sub(1, compDbPos)
+    -- TODO: port to compile_commands_reader
     local db = cl.CompilationDatabase(compDbDir)
 
     if (db == nil) then
