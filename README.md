@@ -27,14 +27,12 @@ Requirements
 Building
 --------
 
-The following command builds the required support library `libljclang_support.so`,
+Invoking `make` builds the required support library `libljclang_support.so`,
 converts libclang C headers into a form that can be used by LuaJIT (using a Lua
 program that essentially strips text that would not be understood by LuaJIT's
-`ffi.cdef`) and finally extracts additional information using LJClang itself:
+`ffi.cdef`) and finally extracts additional information using LJClang itself.
 
-~~~~~~~~~~
-LLVM_CONFIG=</path/to/llvm-config> make
-~~~~~~~~~~
+The file `config.make` contains some user-facing configuration.
 
 
 Overview
