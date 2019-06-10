@@ -94,7 +94,7 @@ Human mode options:
   -l <number>: edge count limit for the graph produced by -g %s.
      If exceeded, a placeholder node is placed.
   -O: omit output for compile commands after the first one with errors.
-  -r c<commands>|<seconds>s: print progress after the specified number of
+  -r c<commands>|<seconds>s: report progress after the specified number of
      processed compile commands or the given time interval.
      Specifying any of 'c0', 'c1' or '0s' effectively prints progress with each compile command.
   -s <selector>: Select compile command(s) to process.
