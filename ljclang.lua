@@ -94,7 +94,7 @@ local function TranslationUnit_t(cxtu)
     return TranslationUnit_t_(cxtu)
 end
 
--- Our wrapping type Cursor_t is seen as raw CXCursor on the C side.
+-- Our wrapping type Cursor_t is seen as raw CXCursor on the C++ side.
 assert(ffi.sizeof("CXCursor") == ffi.sizeof(Cursor_t))
 
 ffi.cdef([[
