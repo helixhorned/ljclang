@@ -863,13 +863,15 @@ local FormattedDiagSetPrinter = class
 }
 
 -- For clearer exposition only.
+-- TODO: rename to 'Connection'?
 local FdPair = class
 {
-    function(readFd, writeFd, extraFd)
+    function(readFd, writeFd, childPid, extraFd)
         return {
             r = readFd,
             w = writeFd,
 
+            childPid = childPid,
             _extra = extraFd,
         }
     end,
@@ -884,8 +886,9 @@ local PipePair = class
         }
     end,
 
-    getUsedEnds = function(self, whoami)
+    getUsedEnds = function(self, whoami, childPid)
         assert(whoami == "child" or whoami == "parent")
+        assert((whoami == "parent") == (childPid ~= nil))
 
         if (whoami == "child") then
             self.toParent.r:close()
@@ -897,7 +900,7 @@ local PipePair = class
             --[[self.toParent.w:close()--]]
             self.toChild.r:close()
             return FdPair(self.toParent.r, self.toChild.w,
-                          self.toParent.w)
+                          childPid, self.toParent.w)
         end
     end,
 }
@@ -1024,6 +1027,8 @@ local Controller = class
         assert(self.readFdToConnIdx[readFd] == connIdx)
         self.readFdToConnIdx[readFd] = nil
 
+        posix.waitpid(conn.childPid, 0)
+
         self.connections[connIdx] = nil
 
         -- Remove entry from self.pendingFds[].
@@ -1050,9 +1055,10 @@ local Controller = class
 
         local pipes = PipePair()
 
-        self.whoami = posix.fork()
+        local whoami, childPid = posix.fork()
+        self.whoami = whoami
 
-        local connection = pipes:getUsedEnds(self.whoami)
+        local connection = pipes:getUsedEnds(whoami, childPid)
 
         if (self:is("child")) then
             self.connection = connection

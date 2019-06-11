@@ -29,6 +29,7 @@ char *strerror(int);
 
 pid_t fork(void);
 pid_t getpid(void);
+pid_t waitpid(pid_t pid, int *stat_loc, int options);
 int pipe(int pipefd[2]);
 ]]
 
@@ -185,10 +186,27 @@ api.fork = function()
     assert(ret >= 0)
 
     if (ret == 0) then
-        return "child", C.getpid()
+        return "child", nil
     else
         return "parent", ret
     end
+end
+
+api.waitpid = function(pid, options)
+    check(ffi.istype("pid_t", pid), 1, "argument #1 must be a pid_t", 2)
+    checktype(options, 2, "number", 2)
+    check(options == 0, "argument #2 must be 0 (not yet implemented)", 2)
+
+    local stat_loc = ffi.new("int [1]")
+    local ret = call("waitpid", pid, stat_loc, options)
+
+    if (ret == 0) then
+        return "exited", 0
+    end
+
+    -- Any other condition than exiting with status 0: not implemented.
+    -- (We would have to have the W*() macros from sys/wait.h here somehow.)
+    return "NYI", -1
 end
 
 api.pipe = function()
