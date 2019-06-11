@@ -133,7 +133,7 @@ local Index = class
             self._idx, filename, cxtuAr)
 
         if (cxErrorCode == 'CXError_Success') then
-            return TranslationUnit_t(cxtuAr[0], self, true), cxErrorCode
+            return TranslationUnit_t(cxtuAr[0], self), cxErrorCode
         else
             return nil, cxErrorCode
         end
@@ -193,7 +193,7 @@ local Index = class
         end
 
         -- Wrap it in a TranslationUnit_t.
-        return TranslationUnit_t(tuAr[0], self, true), errorCode
+        return TranslationUnit_t(tuAr[0], self), errorCode
     end,
 
     __gc = function(self)
@@ -546,24 +546,20 @@ local WrappedSourceLocArray = class
 
 TranslationUnit_t = class
 {
-    function(cxtu, parent, needsDisposal)
+    function(cxtu, parent)
         assert(ffi.istype("CXTranslationUnit", cxtu))
         assert(cxtu ~= nil)
         assert(parent ~= nil) -- TODO: more precise?
-        assert(type(needsDisposal) == "boolean")
 
         return {
             _tu = cxtu,
             _parent = parent,
-            _needsDisposal = needsDisposal,
         }
     end,
 
     __gc = function(self)
-        if (self._needsDisposal) then
-            -- NOTE: nullptr is fine, see libclang's CIndex.cpp.
-            clang.clang_disposeTranslationUnit(self._tu)
-        end
+        -- NOTE: nullptr is fine, see libclang's CIndex.cpp.
+        clang.clang_disposeTranslationUnit(self._tu)
     end,
 
     save = function(self, filename)
@@ -894,13 +890,6 @@ class
     end,
 
     --== LJClang-specific ==--
-
-    translationUnit = function(self)
-        local cxtu = clang.clang_Cursor_getTranslationUnit(self._cur)
-        -- NOTE: only invalid cursors have a nullptr TU. See libclang's CXCursor.cpp's
-        -- MakeCXCursor() functions and MakeCXCursorInvalid() function.
-        return TranslationUnit_t(cxtu, self, false)
-    end,
 
     -- NOTE: *Sometimes* returns one token too much, see
     --   http://clang-developers.42468.n3.nabble.com/querying-information-about-preprocessing-directives-in-libclang-td2740612.html
