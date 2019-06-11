@@ -6,7 +6,6 @@
 
 local assert = assert
 local error = error
-local print = print
 local require = require
 local select = select
 local setmetatable = setmetatable
@@ -59,14 +58,6 @@ api.hardwareConcurrency = function()
 end
 
 -----=====
-
---[[
-local function debugf(fmt, ...)
-    print(string.format("ljclang: "..fmt, ...))
-end
---[=[]]
-local function debugf() end
---]=]
 
 -- Give our structs names for nicer error messages.
 ffi.cdef[[
