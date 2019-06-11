@@ -49,11 +49,12 @@ api.init = class
             fd = fd
         }
     end,
-
+--[[
+-- TODO: implement
     __gc = function(self)
         C.close(self.fd)
     end,
-
+]]
     add_watch = function(self, pathname, mask)
         check(type(pathname) == "string", "<pathname> must be a string", 2)
         check(type(mask) == "number", "<mask> must be a number", 2)

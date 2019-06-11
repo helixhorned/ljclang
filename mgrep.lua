@@ -182,10 +182,6 @@ local SourceFile = class
         return { fh=fh, line=0 }
     end,
 
-    __gc = function(f)
-        f.fh:close()
-    end,
-
     getLine = function(f, line)
         assert(f.line < line)
 

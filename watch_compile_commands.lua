@@ -29,6 +29,7 @@ local inotify = require("inotify")
 local IN = inotify.IN
 
 local assert = assert
+local collectgarbage = collectgarbage
 local format = string.format
 local ipairs = ipairs
 local pairs = pairs
@@ -541,6 +542,10 @@ local function ProcessCompileCommand(ccIndex, parseOptions)
     local inclusionGraph = (tu ~= nil) and
         InclusionGraph_ProcessTU(InclusionGraph(), tu) or
         InclusionGraph()
+
+    -- Make LuaJIT release libclang-allocated TU memory.
+    tu = nil
+    collectgarbage()
 
     assert(formattedDiagSet ~= nil and inclusionGraph ~= nil)
     return formattedDiagSet, inclusionGraph, hadSomeSystemIncludesAdded

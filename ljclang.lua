@@ -122,7 +122,7 @@ local Index = class
     function(cxidx)
         assert(ffi.istype("CXIndex", cxidx))
         assert(cxidx ~= nil)
-        return { _idx = cxidx }
+        return { _idx = ffi.gc(cxidx, clang.clang_disposeIndex) }
     end,
 
     loadTranslationUnit = function(self, filename)
@@ -133,7 +133,7 @@ local Index = class
             self._idx, filename, cxtuAr)
 
         if (cxErrorCode == 'CXError_Success') then
-            return TranslationUnit_t(cxtuAr[0], self), cxErrorCode
+            return TranslationUnit_t(cxtuAr[0], self, true), cxErrorCode
         else
             return nil, cxErrorCode
         end
@@ -193,14 +193,7 @@ local Index = class
         end
 
         -- Wrap it in a TranslationUnit_t.
-        return TranslationUnit_t(tuAr[0], self), errorCode
-    end,
-
-    __gc = function(self)
-        -- Regarding "[t]he index must not be destroyed until all of the translation units
-        -- created within that index have been destroyed" (from libclang's Index.h): that is
-        -- handled by having the TranslationUnit_t objects reference us as their parent.
-        clang.clang_disposeIndex(self._idx)
+        return TranslationUnit_t(tuAr[0], self, true), errorCode
     end,
 }
 
@@ -358,7 +351,9 @@ local Diagnostic = class
         assert(type(parent) == "table")
 
         return {
-            _diag = cxdiag,
+            -- NOTE: in LLVM 7 at least, disposition of a diagnostic is a no-op.
+            -- See libclang's CIndexDiagnostic.cpp.
+            _diag = ffi.gc(cxdiag, clang.clang_disposeDiagnostic),
             _parent = parent
         }
     end,
@@ -402,12 +397,6 @@ local Diagnostic = class
 
     -- TODO: ranges()?
     -- TODO: fixIts()?
-
-    __gc = function(self)
-        -- NOTE: in LLVM 7 at least, this is a no-op. See LLVM's
-        -- clang/tools/libclang/CIndexDiagnostic.cpp
-        clang.clang_disposeDiagnostic(self._diag)
-    end,
 }
 
 -------------------------------------------------------------------------
@@ -424,11 +413,12 @@ DiagnosticSet = class
 
         assert(needsNoDisposal == nil or type(needsNoDisposal) == "boolean")
         local haveDiagSet = (cxdiagset ~= nil)
+        local needsDisposal = haveDiagSet and not needsNoDisposal
+        local finalizer = needsDisposal and clang.clang_disposeDiagnosticSet or nil
 
         local tab = {
-            _set = cxdiagset,
+            _set = ffi.gc(cxdiagset, finalizer),
             _parent = parent,
-            _needsDisposal = haveDiagSet and not needsNoDisposal,
         }
 
         if (haveDiagSet) then
@@ -439,12 +429,6 @@ DiagnosticSet = class
         end
 
         return tab
-    end,
-
-    __gc = function(self)
-        if (self._needsDisposal) then
-            clang.clang_disposeDiagnosticSet(self._set)
-        end
     end,
 }
 
@@ -549,20 +533,16 @@ local WrappedSourceLocArray = class
 
 TranslationUnit_t = class
 {
-    function(cxtu, parent)
+    function(cxtu, parent, needsDisposal)
         assert(ffi.istype("CXTranslationUnit", cxtu))
         assert(cxtu ~= nil)
         assert(parent ~= nil) -- TODO: more precise?
+        assert(type(needsDisposal) == "boolean")
 
         return {
-            _tu = cxtu,
+            _tu = ffi.gc(cxtu, needsDisposal and clang.clang_disposeTranslationUnit or nil),
             _parent = parent,
         }
-    end,
-
-    __gc = function(self)
-        -- NOTE: nullptr is fine, see libclang's CIndex.cpp.
-        clang.clang_disposeTranslationUnit(self._tu)
     end,
 
     save = function(self, filename)
@@ -592,9 +572,16 @@ TranslationUnit_t = class
         check_tu_valid(self)
         check(type(visitor) == "function", "<visitor> must be a Lua function", 2)
 
+        -- Create a "loose" translation unit from us, that is, one that is not associated
+        -- with a finalizer. If we were to pass 'self' instead of 'looseTU', we would never
+        -- be garbage-collected: it appears that crossing the boundary to the C++ side
+        -- anchors the cdata object with a finalizer association.
+        local looseCXTU = ffi.new("CXTranslationUnit", self._tu)
+        local looseTU = TranslationUnit_t(looseCXTU, {}, false)
+
         local clangInclusionVisitor = function(includedFile, inclusionStackPtr, includeLength, _)
             local wrappedInclusionStack = WrappedSourceLocArray(inclusionStackPtr, includeLength)
-            visitor(File(includedFile, self), wrappedInclusionStack)
+            visitor(File(includedFile, looseTU), wrappedInclusionStack)
         end
 
         clang.clang_getInclusions(self._tu, clangInclusionVisitor, nil)

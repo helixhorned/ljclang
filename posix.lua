@@ -141,10 +141,12 @@ api.Fd = class
         assert(ret == 0)
         return ret
     end,
-
+--[[
+-- TODO: implement
     __gc = function(self)
         return self:close()
     end,
+--]]
 }
 
 api.poll = function(tab)

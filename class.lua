@@ -39,6 +39,8 @@ function api.class(tab)
             if (k:sub(1,2) == "__") then
                 if (k == "__index") then
                     check(type(v) == "function", "tab.__index must be a function", 2)
+                elseif (k == "__gc") then
+                    error("__gc does not work, use ffi.gc() instead", 2)
                 end
             else
                 havePlainKeys = true
