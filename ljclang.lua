@@ -117,22 +117,84 @@ end
 --------------------------------- Index ---------------------------------
 -------------------------------------------------------------------------
 
-local Index_mt = {
-    __index = {
-        loadTranslationUnit = function(self, filename)
-            check(type(filename) == "string", "<filename> must be a string", 2)
+local Index = class
+{
+    function(cxidx)
+        assert(ffi.istype("CXIndex", cxidx))
+        assert(cxidx ~= nil)
+        return { _idx = cxidx }
+    end,
 
-            local cxtuAr = ffi.new("CXTranslationUnit [1]")
-            local cxErrorCode = clang.clang_createTranslationUnit2(
-                self._idx, filename, cxtuAr)
+    loadTranslationUnit = function(self, filename)
+        check(type(filename) == "string", "<filename> must be a string", 2)
 
-            if (cxErrorCode == 'CXError_Success') then
-                return TranslationUnit_t(cxtuAr[0], self, true), cxErrorCode
-            else
-                return nil, cxErrorCode
-            end
-        end,
-    },
+        local cxtuAr = ffi.new("CXTranslationUnit [1]")
+        local cxErrorCode = clang.clang_createTranslationUnit2(
+            self._idx, filename, cxtuAr)
+
+        if (cxErrorCode == 'CXError_Success') then
+            return TranslationUnit_t(cxtuAr[0], self, true), cxErrorCode
+        else
+            return nil, cxErrorCode
+        end
+    end,
+
+    -- #### `translationUnit, errorCode = index:parse(sourceFileName, cmdLineArgs [, opts])`
+    --
+    -- [`clang_parseTranslationUnit2`]:
+    --  http://clang.llvm.org/doxygen/group__CINDEX__TRANSLATION__UNIT.html#ga494de0e725c5ae40cbdea5fa6081027d
+    --
+    -- [`CXTranslationUnit_*`]:
+    --  http://clang.llvm.org/doxygen/group__CINDEX__TRANSLATION__UNIT.html#enum-members
+    --
+    -- Binding for [`clang_parseTranslationUnit2`]. This will parse a given source
+    -- file named `sourceFileName` with the command line arguments `cmdLineArgs` given
+    -- to the compiler, containing e.g. include paths or defines. If `sourceFile` is
+    -- the empty string, the source file is expected to be named in `cmdLineArgs`.
+    --
+    -- The optional argument `opts` is expected to be a sequence containing
+    -- [`CXTranslationUnit_*`] enum names without the `"CXTranslationUnit_"` prefix,
+    -- for example `{ "DetailedPreprocessingRecord", "SkipFunctionBodies" }`.
+    --
+    -- NOTE: Both `cmdLineArgs` and `opts` (if given) must not contain an element at index 0.
+    --
+    -- On failure, `translationUnit` is `nil` and `errorCode` (comparable against
+    -- values in `clang.ErrorCode`) can be examined.
+    parse = function(self, srcfile, args, opts)
+        check(type(srcfile)=="string", "<srcfile> must be a string", 2)
+        check(type(args)=="string" or type(args)=="table", "<args> must be a string or table", 2)
+        util.check_iftab_iscellstr(args, "<args>", 2)
+
+        if (srcfile == "") then
+            srcfile = nil
+        end
+
+        local opts = util.checkOptionsArgAndGetDefault(opts, C.CXTranslationUnit_None)
+
+        -- Input argument handling.
+
+        if (type(args)=="string") then
+            args = api.splitAtWhitespace(args)
+        end
+
+        opts = util.handleTableOfOptionStrings(clang, "CXTranslationUnit_", opts)
+
+        local argsptrs = ffi.new("const char * [?]", #args, args)  -- ARGS_FROM_TAB
+
+        -- Create the CXTranslationUnit.
+        local tuAr = ffi.new("CXTranslationUnit [1]")
+        local errorCode = clang.clang_parseTranslationUnit2(
+            self._idx, srcfile, argsptrs, #args, nil, 0, opts, tuAr)
+
+        assert((tuAr[0] ~= nil) == (errorCode == 'CXError_Success'))
+
+        if (tuAr[0] == nil) then
+            return nil, errorCode
+        end
+
+        -- Wrap it in a TranslationUnit_t.
+        return TranslationUnit_t(tuAr[0], self, true), errorCode
+    end,
 
     __gc = function(self)
         -- Regarding "[t]he index must not be destroyed until all of the translation units
@@ -141,12 +203,6 @@ local Index_mt = {
         clang.clang_disposeIndex(self._idx)
     end,
 }
-
-local function NewIndex(cxidx)
-    assert(ffi.istype("CXIndex", cxidx))
-    local index = { _idx=cxidx }
-    return setmetatable(index, Index_mt)
-end
 
 -------------------------------------------------------------------------
 ---------------------------- SourceLocation -----------------------------
@@ -1063,71 +1119,12 @@ class
 function api.createIndex(excludeDeclarationsFromPCH, displayDiagnostics)
     local cxidx = clang.clang_createIndex(excludeDeclarationsFromPCH or false,
                                           displayDiagnostics or false)
-    if (cxidx == nil) then
-        return nil
-    end
-
-    return NewIndex(cxidx)
+    return Index(cxidx)
 end
+
+----------
 
 api.splitAtWhitespace = util.splitAtWhitespace
-
--- #### `translationUnit, errorCode = index:parse(sourceFileName, cmdLineArgs [, opts])`
---
--- [`clang_parseTranslationUnit2`]:
---  http://clang.llvm.org/doxygen/group__CINDEX__TRANSLATION__UNIT.html#ga494de0e725c5ae40cbdea5fa6081027d
---
--- [`CXTranslationUnit_*`]:
---  http://clang.llvm.org/doxygen/group__CINDEX__TRANSLATION__UNIT.html#enum-members
---
--- Binding for [`clang_parseTranslationUnit2`]. This will parse a given source
--- file named `sourceFileName` with the command line arguments `cmdLineArgs` given
--- to the compiler, containing e.g. include paths or defines. If `sourceFile` is
--- the empty string, the source file is expected to be named in `cmdLineArgs`.
---
--- The optional argument `opts` is expected to be a sequence containing
--- [`CXTranslationUnit_*`] enum names without the `"CXTranslationUnit_"` prefix,
--- for example `{ "DetailedPreprocessingRecord", "SkipFunctionBodies" }`.
---
--- NOTE: Both `cmdLineArgs` and `opts` (if given) must not contain an element at index 0.
---
--- On failure, `translationUnit` is `nil` and `errorCode` (comparable against
--- values in `clang.ErrorCode`) can be examined.
-function Index_mt.__index.parse(self, srcfile, args, opts)
-    check(type(srcfile)=="string", "<srcfile> must be a string", 2)
-    check(type(args)=="string" or type(args)=="table", "<args> must be a string or table", 2)
-    util.check_iftab_iscellstr(args, "<args>", 2)
-
-    if (srcfile == "") then
-        srcfile = nil
-    end
-
-    local opts = util.checkOptionsArgAndGetDefault(opts, C.CXTranslationUnit_None)
-
-    -- Input argument handling.
-
-    if (type(args)=="string") then
-        args = api.splitAtWhitespace(args)
-    end
-
-    opts = util.handleTableOfOptionStrings(clang, "CXTranslationUnit_", opts)
-
-    local argsptrs = ffi.new("const char * [?]", #args, args)  -- ARGS_FROM_TAB
-
-    -- Create the CXTranslationUnit.
-    local tuAr = ffi.new("CXTranslationUnit [1]")
-    local errorCode = clang.clang_parseTranslationUnit2(
-        self._idx, srcfile, argsptrs, #args, nil, 0, opts, tuAr)
-
-    assert((tuAr[0] ~= nil) == (errorCode == 'CXError_Success'))
-
-    if (tuAr[0] == nil) then
-        return nil, errorCode
-    end
-
-    -- Wrap it in a TranslationUnit_t.
-    return TranslationUnit_t(tuAr[0], self, true), errorCode
-end
 
 -- NOTE: This is unsupported.
 api.TranslationUnit_t = TranslationUnit_t
