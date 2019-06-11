@@ -26,11 +26,15 @@ for i = 2,#arg do
     readFileIntoTable(arg[i], srcLines)
 end
 
+local LineBegPattern = "^ *%-%- "
+-- For continued doc lines, it is valid to not have a space after the comment marker.
+local LineContPattern = "^ *%-%- ?"
+
 local function findText(table, searchText)
     local lineNum
 
     for i, line in ipairs(table) do
-        if (line:sub(1,3) == "-- " and line:find(searchText, 1, true)) then
+        if (line:match(LineBegPattern) and line:gsub(LineBegPattern, ""):find(searchText, 1, true)) then
             if (lineNum ~= nil) then
                 error("Search text '" .. searchText .. "' is present multiple times.")
             end
@@ -56,14 +60,12 @@ for _, docLine in ipairs(docLines) do
         else
             for i = lineNum, #srcLines do
                 local line = srcLines[i]
-                local prefix = line:sub(1,3)
 
-                if (prefix ~= "-- " and prefix ~= "--") then
+                if (not line:match(LineContPattern)) then
                     break
                 end
 
-                io.write(line:sub(4))
-                io.write("\n")
+                io.write(line:gsub(LineContPattern, ""), "\n")
             end
         end
     end
