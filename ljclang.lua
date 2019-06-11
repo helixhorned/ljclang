@@ -459,11 +459,12 @@ File = class
         assert(cxfile ~= nil) -- TODO: handle?
 
         -- table can be: SourceLocation, TranslationUnit_t
+        -- TODO: clean this up.
         assert(type(parent) == "table")
 
         return {
             _cxfile = cxfile,
-            _tu = parent
+            _parent = parent
         }
     end,
 
@@ -485,12 +486,14 @@ File = class
     end,
 
     location = function(self, line, column)
-        local cxloc = clang.clang_getLocation(self._tu._tu, self._cxfile, line, column)
+        -- TODO: assert that _parent is a TU, or allow SourceLocation _parent
+        local cxloc = clang.clang_getLocation(self._parent._tu, self._cxfile, line, column)
         return SourceLocation(cxloc, self)
     end,
 
     locationForOffset = function(self, offset)
-        local cxloc = clang.clang_getLocationForOffset(self._tu._tu, self._cxfile, offset)
+        -- TODO: assert that _parent is a TU, or allow SourceLocation _parent
+        local cxloc = clang.clang_getLocationForOffset(self._parent._tu, self._cxfile, offset)
         return SourceLocation(cxloc, self)
     end,
 
