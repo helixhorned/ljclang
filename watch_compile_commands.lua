@@ -862,9 +862,7 @@ local FormattedDiagSetPrinter = class
     end,
 }
 
--- For clearer exposition only.
--- TODO: rename to 'Connection'?
-local FdPair = class
+local Connection = class
 {
     function(readFd, writeFd, childPid, extraFd)
         return {
@@ -886,20 +884,20 @@ local PipePair = class
         }
     end,
 
-    getUsedEnds = function(self, whoami, childPid)
+    getConnection = function(self, whoami, childPid)
         assert(whoami == "child" or whoami == "parent")
         assert((whoami == "parent") == (childPid ~= nil))
 
         if (whoami == "child") then
             self.toParent.r:close()
             self.toChild.w:close()
-            return FdPair(self.toChild.r, self.toParent.w)
+            return Connection(self.toChild.r, self.toParent.w)
         else
             -- NOTE: deliberately keep open the write end of the 'child -> parent'
             -- connection in the parent so that we never get POLL.HUP from poll().
             --[[self.toParent.w:close()--]]
             self.toChild.r:close()
-            return FdPair(self.toParent.r, self.toChild.w,
+            return Connection(self.toParent.r, self.toChild.w,
                           childPid, self.toParent.w)
         end
     end,
@@ -940,10 +938,10 @@ local Controller = class
             printer = nil,  -- FormattedDiagSetPrinter
 
             -- Child will have:
-            connection = nil,  -- FdPair
+            connection = nil,  -- Connection
 
             --== Parent will have:
-            -- Table of FdPair elements with possible holes. Indexed by the 'connection index'.
+            -- Table of Connection elements with possible holes. Indexed by the 'connection index'.
             connections = nil,
             -- Table (read file descriptor -> index into self.connections[]).
             readFdToConnIdx = nil,
@@ -1058,7 +1056,7 @@ local Controller = class
         local whoami, childPid = posix.fork()
         self.whoami = whoami
 
-        local connection = pipes:getUsedEnds(whoami, childPid)
+        local connection = pipes:getConnection(whoami, childPid)
 
         if (self:is("child")) then
             self.connection = connection
