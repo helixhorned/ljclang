@@ -70,29 +70,15 @@ local function debugf() end
 
 -- Give our structs names for nicer error messages.
 ffi.cdef[[
-struct LJClangTranslationUnit { CXTranslationUnit _tu; };
 // NOTE: CXCursor is a struct type by itself, but we wrap it to e.g. provide a
 // kind() *method* (CXCursor contains a member of the same name).
 struct LJClangCursor { CXCursor _cur; };
 struct LJClangType { CXType _typ; };
 ]]
 
-local TranslationUnit_t_ = ffi.typeof "struct LJClangTranslationUnit"
+local TranslationUnit_t  -- class "forward-reference"
 local Cursor_t = ffi.typeof "struct LJClangCursor"
 local Type_t = ffi.typeof "struct LJClangType"
-
--- [<address of CXTranslationUnit as string>] = count
-local TUCount = {}
-
-local function getCXTUaddr(cxtu)
-    return tostring(cxtu):gsub(".*: 0x", "")
-end
-
-local function TranslationUnit_t(cxtu)
-    local addr = getCXTUaddr(cxtu)
-    TUCount[addr] = (TUCount[addr] or 0) + 1
-    return TranslationUnit_t_(cxtu)
-end
 
 -- Our wrapping type Cursor_t is seen as raw CXCursor on the C++ side.
 assert(ffi.sizeof("CXCursor") == ffi.sizeof(Cursor_t))
@@ -150,7 +136,7 @@ local Index_mt = {
                 self._idx, filename, cxtuAr)
 
             if (cxErrorCode == 'CXError_Success') then
-                return TranslationUnit_t(cxtuAr[0]), cxErrorCode
+                return TranslationUnit_t(cxtuAr[0], self, true), cxErrorCode
             else
                 return nil, cxErrorCode
             end
@@ -158,19 +144,16 @@ local Index_mt = {
     },
 
     __gc = function(self)
-        -- "The index must not be destroyed until all of the translation units created
-        --  within that index have been destroyed."
-        for i=1,#self._tus do
-            self._tus[i]:_cleanup()
-        end
+        -- Regarding "[t]he index must not be destroyed until all of the translation units
+        -- created within that index have been destroyed" (from libclang's Index.h): that is
+        -- handled by having the TranslationUnit_t objects reference us as their parent.
         clang.clang_disposeIndex(self._idx)
     end,
 }
 
 local function NewIndex(cxidx)
     assert(ffi.istype("CXIndex", cxidx))
-    -- _tus is a list of the Index's TranslationUnit_t objects.
-    local index = { _idx=cxidx, _tus={} }
+    local index = { _idx=cxidx }
     return setmetatable(index, Index_mt)
 end
 
@@ -230,11 +213,8 @@ local SourceLocation = class
     function(cxloc, parent)
         assert(ffi.istype("CXSourceLocation", cxloc))
 
-        -- XXX: ffi.istype(...) is not what we want: there is no anchoring then, after all!
-        -- TODO: make them all into tables!
-        --
-        -- type(parent) can be: TODO:
-        assert(type(parent) == "table" or ffi.istype("struct LJClangTranslationUnit", parent))
+        -- type(parent) can be: TODO?, TranslationUnit_t
+        assert(type(parent) == "table")
 
         if (clang.clang_equalLocations(cxloc, clang.clang_getNullLocation()) ~= 0) then
             -- Return nil (and not a SourceLocation object) on invalid (null) location.
@@ -392,11 +372,8 @@ DiagnosticSet = class
     function(cxdiagset, parent, needsNoDisposal)
         assert(ffi.istype("CXDiagnosticSet", cxdiagset))
 
-        -- XXX: ffi.istype(...) is not what we want: there is no anchoring then, after all!
-        -- TODO: make them all into tables!
-        --
-        -- type(parent) can be: TODO
-        assert(type(parent) == "table" or ffi.istype("struct LJClangTranslationUnit", parent))
+        -- type(parent) can be: TODO?, TranslationUnit_t
+        assert(type(parent) == "table")
 
         assert(needsNoDisposal == nil or type(needsNoDisposal) == "boolean")
         local haveDiagSet = (cxdiagset ~= nil)
@@ -434,10 +411,8 @@ File = class
         check(ffi.istype(CXFile, cxfile), "<cxfile> must be a CXFile object", 2)
         assert(cxfile ~= nil) -- TODO: handle?
 
-        -- XXX: ffi.istype(...) is not what we want: there is no anchoring then, after all!
-        -- TODO: make them all into tables!
-        -- table can be: SourceLocation
-        assert(type(parent) == "table" or ffi.istype("struct LJClangTranslationUnit", parent))
+        -- table can be: SourceLocation, TranslationUnit_t
+        assert(type(parent) == "table")
 
         return {
             _cxfile = cxfile,
@@ -487,10 +462,9 @@ File = class
 ---------------------------- TranslationUnit ----------------------------
 -------------------------------------------------------------------------
 
+-- TODO: remove?
 local function check_tu_valid(self)
-    if (self._tu == nil) then
-        error("Attempt to access freed TranslationUnit", 3)
-    end
+    assert(self._tu ~= nil)
 end
 
 -- Construct a Cursor_t from a libclang's CXCursor <cxcur>. If <cxcur> is the
@@ -523,21 +497,25 @@ local WrappedSourceLocArray = class
     end,
 }
 
-class
+TranslationUnit_t = class
 {
-    TranslationUnit_t_,
+    function(cxtu, parent, needsDisposal)
+        assert(ffi.istype("CXTranslationUnit", cxtu))
+        assert(cxtu ~= nil)
+        assert(parent ~= nil) -- TODO: more precise?
+        assert(type(needsDisposal) == "boolean")
 
-    __gc = "_cleanup",
+        return {
+            _tu = cxtu,
+            _parent = parent,
+            _needsDisposal = needsDisposal,
+        }
+    end,
 
-    _cleanup = function(self)
-        if (self._tu ~= nil) then
-            local addr = getCXTUaddr(self._tu)
-            TUCount[addr] = TUCount[addr]-1
-            if (TUCount[addr] == 0) then
-                clang.clang_disposeTranslationUnit(self._tu)
-                TUCount[addr] = nil
-            end
-            self._tu = nil
+    __gc = function(self)
+        if (self._needsDisposal) then
+            -- NOTE: nullptr is fine, see libclang's CIndex.cpp.
+            clang.clang_disposeTranslationUnit(self._tu)
         end
     end,
 
@@ -565,6 +543,7 @@ class
     end,
 
     inclusions = function(self, visitor)
+        check_tu_valid(self)
         check(type(visitor) == "function", "<visitor> must be a Lua function", 2)
 
         local clangInclusionVisitor = function(includedFile, inclusionStackPtr, includeLength, _)
@@ -870,7 +849,10 @@ class
     --== LJClang-specific ==--
 
     translationUnit = function(self)
-        return TranslationUnit_t(clang.clang_Cursor_getTranslationUnit(self._cur))
+        local cxtu = clang.clang_Cursor_getTranslationUnit(self._cur)
+        -- NOTE: only invalid cursors have a nullptr TU. See libclang's CXCursor.cpp's
+        -- MakeCXCursor() functions and MakeCXCursorInvalid() function.
+        return TranslationUnit_t(cxtu, self, false)
     end,
 
     -- NOTE: *Sometimes* returns one token too much, see
@@ -1153,16 +1135,11 @@ function Index_mt.__index.parse(self, srcfile, args, opts)
     end
 
     -- Wrap it in a TranslationUnit_t.
-    local tunit = TranslationUnit_t(tuAr[0])
-
-    -- Add this TranslationUnit_t to the list of its Index's TUs.
-    self._tus[#self._tus+1] = tunit
-
-    return tunit, errorCode
+    return TranslationUnit_t(tuAr[0], self, true), errorCode
 end
 
 -- NOTE: This is unsupported.
-api.TranslationUnit_t = TranslationUnit_t_
+api.TranslationUnit_t = TranslationUnit_t
 api.Cursor_t = Cursor_t
 api.Type_t = Type_t
 
