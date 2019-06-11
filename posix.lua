@@ -121,7 +121,7 @@ api.Fd = class
         check(length >= 1, "argument must have ffi.sizeof() >= 1", 2)
         local bytesRead = call("read", self.fd, obj, length)
         -- Partial reads not yet handled.
-        check(bytesRead == length, "partial read occurred")
+        check(bytesRead == length, "partial read occurred", 2)
         return obj
     end,
 
@@ -203,8 +203,8 @@ api.pipe = function()
 end
 
 api.signal = function(sig, handler)
-    check(sig == SIG.INT, "argument #1 must be SIG.INT")
-    check(handler == SIG_DFL, "argument #2 must be SIG.DFL")
+    check(sig == SIG.INT, "argument #1 must be SIG.INT", 2)
+    check(handler == SIG_DFL, "argument #2 must be SIG.DFL", 2)
     support.ljclang_setSigintHandlingToDefault()
 end
 

@@ -6,6 +6,8 @@ local type = type
 
 local api = {}
 
+-- TODO: default 'level' to 2 for the following two functions?
+
 -- Wrap 'error' in assert-like call to write type checks in one line instead of three.
 function api.check(pred, msg, level)
     if (not pred) then
