@@ -641,7 +641,7 @@ local function AddFileWatches(initialGraph)
     -- command or reached by #include, as well as the compile_commands.json file itself.
 
     local notifier = inotify.init()
-    local fileNameOfWd = {}
+    local wdToFileName = {}
 
     for _, filename in initialGraph:iFileNames() do
         local wd = notifier:add_watch(filename, WATCH_FLAGS)
@@ -650,14 +650,14 @@ local function AddFileWatches(initialGraph)
         -- through realPathName() earlier.)
         --
         -- TODO: this does not need to hold in the presence of hard links though. Test.
-        assert(fileNameOfWd[wd] == nil or fileNameOfWd[wd] == filename)
+        assert(wdToFileName[wd] == nil or wdToFileName[wd] == filename)
 
-        fileNameOfWd[wd] = filename
+        wdToFileName[wd] = filename
     end
 
     local compileCommandsWd = notifier:add_watch(compileCommandsFile, WATCH_FLAGS)
 
-    return notifier, fileNameOfWd, compileCommandsWd
+    return notifier, wdToFileName, compileCommandsWd
 end
 
 local function CheckForNotHandledEvents(event, compileCommandsWd)
@@ -1266,7 +1266,7 @@ local function humanModeMain()
     local parserOpts = printGraphMode and {"SkipFunctionBodies", "Incomplete"} or {}
     local control = Controller(range(#compileCommands), parserOpts)
 
-    local notifier, fileNameOfWd, compileCommandsWd
+    local notifier, wdToFileName, compileCommandsWd
 
     repeat
         -- Print current diagnostics.
@@ -1286,7 +1286,7 @@ local function humanModeMain()
 
         if (notifier == nil and not exitImmediately) then
             local graph = GetGlobalInclusionGraph(#compileCommands, ccInclusionGraphs)
-            notifier, fileNameOfWd, compileCommandsWd = AddFileWatches(graph)
+            notifier, wdToFileName, compileCommandsWd = AddFileWatches(graph)
             info("Watching %d files.", graph:getNodeCount() + 1)
         end
 
@@ -1308,7 +1308,7 @@ local function humanModeMain()
 
         CheckForNotHandledEvents(event, compileCommandsWd)
 
-        local eventFileName = fileNameOfWd[event.wd]
+        local eventFileName = wdToFileName[event.wd]
         assert(eventFileName ~= nil)
 
         -- Determine the set of compile commands to re-process.
