@@ -18,9 +18,10 @@ function api.addSystemInclude(compilerArgs, language)
     compilerArgs[#compilerArgs + 1] = "-isystem"
     compilerArgs[#compilerArgs + 1] = (language == "c") and
         -- Fixes LuaJIT, extractdecls.lua on <signal.h>:
-        "/usr/lib/llvm-7/lib/clang/7.0.1/include" or
+        "/usr/lib/llvm-8/lib/clang/8.0.1/include" or
         -- Fixes conky, but breaks EP (personal project of author):
-        "/usr/lib/llvm-7/include/c++/v1"
+        -- (from libc++)
+        "/usr/lib/llvm-8/include/c++/v1"
 end
 
 -- Done!

@@ -376,7 +376,11 @@ enum CXTranslationUnit_Flags {
 
   CXTranslationUnit_SingleFileParse = 0x400,
 
-  CXTranslationUnit_LimitSkipFunctionBodiesToPreamble = 0x800
+  CXTranslationUnit_LimitSkipFunctionBodiesToPreamble = 0x800,
+
+  CXTranslationUnit_IncludeAttributedTypes = 0x1000,
+
+  CXTranslationUnit_VisitImplicitAttributes = 0x2000
 };
  unsigned clang_defaultEditingTranslationUnitOptions(void);
  CXTranslationUnit
@@ -891,7 +895,25 @@ enum CXCursorKind {
   CXCursor_VisibilityAttr                = 417,
   CXCursor_DLLExport                     = 418,
   CXCursor_DLLImport                     = 419,
-  CXCursor_LastAttr                      = CXCursor_DLLImport,
+  CXCursor_NSReturnsRetained             = 420,
+  CXCursor_NSReturnsNotRetained          = 421,
+  CXCursor_NSReturnsAutoreleased         = 422,
+  CXCursor_NSConsumesSelf                = 423,
+  CXCursor_NSConsumed                    = 424,
+  CXCursor_ObjCException                 = 425,
+  CXCursor_ObjCNSObject                  = 426,
+  CXCursor_ObjCIndependentClass          = 427,
+  CXCursor_ObjCPreciseLifetime           = 428,
+  CXCursor_ObjCReturnsInnerPointer       = 429,
+  CXCursor_ObjCRequiresSuper             = 430,
+  CXCursor_ObjCRootClass                 = 431,
+  CXCursor_ObjCSubclassingRestricted     = 432,
+  CXCursor_ObjCExplicitProtocolImpl      = 433,
+  CXCursor_ObjCDesignatedInitializer     = 434,
+  CXCursor_ObjCRuntimeVisible            = 435,
+  CXCursor_ObjCBoxable                   = 436,
+  CXCursor_FlagEnum                      = 437,
+  CXCursor_LastAttr                      = CXCursor_FlagEnum,
   /* Preprocessing */
   CXCursor_PreprocessingDirective        = 500,
   CXCursor_MacroDefinition               = 501,
@@ -1124,7 +1146,22 @@ enum CXTypeKind {
   CXType_OCLSampler = 157,
   CXType_OCLEvent = 158,
   CXType_OCLQueue = 159,
-  CXType_OCLReserveID = 160
+  CXType_OCLReserveID = 160,
+  CXType_ObjCObject = 161,
+  CXType_ObjCTypeParam = 162,
+  CXType_Attributed = 163,
+  CXType_OCLIntelSubgroupAVCMcePayload = 164,
+  CXType_OCLIntelSubgroupAVCImePayload = 165,
+  CXType_OCLIntelSubgroupAVCRefPayload = 166,
+  CXType_OCLIntelSubgroupAVCSicPayload = 167,
+  CXType_OCLIntelSubgroupAVCMceResult = 168,
+  CXType_OCLIntelSubgroupAVCImeResult = 169,
+  CXType_OCLIntelSubgroupAVCRefResult = 170,
+  CXType_OCLIntelSubgroupAVCSicResult = 171,
+  CXType_OCLIntelSubgroupAVCImeResultSingleRefStreamout = 172,
+  CXType_OCLIntelSubgroupAVCImeResultDualRefStreamout = 173,
+  CXType_OCLIntelSubgroupAVCImeSingleRefStreamin = 174,
+  CXType_OCLIntelSubgroupAVCImeDualRefStreamin = 175
 };
 enum CXCallingConv {
   CXCallingConv_Default = 0,
@@ -1145,6 +1182,7 @@ enum CXCallingConv {
   CXCallingConv_Swift = 13,
   CXCallingConv_PreserveMost = 14,
   CXCallingConv_PreserveAll = 15,
+  CXCallingConv_AArch64VectorCall = 16,
   CXCallingConv_Invalid = 100,
   CXCallingConv_Unexposed = 200
 };
@@ -1203,6 +1241,11 @@ enum CXTemplateArgumentKind {
  int clang_getExceptionSpecificationType(CXType T);
  int clang_getNumArgTypes(CXType T);
  CXType clang_getArgType(CXType T, unsigned i);
+ CXType clang_Type_getObjCObjectBaseType(CXType T);
+ unsigned clang_Type_getNumObjCProtocolRefs(CXType T);
+ CXCursor clang_Type_getObjCProtocolDecl(CXType T, unsigned i);
+ unsigned clang_Type_getNumObjCTypeArgs(CXType T);
+ CXType clang_Type_getObjCTypeArg(CXType T, unsigned i);
  unsigned clang_isFunctionTypeVariadic(CXType T);
  CXType clang_getCursorResultType(CXCursor C);
  int clang_getCursorExceptionSpecificationType(CXCursor C);
@@ -1213,6 +1256,17 @@ enum CXTemplateArgumentKind {
  long long clang_getArraySize(CXType T);
  CXType clang_Type_getNamedType(CXType T);
  unsigned clang_Type_isTransparentTagTypedef(CXType T);
+enum CXTypeNullabilityKind {
+
+  CXTypeNullability_NonNull = 0,
+
+  CXTypeNullability_Nullable = 1,
+
+  CXTypeNullability_Unspecified = 2,
+
+  CXTypeNullability_Invalid = 3
+};
+ enum CXTypeNullabilityKind clang_Type_getNullability(CXType T);
 enum CXTypeLayoutError {
 
   CXTypeLayoutError_Invalid = -1,
@@ -1229,6 +1283,7 @@ enum CXTypeLayoutError {
  CXType clang_Type_getClassType(CXType T);
  long long clang_Type_getSizeOf(CXType T);
  long long clang_Type_getOffsetOf(CXType T, const char *S);
+ CXType clang_Type_getModifiedType(CXType T);
  long long clang_Cursor_getOffsetOfField(CXCursor C);
  unsigned clang_Cursor_isAnonymous(CXCursor C);
 enum CXRefQualifierKind {
@@ -1364,6 +1419,8 @@ typedef enum {
 } CXObjCPropertyAttrKind;
  unsigned clang_Cursor_getObjCPropertyAttributes(CXCursor C,
                                                              unsigned reserved);
+ CXString clang_Cursor_getObjCPropertyGetterName(CXCursor C);
+ CXString clang_Cursor_getObjCPropertySetterName(CXCursor C);
 typedef enum {
   CXObjCDeclQualifier_None = 0x0,
   CXObjCDeclQualifier_In = 0x1,
@@ -1614,7 +1671,9 @@ enum CXCompletionContext {
 
   CXCompletionContext_NaturalLanguage = 1 << 21,
 
-  CXCompletionContext_Unknown = ((1 << 22) - 1)
+  CXCompletionContext_IncludedFile = 1 << 22,
+
+  CXCompletionContext_Unknown = ((1 << 23) - 1)
 };
  unsigned clang_defaultCodeCompleteOptions(void);
 CXCodeCompleteResults *clang_codeCompleteAt(CXTranslationUnit TU,
