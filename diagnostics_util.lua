@@ -50,15 +50,23 @@ end
 
 local FormattedDiag = class
 {
-    function(useColors)
+    function(useColors, severity)
+        checktype(useColors, 1, "boolean", 2)
+        checktype(severity, 2, "string", 2)
+
         -- self: sequence table of lines constituting the diagnostic
         return {
             usingColors = useColors,
+            severity = severity,
         }
     end,
 
     addIndentedLine = function(self, indentation, str)
         self[#self + 1] = getIndented(indentation, str)
+    end,
+
+    getSeverity = function(self)
+        return self.severity
     end,
 
     getString = function(self, keepColorsIfPresent)
@@ -87,6 +95,7 @@ local Sep = {
 }
 
 local SpecialCharsPattern = "[%z\xFE\xFD]"
+local DiagInfoSeverity = "ignored"
 
 local function patternFor(sep)
     return "([^"..sep.."]+)"..sep
@@ -96,7 +105,7 @@ local function FormattedDiagSet_Serialize(self)
     local tab = {}
 
     for _, diag in ipairs(self.diags) do
-        local innerTab = {}
+        local innerTab = { diag.severity }
 
         for _, line in ipairs(diag) do
             assert(not line:find(SpecialCharsPattern))
@@ -106,13 +115,15 @@ local function FormattedDiagSet_Serialize(self)
         tab[#tab + 1] = table.concat(innerTab, Sep.Line)..Sep.Line
     end
 
+    local L = Sep.Line
+    local info = self.info ~= nil and self.info[1] or Sep.EmptyInfo
+
     if (self.info ~= nil) then
         assert(#self.info == 1)
         assert(not self.info[1]:find(SpecialCharsPattern))
-        tab[#tab + 1] = self.info[1]..Sep.Line
-    else
-        tab[#tab + 1] = Sep.EmptyInfo..Sep.Line
     end
+
+    tab[#tab + 1] = DiagInfoSeverity..Sep.Line..info..Sep.Line
 
     return table.concat(tab, Sep.Diag.Value)..Sep.Diag.Value
 end
@@ -127,10 +138,15 @@ function api.FormattedDiagSet_Deserialize(diagsStr, useColors)
     local fDiagSet = FormattedDiagSet(useColors)
 
     for diagStr in diagsStr:gmatch(patternFor(Sep.Diag.Pattern)) do
-        local fDiag = FormattedDiag(useColors)
+        local fDiag
         for line in diagStr:gmatch(patternFor(Sep.Line)) do
-            fDiag[#fDiag + 1] = line
+            if (fDiag == nil) then
+                fDiag = FormattedDiag(useColors, line)
+            else
+                fDiag[#fDiag + 1] = line
+            end
         end
+        assert(fDiag ~= nil)
         fDiagSet.diags[#fDiagSet.diags + 1] = fDiag
     end
 
@@ -171,8 +187,8 @@ FormattedDiagSet = class
         return self.info
     end,
 
-    newDiag = function(self)
-        return FormattedDiag(self.usingColors)
+    newDiag = function(self, severity)
+        return FormattedDiag(self.usingColors, severity)
     end,
 
     appendDiag = function(self, fDiag)
@@ -182,7 +198,7 @@ FormattedDiagSet = class
     setInfo = function(self, info)
         checktype(info, 1, "string", 2)
 
-        self.info = self:newDiag()
+        self.info = self:newDiag(DiagInfoSeverity)
         self.info:addIndentedLine(0, info)
     end,
 
@@ -255,9 +271,11 @@ local function PrintDiagsImpl(diags, useColors, allDiags,
     local formattedDiags = FormattedDiagSet(useColors)
 
     for i = startIndex, #diags do
-        local fDiag = (currentFDiag ~= nil) and currentFDiag or formattedDiags:newDiag()
-
         local diag = diags[i]
+        local fDiag = (currentFDiag ~= nil) and
+            currentFDiag or
+            formattedDiags:newDiag(diag:severity())
+
         local childDiags = diag:childDiagnostics()
 
         local innerStartIndex = PrintPrefixDiagnostics(childDiags, indentation, fDiag)

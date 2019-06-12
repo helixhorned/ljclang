@@ -733,6 +733,9 @@ local FormattedDiagSetPrinter = class
 
         local fDiags = formattedDiagSet:getDiags()
 
+        local IsErrorSeverity = { fatal=true, error=true }
+        local IsTrackedSeverity = { fatal=true, error=true, warning=true }
+
         for i, fDiag in ipairs(fDiags) do
             local str = fDiag:getString(true)
             local normStr = getNormalizedDiag(str)
@@ -740,18 +743,14 @@ local FormattedDiagSetPrinter = class
             if (printAllDiags or not self.seenDiags[normStr]) then
                 newSeenDiags[#newSeenDiags + 1] = normStr
                 toPrint[#toPrint+1] = format("%s%s", (i == 1) and "" or "\n", str)
-                -- TODO: this is somewhat brittle, make more robust?
-                haveError = haveError or str:find("error: ")
+                haveError = haveError or IsErrorSeverity[fDiag:getSeverity()]
             else
-                -- TODO: also somewhat brittle, would be nice if we still had the
-                -- unformatted diagnostic.
-                local severity =
-                    str:find("fatal error: ") and "fatals" or
-                    str:find("error: ") and "errors" or
-                    str:find("warning: ") and "warnings" or
-                    "others"
+                local severity = fDiag:getSeverity()
+                local severityTag = IsTrackedSeverity[severity]
+                    and severity..'s'
+                    or "others"
 
-                toPrint.omittedDiagCounts:increment(severity)
+                toPrint.omittedDiagCounts:increment(severityTag)
                 omittedLastDiag = (i == #fDiags)
             end
         end
