@@ -90,6 +90,8 @@ Human mode options:
   -c <concurrency>: set number of parallel parser invocations.
      0 means do everything serially (do not fork),
      'auto' means use hardware concurrency (the default).
+  -i [warning|error]: Enable incremental mode. Stop processing further compile commands on the first
+     warning or error (as specified by the argument).
   -g [includes|isIncludedBy]: Print inclusion graph as a DOT (of Graphviz) file to stdout and exit.
      Argument specifies the relation between graph nodes (which are file names).
   -l <number>: edge count limit for the graph produced by -g %s.
@@ -123,6 +125,7 @@ local parsecmdline = require("parsecmdline_pk")
 
 local opts_meta = {
     c = true,
+    i = true,
     m = false,
     g = true,
     l = true,
@@ -138,6 +141,7 @@ local opts, args = parsecmdline.getopts(opts_meta, arg, usage)
 
 local concurrencyOpt = opts.c or "auto"
 local commandMode = opts.m
+local incrementalMode = opts.i
 local printGraphMode = opts.g
 local edgeCountLimit = tonumber(opts.l)
 local printOnlyFirstErrorCc = opts.O
@@ -199,6 +203,12 @@ end
 if (printGraphMode ~= nil) then
     if (printGraphMode ~= "includes" and printGraphMode ~= "isIncludedBy") then
         abort("Argument to option -g must be 'includes' or 'isIncludedBy'")
+    end
+end
+
+if (incrementalMode ~= nil) then
+    if (incrementalMode ~= "warning" and incrementalMode ~= "error") then
+        abort("Argument to option -i must be 'warning' or 'error'")
     end
 end
 
@@ -624,16 +634,41 @@ local function PrintInclusionGraphAsGraphvizDot(graph)
     graph:printAsGraphvizDot(title, reverse, commonPrefix, edgeCountLimit, printf)
 end
 
-local function GetAffectedCompileCommandIndexes(ccInclusionGraphs, eventFileName)
+local function GetNewCcIndexes(ccInclusionGraphs, eventFileName,
+                               processedCommandCount, oldCcIdxs)
+    assert(#ccInclusionGraphs <= #compileCommands)
+    assert(not (#ccInclusionGraphs < #compileCommands) or incrementalMode ~= nil)
+    assert(processedCommandCount <= #oldCcIdxs)
+
     local indexes = {}
 
-    for i = 1, #compileCommands do
-        if (ccInclusionGraphs[i]:getNode(eventFileName) ~= nil) then
-            indexes[#indexes + 1] = i
+    -- 1. compile commands affected by the file on which we had watch event.
+    for ccIdx = 1, #ccInclusionGraphs do
+        if (ccInclusionGraphs[ccIdx]:getNode(eventFileName) ~= nil) then
+            indexes[#indexes + 1] = ccIdx
         end
     end
 
-    return indexes
+    -- 2. compileCommands left over because we stopped early in incremental mode.
+    for i = processedCommandCount + 1, #oldCcIdxs do
+        indexes[#indexes + 1] = oldCcIdxs[i]
+    end
+
+    -- Now, sort+uniquify the two compile command index sequences, for the assert in checkCcIdxs_().
+    -- Violation can only happen if we stopped early on a re-process that was due to an early stop.
+    -- (Because we get the same compile command twice -- once from 1. and once from 2.)
+
+    table.sort(indexes)
+
+    local newIndexes = {}
+
+    for i, ccIdx in ipairs(indexes) do
+        if (newIndexes[#newIndexes] ~= ccIdx) then
+            newIndexes[#newIndexes + 1] = ccIdx
+        end
+    end
+
+    return newIndexes, #oldCcIdxs - processedCommandCount
 end
 
 local function range(n)
@@ -898,6 +933,21 @@ local ParentMarker = {
     end,
 }
 
+local function HasMatchingDiag(fDiagSet, userSeverity)
+    assert(userSeverity == "warning" or userSeverity == "error")
+
+    local IsSeverityMatching = {
+        warning = { warning=true },
+        error = { fatal = true, error = true },
+    }
+
+    for _, fDiag in ipairs(fDiagSet:getDiags()) do
+        if (IsSeverityMatching[userSeverity][fDiag:getSeverity()]) then
+            return true
+        end
+    end
+end
+
 local Controller = class
 {
     function(...)
@@ -956,7 +1006,6 @@ local Controller = class
 
     setupParserAndPrinter = function(self, ...)
         self.parser = OnDemandParser(...)
-        self.onDemandParserArgs = nil
         self.printer = FormattedDiagSetPrinter()
     end,
 
@@ -964,6 +1013,18 @@ local Controller = class
         if (self:is("unforked")) then
             return self.parser:getAdditionalInfo()
         end
+    end,
+
+    checkCcIdxs_ = function(self, ccIdxs)
+        -- Assert strict monotonicity requirement.
+        for i = 2, #ccIdxs do
+            assert(ccIdxs[i - 1] < ccIdxs[i])
+        end
+        return ccIdxs
+    end,
+
+    getCcIdxs = function(self)
+        return self:checkCcIdxs_(self.onDemandParserArgs[1])
     end,
 
     --== Parent only ==--
@@ -1087,7 +1148,7 @@ local Controller = class
     --== Unforked only ==--
 
     setupConcurrency = function(self, ccInclusionGraphs)
-        local ccIdxs = self.onDemandParserArgs[1]
+        local ccIdxs = self:getCcIdxs()
         local localConcurrency = math.min(usedConcurrency, #ccIdxs)
         local spawnCount = 0
 
@@ -1095,7 +1156,7 @@ local Controller = class
         for ii = 1, localConcurrency do
             spawnCount = spawnCount + 1
             if (self:spawnChild(ccIdxs[ii]):isChild()) then
-                return ChildMarker
+                return ChildMarker, 0
             end
         end
 
@@ -1105,8 +1166,10 @@ local Controller = class
         local ii = localConcurrency + 1
         local haveErrorTab = { false }
 
-        local firstIdx = 1
+        local firstUnprocessedIdx = 1
         local formattedDiagSets = {}
+        local lastCcIdxToPrint = math.huge
+        local spawnNewChildren = true
 
         repeat
             local connIdxs = self:wait()
@@ -1114,10 +1177,10 @@ local Controller = class
 
             -- To retain the requested concurrency, spawn as many new children as we were
             -- informed are ready.
-            while (newChildCount > 0 and ii <= #ccIdxs) do
+            while (lastCcIdxToPrint == math.huge and newChildCount > 0 and ii <= #ccIdxs) do
                 spawnCount = spawnCount + 1
                 if (self:spawnChild(ccIdxs[ii]):isChild()) then
-                    return ChildMarker
+                    return ChildMarker, 0
                 end
 
                 newChildCount = newChildCount - 1
@@ -1140,39 +1203,53 @@ local Controller = class
                 formattedDiagSets[ccIdx] = diagnostics_util.FormattedDiagSet_Deserialize(
                     serializedDiags, not plainMode)
                 ccInclusionGraphs[ccIdx] = inclusion_graph.Deserialize(serializedGraph)
+
+                if (incrementalMode ~= nil) then
+                    if (HasMatchingDiag(formattedDiagSets[ccIdx], incrementalMode)) then
+                        -- We are in incremental mode and have detected a diagnostic severity
+                        -- for which the user wants us to stop. So:
+                        --
+                        --  1. Do not spawn any more new children.
+                        --  2. But, do handle the ones currently in flight.
+                        --
+                        -- NOTE: requires strictly monotonic ascending 'ccIdxs' (asserted
+                        -- above) for sane functioning.
+                        lastCcIdxToPrint = math.min(lastCcIdxToPrint, ccIdx)
+                    end
+                end
             end
 
             -- Print diagnostic sets in compile command order.
             -- TODO: for command mode (where we might want to get results as soon as they
             --  arrive), make this an option?
-            for idx = firstIdx, #ccIdxs do
+            for idx = firstUnprocessedIdx, #ccIdxs do
                 local ccIdx = ccIdxs[idx]
                 local fDiagSet = formattedDiagSets[ccIdx]
                 formattedDiagSets[ccIdx] = nil
 
                 if (fDiagSet == nil) then
                     break
-                else
+                elseif (ccIdx <= lastCcIdxToPrint) then
                     self.printer:print(fDiagSet, ccIdx, haveErrorTab)
-                    firstIdx = firstIdx + 1
+                    firstUnprocessedIdx = firstUnprocessedIdx + 1
                 end
             end
         until (not self:haveActiveChildren())
 
         self.printer:printTrailingInfo()
 
-        assert(spawnCount == #ccIdxs)
-        return ParentMarker
+        assert(not incrementalMode and spawnCount == #ccIdxs or
+                   incrementalMode and spawnCount <= #ccIdxs)
+        return ParentMarker, firstUnprocessedIdx - 1
     end,
 
     printDiagnostics = function(self, ccInclusionGraphs)
-        local compileCommandCount = #self.onDemandParserArgs[1]
-
         if (usedConcurrency == 0) then
             self:setupParserAndPrinter(unpack(self.onDemandParserArgs))
         else
-            if (not self:setupConcurrency(ccInclusionGraphs):isChild()) then
-                return compileCommandCount
+            local marker, processedCcCount = self:setupConcurrency(ccInclusionGraphs)
+            if (not marker:isChild()) then
+                return processedCcCount
             end
         end
 
@@ -1188,6 +1265,10 @@ local Controller = class
             else
                 self.printer:print(fDiagSet, ccIndex, haveErrorTab)
                 ccInclusionGraphs[ccIndex] = incGraph
+
+                if (incrementalMode ~= nil and HasMatchingDiag(fDiagSet, incrementalMode)) then
+                    break
+                end
             end
         end
 
@@ -1198,7 +1279,7 @@ local Controller = class
 
         self.printer:printTrailingInfo()
 
-        return compileCommandCount
+        return iterationCount
     end,
 }
 
@@ -1381,8 +1462,14 @@ local function humanModeMain()
         if (control:getAdditionalInfo() ~= nil) then
             info("%s", control:getAdditionalInfo())
         end
-        info_underline("Processed %s in %d seconds.",
+
+        local currentCcIdxs = control:getCcIdxs()
+        local stoppedEarly = (processedCommandCount < #currentCcIdxs)
+        assert(not stoppedEarly or incrementalMode ~= nil)
+
+        info_underline("Processed %s%s in %d seconds.",
                        pluralize(processedCommandCount, "compile command"),
+                       stoppedEarly and format(" (of %d requested)", #control:getCcIdxs()) or "",
                        os.difftime(os.time(), startTime))
         printf("")
 
@@ -1396,16 +1483,18 @@ local function humanModeMain()
         notifier:close()
 
         -- Determine the set of compile commands to re-process.
-        local ccIndexes = GetAffectedCompileCommandIndexes(
-            ccInclusionGraphs, eventFileName)
+        local newCcIdxs, earlyStopCount = GetNewCcIndexes(
+            ccInclusionGraphs, eventFileName,
+            processedCommandCount, currentCcIdxs)
 
-        info("Detected modification of %s. Need re-processing %s.",
+        info("Detected modification of %s. Processing %s%s.",
              colorize(eventFileName, Col.Bold..Col.White),
-             pluralize(#ccIndexes, "compile command"))
+             pluralize(#newCcIdxs, "compile command"),
+             earlyStopCount > 0 and format(" (including %d due to prior early stop)", earlyStopCount) or "")
 
         -- Finally, re-process them.
         startTime = os.time()
-        control = Controller(ccIndexes, parserOpts)
+        control = Controller(newCcIdxs, parserOpts)
     until (false)
 end
 
