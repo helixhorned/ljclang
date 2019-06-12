@@ -30,7 +30,6 @@ local api = { IN=IN }
 local getErrnoString = posix.getErrnoString
 
 local inotify_event_t = ffi.typeof("struct inotify_event")
-local sizeof_inotify_event = ffi.sizeof(inotify_event_t)
 
 api.init = class
 {
@@ -46,20 +45,26 @@ api.init = class
         end
 
         return {
-            fd = fd
+            fd = posix.Fd(fd)
         }
     end,
 --[[
 -- TODO: implement
     __gc = function(self)
-        C.close(self.fd)
+        self:close()
     end,
-]]
+--]]
+    close = function(self)
+        if (self.fd.fd ~= -1) then
+            self.fd:close()
+        end
+    end,
+
     add_watch = function(self, pathname, mask)
         check(type(pathname) == "string", "<pathname> must be a string", 2)
         check(type(mask) == "number", "<mask> must be a number", 2)
 
-        local wd = C.inotify_add_watch(self.fd, pathname, mask)
+        local wd = C.inotify_add_watch(self.fd.fd, pathname, mask)
 
         if (wd == -1) then
             error("inotify_add_watch() on '"..pathname.."' failed: "..getErrnoString())
@@ -70,12 +75,7 @@ api.init = class
     end,
 
     check_ = function(self, printf) -- TEMP
-        local ev = inotify_event_t()
-        local numBytes = C.read(self.fd, ev, sizeof_inotify_event)
-
-        if (numBytes == -1) then
-            error("read() failed: "..getErrnoString())
-        end
+        local ev = self.fd:readInto(inotify_event_t())
 
         -- TODO: read all in the queue (needs switching between nonblocking and blocking at
         -- runtime?) A: No, did not work out well.
