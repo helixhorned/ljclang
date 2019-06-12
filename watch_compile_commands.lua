@@ -887,6 +887,18 @@ local DoneHeader_t = class
     end,
 }
 
+local ChildMarker = {
+    isChild = function()
+        return true
+    end,
+}
+
+local ParentMarker = {
+    isChild = function()
+        return false
+    end,
+}
+
 local Controller = class
 {
     function(...)
@@ -1024,7 +1036,7 @@ local Controller = class
         if (self:is("child")) then
             self.connection = connection
             self:setupParserAndPrinter({ccIdx}, unpack(self.onDemandParserArgs, 2))
-            return true
+            return ChildMarker
         end
 
         -- Set up and/or update the child-tracking state in the parent.
@@ -1045,6 +1057,8 @@ local Controller = class
         local pendingFds = self.pendingFds or { events=POLL.IN }
         pendingFds[#pendingFds + 1] = readFd
         self.pendingFds = pendingFds
+
+        return ParentMarker
     end,
 
     -- TODO: watch inotify descriptor, too.
@@ -1081,8 +1095,8 @@ local Controller = class
         -- Spawn the initial batch of children.
         for ii = 1, localConcurrency do
             spawnCount = spawnCount + 1
-            if (self:spawnChild(ccIdxs[ii])) then
-                return true
+            if (self:spawnChild(ccIdxs[ii]):isChild()) then
+                return ChildMarker
             end
         end
 
@@ -1103,8 +1117,8 @@ local Controller = class
             -- informed are ready.
             while (newChildCount > 0 and ii <= #ccIdxs) do
                 spawnCount = spawnCount + 1
-                if (self:spawnChild(ccIdxs[ii])) then
-                    return true
+                if (self:spawnChild(ccIdxs[ii]):isChild()) then
+                    return ChildMarker
                 end
 
                 newChildCount = newChildCount - 1
@@ -1149,6 +1163,7 @@ local Controller = class
         self.printer:printTrailingInfo()
 
         assert(spawnCount == #ccIdxs)
+        return ParentMarker
     end,
 
     printDiagnostics = function(self, ccInclusionGraphs)
@@ -1157,7 +1172,7 @@ local Controller = class
         if (usedConcurrency == 0) then
             self:setupParserAndPrinter(unpack(self.onDemandParserArgs))
         else
-            if (not self:setupConcurrency(ccInclusionGraphs)) then
+            if (not self:setupConcurrency(ccInclusionGraphs):isChild()) then
                 return compileCommandCount
             end
         end
