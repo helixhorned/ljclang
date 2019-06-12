@@ -881,6 +881,13 @@ class
 
     --== LJClang-specific ==--
 
+    translationUnit = function(self)
+        local cxtu = clang.clang_Cursor_getTranslationUnit(self._cur)
+        -- NOTE: only invalid cursors have a nullptr TU. See libclang's CXCursor.cpp's
+        -- MakeCXCursor() functions and MakeCXCursorInvalid() function.
+        return TranslationUnit_t(cxtu, self, false)
+    end,
+
     -- NOTE: *Sometimes* returns one token too much, see
     --   http://clang-developers.42468.n3.nabble.com/querying-information-about-preprocessing-directives-in-libclang-td2740612.html
     -- Related bug report:
