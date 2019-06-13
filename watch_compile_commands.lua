@@ -83,6 +83,9 @@ local function usage(hline)
     local progname = arg[0]:match("([^/]+)$")
     errprint("Usage:\n  "..progname.." [options...] <compile_commands-file>\n")
     errprintf([[
+In this help text, single quotes ("'") are for exposition purposes only.
+They are never to be spelled in actual option arguments.
+
 Options:
   -m: Use machine interface / "command mode" (default: for human inspection)
 
@@ -90,14 +93,19 @@ Human mode options:
   -c <concurrency>: set number of parallel parser invocations.
      0 means do everything serially (do not fork),
      'auto' means use hardware concurrency (the default).
-  -i [warning|error]: Enable incremental mode. Stop processing further compile commands on the first
-     warning or error (as specified by the argument).
+  -i <severity-spec>: Enable incremental mode. Stop processing further compile commands on the first
+     diagnostic matching the severity specification. Its syntax one of:
+      1. a comma-separated list, <severity>(,<severity>)*
+         where each <severity> is one of 'note', 'warning', 'error' or 'fatal'.
+      2. a single severity suffixed by '+', meaning to select the specified severity
+         and more serious ones.
+     As a convenience, the specification can also be '-', meaning 'error+'.
   -g [includes|isIncludedBy]: Print inclusion graph as a DOT (of Graphviz) file to stdout and exit.
      Argument specifies the relation between graph nodes (which are file names).
   -l <number>: edge count limit for the graph produced by -g %s.
      If exceeded, a placeholder node is placed.
   -O: omit output for compile commands after the first one with errors.
-  -r c<commands>|<seconds>s: report progress after the specified number of
+  -r [c<commands>|<seconds>s]: report progress after the specified number of
      processed compile commands or the given time interval.
      Specifying any of 'c0', 'c1' or '0s' effectively prints progress with each compile command.
   -s <selector>: Select compile command(s) to process.
@@ -207,9 +215,45 @@ if (printGraphMode ~= nil) then
 end
 
 if (incrementalMode ~= nil) then
-    if (incrementalMode ~= "warning" and incrementalMode ~= "error") then
-        abort("Argument to option -i must be 'warning' or 'error'")
+    if (incrementalMode == "-") then
+        incrementalMode = "error+"
     end
+
+    local SeverityIdx = { note=1, warning=2, error=3, fatal=4 }
+    local Severities  = { "note", "warning", "error", "fatal" }
+
+    local incMode = {}
+
+    if (incrementalMode:sub(-1) == '+') then
+        local severity = incrementalMode:sub(1, -2)
+        local startSeverityIdx = SeverityIdx[severity]
+
+        if (startSeverityIdx == nil) then
+            abort("Argument to option -i, when ending with '+', must be a single severity. "..
+                      "Unknown severity '%s'.", severity)
+        end
+
+        for i = startSeverityIdx, #Severities do
+            incMode[Severities[i]] = true
+        end
+    else
+        -- Disallow the empty string manually. Having the pattern for the severity being
+        -- able to match the empty string (using '*' instead of '+') is troublesome.
+        if (incrementalMode:find("^,") or incrementalMode:find(",,") or incrementalMode:find(",$")) then
+            abort("Argument to option -i (when not ending in '+') must be comma-separated list of severities. "..
+                      "Unknown severity ''.")
+        end
+
+        for severity in incrementalMode:gmatch("[^,]+") do
+            if (SeverityIdx[severity] == nil) then
+                abort("Argument to option -i (when not ending in '+') must be comma-separated list of severities. "..
+                          "Unknown severity '%s'.", severity)
+            end
+            incMode[severity] = true
+        end
+    end
+
+    incrementalMode = incMode
 end
 
 if (edgeCountLimit ~= nil) then
@@ -933,16 +977,9 @@ local ParentMarker = {
     end,
 }
 
-local function HasMatchingDiag(fDiagSet, userSeverity)
-    assert(userSeverity == "warning" or userSeverity == "error")
-
-    local IsSeverityMatching = {
-        warning = { warning=true },
-        error = { fatal = true, error = true },
-    }
-
+local function HasMatchingDiag(fDiagSet, isSeverityRelevant)
     for _, fDiag in ipairs(fDiagSet:getDiags()) do
-        if (IsSeverityMatching[userSeverity][fDiag:getSeverity()]) then
+        if (isSeverityRelevant[fDiag:getSeverity()]) then
             return true
         end
     end
