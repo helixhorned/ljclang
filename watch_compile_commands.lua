@@ -91,8 +91,12 @@ Options:
 
 Human mode options:
   -c <concurrency>: set number of parallel parser invocations.
-     0 means do everything serially (do not fork),
-     'auto' means use hardware concurrency (the default).
+     - 0 means do everything serially (do not fork).
+       Limitation: in this mode, changes to watched files lead to a re-processing only after all
+       compile commands have been processed.
+     - 'auto' means use hardware concurrency (the default).
+       With concurrecny enabled, changes to watched files lead to a re-processing of affected
+       compile commands as soon as possible.
   -i <severity-spec>: Enable incremental mode. Stop processing further compile commands on the first
      diagnostic matching the severity specification. Its syntax one of:
       1. a comma-separated list, <severity>(,<severity>)*
@@ -681,7 +685,6 @@ end
 local function GetNewCcIndexes(ccInclusionGraphs, eventFileName,
                                processedCommandCount, oldCcIdxs)
     assert(#ccInclusionGraphs <= #compileCommands)
-    assert(not (#ccInclusionGraphs < #compileCommands) or incrementalMode ~= nil)
     assert(processedCommandCount <= #oldCcIdxs)
 
     local indexes = {}
@@ -1018,6 +1021,10 @@ local Notifier = class
         return filename
     end,
 
+    getRawFd = function(self)
+        return self.inotifier:getRawFd()
+    end,
+
     check_ = function(self, printfFunc)
         assert(self.inotifier ~= nil)
         local event = self.inotifier:check_(printfFunc)
@@ -1052,6 +1059,8 @@ local function HasMatchingDiag(fDiagSet, isSeverityRelevant)
         end
     end
 end
+
+local INOTIFY_FD_MARKER = -math.huge
 
 local Controller = class
 {
@@ -1239,8 +1248,13 @@ local Controller = class
     wait = function(self)
         assert(self:is("parent"))
 
+        local inotifyFd = self.notifier:getRawFd()
+        self.pendingFds[#self.pendingFds + 1] = inotifyFd
         local pollfds = posix.poll(self.pendingFds)
+        self.pendingFds[#self.pendingFds] = nil
+
         local connIdxs = {}
+        local haveInotifyFd = false
 
         for i = 1, #pollfds do
             -- We should never get:
@@ -1251,12 +1265,15 @@ local Controller = class
             -- TODO: deal with possible POLL.ERR?
             assert(pollfds[i].revents == POLL.IN)
 
-            local connIdx = self.readFdToConnIdx[pollfds[i].fd]
+            local fd = pollfds[i].fd
+            local connIdx = (fd == inotifyFd) and INOTIFY_FD_MARKER or self.readFdToConnIdx[fd]
             assert(connIdx ~= nil)
+
+            haveInotifyFd = haveInotifyFd or (fd == inotifyFd)
             connIdxs[i] = connIdx
         end
 
-        return connIdxs
+        return connIdxs, haveInotifyFd
     end,
 
     --== Unforked only ==--
@@ -1283,15 +1300,18 @@ local Controller = class
         local firstUnprocessedIdx = 1
         local formattedDiagSets = {}
         local lastCcIdxToPrint = math.huge
-        local spawnNewChildren = true
+        local hadInotifyFd = false
 
         repeat
-            local connIdxs = self:wait()
+            local connIdxs, haveInotifyFd = self:wait()
+            local spawnNewChildren = not haveInotifyFd and (lastCcIdxToPrint == math.huge)
             local newChildCount = #connIdxs
+
+            hadInotifyFd = hadInotifyFd or haveInotifyFd
 
             -- To retain the requested concurrency, spawn as many new children as we were
             -- informed are ready.
-            while (lastCcIdxToPrint == math.huge and newChildCount > 0 and ii <= #ccIdxs) do
+            while (spawnNewChildren and newChildCount > 0 and ii <= #ccIdxs) do
                 spawnCount = spawnCount + 1
                 if (self:spawnChild(ccIdxs[ii]):isChild()) then
                     return ChildMarker, 0
@@ -1304,6 +1324,13 @@ local Controller = class
             -- Now, for each ready child in turn, first inform it that it can go ahead
             -- printing and then wait for it to complete that.
             for _, connIdx in ipairs(connIdxs) do
+                if (connIdx == INOTIFY_FD_MARKER) then
+                    -- If any watched file has been modified, stop printing.
+                    -- Continue handling the outstanding connections, though.
+                    lastCcIdxToPrint = 0
+                    goto nextIteration
+                end
+
                 local doneMsg = self:receiveData(connIdx, DoneHeader_t(0, 0)):deserialize()
                 assert(doneMsg.magic == "Done")
 
@@ -1331,6 +1358,8 @@ local Controller = class
                         lastCcIdxToPrint = math.min(lastCcIdxToPrint, ccIdx)
                     end
                 end
+
+                ::nextIteration::
             end
 
             -- Print diagnostic sets in compile command order.
@@ -1353,8 +1382,10 @@ local Controller = class
 
         self.printer:printTrailingInfo()
 
-        assert(not incrementalMode and spawnCount == #ccIdxs or
-                   incrementalMode and spawnCount <= #ccIdxs)
+        local earlyStopReason = hadInotifyFd or incrementalMode
+        assert(not earlyStopReason and spawnCount == #ccIdxs or
+                   earlyStopReason and spawnCount <= #ccIdxs)
+
         return ParentMarker, firstUnprocessedIdx - 1
     end,
 
@@ -1470,7 +1501,6 @@ local function humanModeMain()
 
         local currentCcIdxs = control:getCcIdxs()
         local stoppedEarly = (processedCommandCount < #currentCcIdxs)
-        assert(not stoppedEarly or incrementalMode ~= nil)
 
         info_underline("Processed %s%s in %d seconds.",
                        pluralize(processedCommandCount, "compile command"),

@@ -54,6 +54,11 @@ api.init = class
         self:close()
     end,
 --]]
+    getRawFd = function(self)
+        check(self.fd.fd ~= -1, "must call before closing", 2)
+        return self.fd.fd
+    end,
+
     close = function(self)
         if (self.fd.fd ~= -1) then
             self.fd:close()
