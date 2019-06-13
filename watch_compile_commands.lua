@@ -108,7 +108,6 @@ Human mode options:
      Argument specifies the relation between graph nodes (which are file names).
   -l <number>: edge count limit for the graph produced by -g %s.
      If exceeded, a placeholder node is placed.
-  -O: omit output for compile commands after the first one with errors.
   -r [c<commands>|<seconds>s]: report progress after the specified number of
      processed compile commands or the given time interval.
      Specifying any of 'c0', 'c1' or '0s' effectively prints progress with each compile command.
@@ -141,7 +140,6 @@ local opts_meta = {
     m = false,
     g = true,
     l = true,
-    O = false,
     r = true,
     s = true,
     N = false,
@@ -156,7 +154,6 @@ local commandMode = opts.m
 local incrementalMode = opts.i
 local printGraphMode = opts.g
 local edgeCountLimit = tonumber(opts.l)
-local printOnlyFirstErrorCc = opts.O
 local progressSpec = opts.r
 local selectionSpec = opts.s
 local printAllDiags = opts.N or false
@@ -810,7 +807,6 @@ local FormattedDiagSetPrinter = class
         end
 
         local newSeenDiags = {}
-        local haveError = false
         local omittedLastDiag = false
 
         local fDiags = formattedDiagSet:getDiags()
@@ -825,7 +821,6 @@ local FormattedDiagSetPrinter = class
             if (printAllDiags or not self.seenDiags[normStr]) then
                 newSeenDiags[#newSeenDiags + 1] = normStr
                 toPrint[#toPrint+1] = format("%s%s", (i == 1) and "" or "\n", str)
-                haveError = haveError or IsErrorSeverity[fDiag:getSeverity()]
             else
                 local severity = fDiag:getSeverity()
                 local severityTag = IsTrackedSeverity[severity]
@@ -846,15 +841,11 @@ local FormattedDiagSetPrinter = class
             toPrint[#toPrint+1] = format("%s", info:getString(true))
         end
 
-        return toPrint, haveError
+        return toPrint
     end,
 
-    print = function(self, formattedDiagSet, ccIndex, haveErrorTab)
-        if (haveErrorTab[1]) then
-            return
-        end
-
-        local toPrint, haveError = self:getStringsToPrint_(formattedDiagSet)
+    print = function(self, formattedDiagSet, ccIndex)
+        local toPrint = self:getStringsToPrint_(formattedDiagSet)
         local pSecs, pCount = printProgressAfterSeconds, printProgressAfterCcCount
 
         local shouldPrint = (#toPrint > 0) or
@@ -881,13 +872,7 @@ local FormattedDiagSetPrinter = class
 
             self.lastProgressPrintTime = os.time()
             self.lastProgressPrintCcIndex = ccIndex
-
-            if (printOnlyFirstErrorCc and haveError) then
-                errprintf("%s: omitting all following diagnostics.", NOTE)
-            end
         end
-
-        haveErrorTab[1] = printOnlyFirstErrorCc and haveError
 
         if (toPrint.omittedDiagCounts:getTotal() > 0) then
             self.numCommandsWithOmittedDiags = self.numCommandsWithOmittedDiags + 1
@@ -1295,7 +1280,6 @@ local Controller = class
         self.printer = FormattedDiagSetPrinter()
 
         local ii = localConcurrency + 1
-        local haveErrorTab = { false }
 
         local firstUnprocessedIdx = 1
         local formattedDiagSets = {}
@@ -1374,7 +1358,7 @@ local Controller = class
                     break
                 elseif (ccIdx <= lastCcIdxToPrint) then
                     self.notifier:addFilesFromGraph(ccInclusionGraphs[ccIdx])
-                    self.printer:print(fDiagSet, ccIdx, haveErrorTab)
+                    self.printer:print(fDiagSet, ccIdx)
                     firstUnprocessedIdx = firstUnprocessedIdx + 1
                 end
             end
@@ -1400,7 +1384,6 @@ local Controller = class
         end
 
         local iterationCount = 0
-        local haveErrorTab = { false }
 
         for i, ccIndex, fDiagSet, incGraph in self.parser:iterate() do
             iterationCount = iterationCount + 1
@@ -1411,7 +1394,7 @@ local Controller = class
             else
                 ccInclusionGraphs[ccIndex] = incGraph
                 self.notifier:addFilesFromGraph(incGraph)
-                self.printer:print(fDiagSet, ccIndex, haveErrorTab)
+                self.printer:print(fDiagSet, ccIndex)
 
                 if (incrementalMode ~= nil and HasMatchingDiag(fDiagSet, incrementalMode)) then
                     break
