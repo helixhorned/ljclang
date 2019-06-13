@@ -87,9 +87,6 @@ In this help text, single quotes ("'") are for exposition purposes only.
 They are never to be spelled in actual option arguments.
 
 Options:
-  -m: Use machine interface / "command mode" (default: for human inspection)
-
-Human mode options:
   -c <concurrency>: set number of parallel parser invocations.
      - 0 means do everything serially (do not fork).
        Limitation: in this mode, changes to watched files lead to a re-processing only after all
