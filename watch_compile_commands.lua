@@ -981,41 +981,39 @@ local ParentMarker = {
 -- as well as the compile_commands.json file itself.
 local Notifier = class
 {
-    function(ccInclusionGraphs)
+    function()
         local inotifier = inotify.init()
-        local fileNameWdMap = util.Bimap("string", "number")
-
-        for _, graph in ipairs(ccInclusionGraphs) do
-            for _, filename in graph:iFileNames() do
-                if (fileNameWdMap[filename] == nil) then
-                    local wd = inotifier:add_watch(filename, WATCH_FLAGS)
-
-                    -- Assert one-to-oneness. (Should be the case due to us having passed the file names
-                    -- through realPathName() earlier.)
-                    --
-                    -- TODO: this does not need to hold in the presence of hard links though. Test.
-                    assert(fileNameWdMap[wd] == nil)
-
-                    util.BimapAdd(fileNameWdMap, filename, wd)
-                end
-            end
-        end
-
         local compileCommandsWd = inotifier:add_watch(compileCommandsFile, WATCH_FLAGS)
 
         return {
             inotifier = inotifier,
-            wdToFileName = fileNameWdMap,
+            fileNameWdMap = util.Bimap("string", "number"),
             compileCommandsWd = compileCommandsWd,
         }
     end,
 
+    addFilesFromGraph = function(self, inclusionGraph)
+        for _, filename in inclusionGraph:iFileNames() do
+            if (self.fileNameWdMap[filename] == nil) then
+                local wd = self.inotifier:add_watch(filename, WATCH_FLAGS)
+
+                -- Assert one-to-oneness. (Should be the case due to us having passed the file names
+                -- through realPathName() earlier.)
+                --
+                -- TODO: this does not need to hold in the presence of hard links though. Test.
+                assert(self.fileNameWdMap[wd] == nil)
+
+                util.BimapAdd(self.fileNameWdMap, filename, wd)
+            end
+        end
+    end,
+
     getWatchedFileCount = function(self)
-        return util.BimapGetCount(self.wdToFileName) + 1
+        return util.BimapGetCount(self.fileNameWdMap) + 1
     end,
 
     getFileName = function(self, event)
-        local filename = self.wdToFileName[event.wd]
+        local filename = self.fileNameWdMap[event.wd]
         assert(filename ~= nil)
         return filename
     end,
@@ -1063,6 +1061,9 @@ local Controller = class
 
             -- If concurrency is requested, will be 'child' or 'parent' after forking:
             whoami = "unforked",
+
+            -- Will be closed and nil'd in child.
+            notifier = Notifier(),
 
             -- Child or unforked will have:
             parser = nil,  -- OnDemandParser
@@ -1120,6 +1121,10 @@ local Controller = class
         if (self:is("unforked")) then
             return self.parser:getAdditionalInfo()
         end
+    end,
+
+    getNotifier = function(self)
+        return self.notifier
     end,
 
     checkCcIdxs_ = function(self, ccIdxs)
@@ -1202,6 +1207,8 @@ local Controller = class
 
         if (self:is("child")) then
             self.connection = connection
+            self.notifier:close()
+            self.notifier = nil
             self:setupParserAndPrinter({ccIdx}, unpack(self.onDemandParserArgs, 2))
             return ChildMarker
         end
@@ -1337,6 +1344,7 @@ local Controller = class
                 if (fDiagSet == nil) then
                     break
                 elseif (ccIdx <= lastCcIdxToPrint) then
+                    self.notifier:addFilesFromGraph(ccInclusionGraphs[ccIdx])
                     self.printer:print(fDiagSet, ccIdx, haveErrorTab)
                     firstUnprocessedIdx = firstUnprocessedIdx + 1
                 end
@@ -1370,8 +1378,9 @@ local Controller = class
             if (self:is("child")) then
                 self:sendToParent(fDiagSet, incGraph)
             else
-                self.printer:print(fDiagSet, ccIndex, haveErrorTab)
                 ccInclusionGraphs[ccIndex] = incGraph
+                self.notifier:addFilesFromGraph(incGraph)
+                self.printer:print(fDiagSet, ccIndex, haveErrorTab)
 
                 if (incrementalMode ~= nil and HasMatchingDiag(fDiagSet, incrementalMode)) then
                     break
@@ -1451,7 +1460,7 @@ local function humanModeMain()
         end
 
         if (not exitImmediately) then
-            notifier = Notifier(ccInclusionGraphs)
+            notifier = control:getNotifier()
             info("Watching %d files.", notifier:getWatchedFileCount())
         end
 
