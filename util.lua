@@ -99,5 +99,46 @@ function api.getCommonPrefix(getString, commonPrefix, ...)
     return commonPrefix
 end
 
+---------- Bimap ----------
+
+local BimapTags = {
+    FIRST_TYPE = {},
+    SECOND_TYPE = {},
+    COUNT = {},
+}
+
+api.Bimap = class
+{
+    function(firstType, secondType)
+        checktype(firstType, 1, "string", 2)
+        checktype(secondType, 2, "string", 2)
+        check(firstType ~= secondType, "arguments #1 and #2 must be distinct", 2)
+
+        return {
+            [BimapTags.FIRST_TYPE] = firstType,
+            [BimapTags.SECOND_TYPE] = secondType,
+            [BimapTags.COUNT] = 0,
+        }
+    end,
+
+    -- NOTE: 'self' itself is used to store the data.
+    -- Hence, the "member functions" are stand-alone.
+}
+
+function api.BimapAdd(self, first, second)
+    checktype(first, 1, self[BimapTags.FIRST_TYPE], 2)
+    checktype(second, 2, self[BimapTags.SECOND_TYPE], 2)
+
+    -- NOTE: No checking of any kind (such as for one-to-oneness).
+    self[first] = second
+    self[second] = first
+
+    self[BimapTags.COUNT] = self[BimapTags.COUNT] + 1
+end
+
+function api.BimapGetCount(self)
+    return self[BimapTags.COUNT]
+end
+
 -- Done!
 return api

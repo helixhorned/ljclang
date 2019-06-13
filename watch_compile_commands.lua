@@ -977,6 +977,76 @@ local ParentMarker = {
     end,
 }
 
+-- Monitors all files that directly named by any compile command or reached by #include,
+-- as well as the compile_commands.json file itself.
+local Notifier = class
+{
+    function(ccInclusionGraphs)
+        local inotifier = inotify.init()
+        local fileNameWdMap = util.Bimap("string", "number")
+
+        for _, graph in ipairs(ccInclusionGraphs) do
+            for _, filename in graph:iFileNames() do
+                if (fileNameWdMap[filename] == nil) then
+                    local wd = inotifier:add_watch(filename, WATCH_FLAGS)
+
+                    -- Assert one-to-oneness. (Should be the case due to us having passed the file names
+                    -- through realPathName() earlier.)
+                    --
+                    -- TODO: this does not need to hold in the presence of hard links though. Test.
+                    assert(fileNameWdMap[wd] == nil)
+
+                    util.BimapAdd(fileNameWdMap, filename, wd)
+                end
+            end
+        end
+
+        local compileCommandsWd = inotifier:add_watch(compileCommandsFile, WATCH_FLAGS)
+
+        return {
+            inotifier = inotifier,
+            wdToFileName = fileNameWdMap,
+            compileCommandsWd = compileCommandsWd,
+        }
+    end,
+
+    getWatchedFileCount = function(self)
+        return util.BimapGetCount(self.wdToFileName) + 1
+    end,
+
+    getFileName = function(self, event)
+        local filename = self.wdToFileName[event.wd]
+        assert(filename ~= nil)
+        return filename
+    end,
+
+    check_ = function(self, printfFunc)
+        assert(self.inotifier ~= nil)
+        local event = self.inotifier:check_(printfFunc)
+        return self:checkEvent_(event)
+    end,
+
+    close = function(self)
+        self.inotifier:close()
+        self.inotifier = nil
+    end,
+
+    checkEvent_ = function(self, event)
+        if (bit.band(event.mask, MOVE_OR_DELETE) ~= 0) then
+            errprintf("Exiting: a watched file was moved or deleted. (Handling not implemented.)")
+            os.exit(ErrorCode.WatchedFileMovedOrDeleted)
+        end
+
+        if (event.wd == self.compileCommandsWd) then
+            errprintf("Exiting: an event was generated for '%s'. (Handling not implemented.)",
+                      compileCommandsFile)
+            os.exit(ErrorCode.CompileCommandsJsonGeneratedEvent)
+        end
+
+        return event
+    end,
+}
+
 local function HasMatchingDiag(fDiagSet, isSeverityRelevant)
     for _, fDiag in ipairs(fDiagSet:getDiags()) do
         if (isSeverityRelevant[fDiag:getSeverity()]) then
@@ -1349,118 +1419,7 @@ local function GetGlobalInclusionGraph(compileCommandCount, ccInclusionGraphs)
     return globalGraph
 end
 
----------- Bimap ----------
-
-local BimapTags = {
-    FIRST_TYPE = {},
-    SECOND_TYPE = {},
-    COUNT = {},
-}
-
-local Bimap = class
-{
-    function(firstType, secondType)
-        checktype(firstType, 1, "string", 2)
-        checktype(secondType, 2, "string", 2)
-        check(firstType ~= secondType, "arguments #1 and #2 must be distinct", 2)
-
-        return {
-            [BimapTags.FIRST_TYPE] = firstType,
-            [BimapTags.SECOND_TYPE] = secondType,
-            [BimapTags.COUNT] = 0,
-        }
-    end,
-
-    -- NOTE: 'self' itself is used to store the data.
-    -- Hence, the "member functions" are stand-alone.
-}
-
-local function BimapAdd(self, first, second)
-    checktype(first, 1, self[BimapTags.FIRST_TYPE], 2)
-    checktype(second, 2, self[BimapTags.SECOND_TYPE], 2)
-
-    -- NOTE: No checking of any kind (such as for one-to-oneness).
-    self[first] = second
-    self[second] = first
-
-    self[BimapTags.COUNT] = self[BimapTags.COUNT] + 1
-end
-
-local function BimapGetCount(self)
-    return self[BimapTags.COUNT]
-end
-
 ------------------------------
-
--- Monitors all files that directly named by any compile command or reached by #include,
--- as well as the compile_commands.json file itself.
-local Notifier = class
-{
-    function(ccInclusionGraphs)
-        local inotifier = inotify.init()
-        local fileNameWdMap = Bimap("string", "number")
-
-        for _, graph in ipairs(ccInclusionGraphs) do
-            for _, filename in graph:iFileNames() do
-                if (fileNameWdMap[filename] == nil) then
-                    local wd = inotifier:add_watch(filename, WATCH_FLAGS)
-
-                    -- Assert one-to-oneness. (Should be the case due to us having passed the file names
-                    -- through realPathName() earlier.)
-                    --
-                    -- TODO: this does not need to hold in the presence of hard links though. Test.
-                    assert(fileNameWdMap[wd] == nil)
-
-                    BimapAdd(fileNameWdMap, filename, wd)
-                end
-            end
-        end
-
-        local compileCommandsWd = inotifier:add_watch(compileCommandsFile, WATCH_FLAGS)
-
-        return {
-            inotifier = inotifier,
-            wdToFileName = fileNameWdMap,
-            compileCommandsWd = compileCommandsWd,
-        }
-    end,
-
-    getWatchedFileCount = function(self)
-        return BimapGetCount(self.wdToFileName) + 1
-    end,
-
-    getFileName = function(self, event)
-        local filename = self.wdToFileName[event.wd]
-        assert(filename ~= nil)
-        return filename
-    end,
-
-    check_ = function(self, printfFunc)
-        assert(self.inotifier ~= nil)
-        local event = self.inotifier:check_(printfFunc)
-        return self:checkEvent_(event)
-    end,
-
-    close = function(self)
-        self.inotifier:close()
-        self.inotifier = nil
-    end,
-
-    checkEvent_ = function(self, event)
-        if (bit.band(event.mask, MOVE_OR_DELETE) ~= 0) then
-            errprintf("Exiting: a watched file was moved or deleted. (Handling not implemented.)")
-            os.exit(ErrorCode.WatchedFileMovedOrDeleted)
-        end
-
-        if (event.wd == self.compileCommandsWd) then
-            errprintf("Exiting: an event was generated for '%s'. (Handling not implemented.)",
-                      compileCommandsFile)
-            os.exit(ErrorCode.CompileCommandsJsonGeneratedEvent)
-        end
-
-        return event
-    end,
-}
 
 local function humanModeMain()
     PrintInitialInfo()
