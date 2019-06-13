@@ -80,9 +80,13 @@ local function usage(hline)
     if (hline) then
         errprint("ERROR: "..hline.."\n")
     end
+
     local progname = arg[0]:match("([^/]+)$")
-    errprint("Usage:\n  "..progname.." [options...] <compile_commands-file>\n")
+
     errprintf([[
+Usage:
+   %s [options...] <compile_commands-file>
+
 In this help text, single quotes ("'") are for exposition purposes only.
 They are never to be spelled in actual option arguments.
 
@@ -125,7 +129,7 @@ Options:
     - '@<number>': single compile command, or
     - '@<number>-' or '-@<number>': range starting or ending with the specified index, or
     - '@<number>-@<number>': inclusive range.]],
-GlobalInclusionGraphRelation)
+progname, GlobalInclusionGraphRelation)
     os.exit(ErrorCode.CommandLine)
 end
 
