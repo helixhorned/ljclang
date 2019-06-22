@@ -170,6 +170,23 @@ local function colorize(...)
     end
 end
 
+local function pluralize(count, noun, pluralSuffix, color)
+    pluralSuffix = pluralSuffix or 's'
+    noun = (count == 0 or count > 1) and noun..pluralSuffix or noun
+    noun = (color ~= nil) and colorize(noun, color) or noun
+    return format("%d %s", count, noun)
+end
+
+local function exists(fileName)
+    local f, msg = io.open(fileName)
+    if (f ~= nil) then
+        f:close()
+        return true
+    end
+    -- LuaJIT always prepends the file name and ': ' if present. Strip it.
+    return false, msg:sub(1 + #fileName + 2)
+end
+
 local NOTE = colorize("NOTE", Col.Bold..Col.Blue)
 
 local function info(fmt, ...)
@@ -485,16 +502,6 @@ local WATCH_FLAGS = bit.bor(IN.CLOSE_WRITE, MOVE_OR_DELETE)
 
 ---------- HUMAN MODE ----------
 
-local function exists(fileName)
-    local f, msg = io.open(fileName)
-    if (f ~= nil) then
-        f:close()
-        return true
-    end
-    -- LuaJIT always prepends the file name and ': ' if present. Strip it.
-    return false, msg:sub(1 + #fileName + 2)
-end
-
 local function DoProcessCompileCommand(cmd, additionalSystemInclude, parseOptions)
     local fileExists, msg = exists(cmd.file)
     if (not fileExists) then
@@ -736,13 +743,6 @@ end
 local function getNormalizedDiag(diagStr)
     -- TODO: inform user about the number of different sites that the diagnostics came from.
     return diagStr:gsub("In file included from [^\n]*\n", "")
-end
-
-local function pluralize(count, noun, pluralSuffix, color)
-    pluralSuffix = pluralSuffix or 's'
-    noun = count > 1 and noun..pluralSuffix or noun
-    noun = (color ~= nil) and colorize(noun, color) or noun
-    return format("%d %s", count, noun)
 end
 
 local function getSeverityString(count, severity, color)
