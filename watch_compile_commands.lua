@@ -289,7 +289,7 @@ if (progressSpec ~= nil) then
     local isSecondsSpecified = (progressSpec:sub(-1) == "s")
 
     if (not isCountSpecified and not isSecondsSpecified) then
-        abort("Argument passed to option -r must have the form 'c<count>' or '<seconds>s'")
+        abort("Argument to option -r must have the form 'c<count>' or '<seconds>s'")
     end
 
     local num =
