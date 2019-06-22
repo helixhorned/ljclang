@@ -151,6 +151,9 @@ local function tweak_compile_commands_table(cmds, hasCommand)
             end
         end
 
+        cmd.arguments, cmd.pchArguments =
+            compile_commands_util.sanitize_args(cmd.arguments, cmd.directory)
+
         -- NOTE: "== 1" is overly strict. I'm just curious about the situation in the wild.
         if (matchCount ~= 1) then
             return nil, PREFIX.."contains an entry for which the name of "..

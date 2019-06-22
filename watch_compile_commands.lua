@@ -74,6 +74,12 @@ local ErrorCode = {
     Internal = 255,
 }
 
+local HomeDir = os.getenv("HOME")
+if (HomeDir == nil) then
+    abort("Failed to obtain home directory from environment variable HOME.")
+end
+
+local PchCacheDirectory = HomeDir.."/.cache/ljclang"
 local GlobalInclusionGraphRelation = "isIncludedBy"
 
 local function usage(hline)
@@ -91,6 +97,12 @@ In this help text, single quotes ("'") are for exposition purposes only.
 They are never to be spelled in actual option arguments.
 
 Options:
+  -a: Enable automatic generation and usage of precompiled headers. For each PCH configuration
+      (state of relevant compiler options) meeting a certain threshold of compile commands that
+      it is used with, a PCH file is generated that includes all standard library headers.
+      Note that this will remove errors due to forgetting to include a standard library header.
+      Only supported for C++11 upwards.
+      Precompiled headers are stored in '%s'.
   -c <concurrency>: set number of parallel parser invocations.
      - 0 means do everything serially (do not fork).
        Limitation: in this mode, changes to watched files lead to a re-processing only after all
@@ -129,13 +141,14 @@ Options:
     - '@<number>': single compile command, or
     - '@<number>-' or '-@<number>': range starting or ending with the specified index, or
     - '@<number>-@<number>': inclusive range.]],
-progname, GlobalInclusionGraphRelation)
+progname, PchCacheDirectory, GlobalInclusionGraphRelation)
     os.exit(ErrorCode.CommandLine)
 end
 
 local parsecmdline = require("parsecmdline_pk")
 
 local opts_meta = {
+    a = false,
     c = true,
     i = true,
     m = false,
@@ -150,6 +163,7 @@ local opts_meta = {
 
 local opts, args = parsecmdline.getopts(opts_meta, arg, usage)
 
+local autoPch = opts.a
 local concurrencyOpt = opts.c or "auto"
 local commandMode = opts.m
 local incrementalMode = opts.i
@@ -192,6 +206,17 @@ local NOTE = colorize("NOTE", Col.Bold..Col.Blue)
 local function info(fmt, ...)
     local func = printGraphMode and errprintf or printf
     func("%s: "..fmt, colorize("INFO", Col.Green), ...)
+end
+
+local function errorInfo(fmt, ...)
+    local func = printGraphMode and errprintf or printf
+    func("%s: "..fmt, colorize("INFO", Col.Bold..Col.Red), ...)
+end
+
+local function exitRequestingBugReport()
+    errorInfo("Please report this issue as a bug.")
+    -- TODO: include URL to github, preferably to the issue tracker with the right branch.
+    os.exit(1)
 end
 
 local function infoAndExit(fmt, ...)
@@ -401,6 +426,199 @@ end
 
 local usedConcurrency = math.min(getUsedConcurrency(), #compileCommands)
 
+if (autoPch ~= nil) then
+    -- First, determine which PCH configurations to use.
+
+    local countThreshold =
+        usedConcurrency >= 16 and usedConcurrency or
+        -- lower bound: we do not want too many PCH configurations on disk.
+        8 + math.floor(usedConcurrency / 2)
+
+    local unsupportedCount = 0
+    -- { [0] = <unique count>, [<PCH file basename>] = <count> }
+    local pchFileCounts = { [0] = 0 }
+    -- { [<running index>] = { <PCH args...> } }
+    local usedPchArgs = {}
+    -- { [<PCH file basename>] = true }
+    local isPchFileUsed = {}
+    -- { [CC index] = <index into usedPchArgs> }
+    local ccUsedPchIdxs = {}
+
+    for _, cmd in ipairs(compileCommands) do
+        local pchArgs = cmd.pchArguments
+        local canHavePch = (type(pchArgs) == "table")
+        assert(canHavePch or type(pchArgs) == "string")
+
+        if (not canHavePch) then
+            assert(pchArgs == "unsupported language")
+            unsupportedCount = unsupportedCount + 1
+        else
+            local fn = pchArgs[#pchArgs]
+            local oldCount = pchFileCounts[fn]
+            pchFileCounts[0] = pchFileCounts[0] + ((oldCount == nil) and 1 or 0)
+            pchFileCounts[fn] = (oldCount ~= nil) and oldCount + 1 or 1
+
+            -- Deliberate: if the *new* count is *one greater* than the threshold,
+            -- use the PCH configuration.
+            if (oldCount == countThreshold) then
+                usedPchArgs[#usedPchArgs + 1] = pchArgs
+                isPchFileUsed[fn] = true
+            end
+        end
+    end
+
+    if (pchFileCounts[0] == 0) then
+        info("Auto-PCH: no supported compile commands.")
+        assert(#usedPchArgs == 0)
+    else
+        local suffix = unsupportedCount > 0 and
+            format(", %s", pluralize(unsupportedCount, "unsupported compile command")) or ""
+
+        info("Auto-PCH: %s of %d in total%s.",
+             #usedPchArgs > 0 and pluralize(#usedPchArgs, "used configuration") or
+                 "no configurations used",
+             pchFileCounts[0], suffix)
+    end
+
+    if (#usedPchArgs == 0) then
+        goto end_pch
+    end
+
+    -- Attach the PCH file name to compile commands that are going to be PCH-enabled.
+
+    local pchDir = PchCacheDirectory
+    local pchEnabledCcCount = 0
+
+    for i, cmd in ipairs(compileCommands) do
+        local pchArgs = cmd.pchArguments
+        assert(cmd.pchFileName == nil)
+
+        if (type(pchArgs) == "table") then
+            local fn = pchArgs[#pchArgs]
+            if (isPchFileUsed[fn]) then
+                cmd.pchFileName = pchDir..'/'..fn
+                pchEnabledCcCount = pchEnabledCcCount + 1
+            end
+        end
+    end
+
+    assert(pchEnabledCcCount > 0)
+    info("Auto-PCH: enabled %d compile commands.", pchEnabledCcCount)
+
+    -- Preparation
+
+    if (os.execute("/bin/mkdir -p "..pchDir) ~= 0) then
+        abort("Failed creating directory for PCH files "..pchDir)
+    end
+
+    -- TODO: pull these from the build configuration.
+    local cxxHeadersHpp = HomeDir.."/dl/ljclang/dev/cxx_headers.hpp"
+    local emptyCpp = HomeDir.."/dl/ljclang/dev/empty.cpp"
+    local clangpp = "/usr/lib/llvm-8/bin/clang++"
+
+    -- Functions
+
+    local generatePch = function(pchArgs)
+        local cmdArgs = { clangpp }
+
+        for _, arg in ipairs(pchArgs) do
+            -- os.execute uses the shell, restrict characters. We do not want quotes or
+            -- spaces, nor any character that could have a special meaning to the shell.
+            -- FIXME: this is too strict. Think about a better way, or use fork & exec.
+            if (arg:match("[^-+~A-Za-z_0-9=.]")) then
+                errorInfo("Auto-PCH: generation command argument\
+  %s\
+contains a disallowed character.", arg)
+                exitRequestingBugReport()
+            end
+            cmdArgs[#cmdArgs + 1] = arg
+        end
+
+        local fullPchFileName = pchArgs.pchFileName
+        cmdArgs[#cmdArgs] = fullPchFileName
+        cmdArgs[#cmdArgs + 1] = cxxHeadersHpp
+        cmdArgs[#cmdArgs + 1] = "2>/dev/null"
+
+        local cmd = table.concat(cmdArgs, ' ')
+
+        -- NOTE: we could parallelize, but that does not seem worth the effort since one
+        -- PCH file is generated once and used from then on until it is invalidated for
+        -- some reason (like an update to standard library headers).
+        local ret = os.execute(cmd)
+
+        if (ret ~= 0) then
+            errorInfo("Auto-PCH: exited with code %d: %s", ret, cmd)
+            exitRequestingBugReport()
+        end
+
+        if (not exists(fullPchFileName)) then
+            errorInfo("Auto-PCH: PCH file to be generated\
+  %s\
+does not exist even though the command to generate it ran successfully.", fullPchFileName)
+            exitRequestingBugReport()
+        end
+    end
+
+    -- Attempts to compile an empty file with the given PCH configuration.
+    local testPch = function(pchArgs)
+        local cmdArgs = { clangpp, "-fsyntax-only", "-include-pch", pchArgs.pchFileName }
+
+        -- Convention of compile_commands_util's getPchGenData():
+        assert(pchArgs[#pchArgs - 1] == "-o")
+
+        for i = 1, #pchArgs - 2 do
+            cmdArgs[#cmdArgs + 1] = pchArgs[i]
+        end
+
+        cmdArgs[#cmdArgs + 1] = emptyCpp
+        cmdArgs[#cmdArgs + 1] = "2>/dev/null"
+
+        return (os.execute(table.concat(cmdArgs, ' ')) == 0)
+    end
+
+    -- PCH file generation loop.
+
+    local genCount, regenCount = 0, 0
+
+    for _, pchArgs in ipairs(usedPchArgs) do
+        local fn = pchDir..'/'..pchArgs[#pchArgs]
+        pchArgs.pchFileName = fn
+
+        if (not exists(fn)) then
+            generatePch(pchArgs)
+            genCount = genCount + 1
+        end
+
+        -- Test usage once. If not successful, the PCH is most likely out of date and needs
+        -- to be regenerated.
+        local ok = testPch(pchArgs)
+
+        if (not ok) then
+            generatePch(pchArgs)
+            regenCount = regenCount + 1
+
+            if (not testPch(pchArgs)) then
+                errorInfo("Auto-PCH: regenerated PCH file\
+  %s\
+did not successfully pass test usage with an empty C++ source file.", fn)
+                exitRequestingBugReport()
+            end
+        end
+    end
+
+    if (genCount == 0 and regenCount == 0) then
+        info("Auto-PCH: all existing PCH files are up to date.")
+    else
+        info("Auto-PCH: generated %s%s.",
+             pluralize(genCount, "PCH file"),
+             regenCount > 0 and format(", regenerated %d", regenCount) or "")
+    end
+
+::end_pch::
+end
+
+-----
+
 local function getCompileCommandFileCounts()
     local counts = {}
     for _, cmd in ipairs(compileCommands) do
@@ -508,7 +726,17 @@ local function DoProcessCompileCommand(cmd, additionalSystemInclude, parseOption
         return nil, msg
     end
 
-    local args = compile_commands_util.sanitize_args(cmd.arguments, cmd.directory)
+    local args = {}
+
+    for i, arg in ipairs(cmd.arguments) do
+        args[i] = arg
+    end
+
+    -- TODO: catch a possible error at this stage.
+    if (cmd.pchFileName ~= nil) then
+        table.insert(args, 1, "-include-pch")
+        table.insert(args, 2, cmd.pchFileName)
+    end
 
     if (additionalSystemInclude ~= nil) then
         table.insert(args, 1, "-isystem")
