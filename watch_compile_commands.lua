@@ -74,10 +74,15 @@ local ErrorCode = {
     Internal = 255,
 }
 
-local HomeDir = os.getenv("HOME")
-if (HomeDir == nil) then
-    abort("Failed to obtain home directory from environment variable HOME.")
+local function getEnv(varName, name)
+    local value = os.getenv(varName)
+    if (value == nil) then
+        abort("Failed to obtain %s from environment variable %s.", name, varName)
+    end
+    return value
 end
+
+local HomeDir = getEnv("HOME", "home directory")
 
 local PchCacheDirectory = HomeDir.."/.cache/ljclang"
 local GlobalInclusionGraphRelation = "isIncludedBy"
@@ -511,9 +516,20 @@ if (autoPch ~= nil) then
         abort("Failed creating directory for PCH files "..pchDir)
     end
 
-    -- TODO: pull these from the build configuration.
-    local cxxHeadersHpp = HomeDir.."/dl/ljclang/dev/cxx_headers.hpp"
-    local emptyCpp = HomeDir.."/dl/ljclang/dev/empty.cpp"
+    local getPchInputFiles = function()
+        local luaPath = getEnv("LUA_PATH", "Lua path")
+        -- KEEPINSYNC with app.sh.in
+        local ljclangDir = luaPath:match(";;(.*)/%?%.lua")
+        if (ljclangDir == nil) then
+            abort("Failed to obtain LJClang directory from Lua path.")
+        end
+
+        return ljclangDir.."/dev/cxx_headers.hpp", ljclangDir.."/dev/empty.cpp"
+    end
+
+    local cxxHeadersHpp, emptyCpp = getPchInputFiles()
+
+    -- TODO: pull this from the build configuration.
     local clangpp = "/usr/lib/llvm-8/bin/clang++"
 
     -- Functions
