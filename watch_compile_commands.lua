@@ -83,7 +83,7 @@ local function usage(hline)
 
     local progname = arg[0]:match("([^/]+)$")
 
-    errprintf([[
+    printf([[
 Usage:
    %s [options...] <compile_commands-file>
 
