@@ -1,3 +1,5 @@
+#!/usr/bin/env luajit
+
 local bit = require("bit")
 local ffi = require("ffi")
 local io = require("io")
@@ -6,16 +8,13 @@ local os = require("os")
 local string = require("string")
 local table = require("table")
 
-local cl = require("ljclang")
+local cl -- loaded later
 local class = require("class").class
 local compile_commands_reader = require("compile_commands_reader")
 local compile_commands_util = require("compile_commands_util")
 local diagnostics_util = require("diagnostics_util")
 local hacks = require("hacks")
-local posix = require("posix")
 local util = require("util")
-
-local POLL = posix.POLL
 
 local inclusion_graph = require("inclusion_graph")
 local InclusionGraph = inclusion_graph.InclusionGraph
@@ -24,9 +23,6 @@ local Col = require("terminal_colors")
 
 local check = require("error_util").check
 local checktype = require("error_util").checktype
-
-local inotify = require("inotify")
-local IN = inotify.IN
 
 local assert = assert
 local collectgarbage = collectgarbage
@@ -342,6 +338,13 @@ local compileCommandsFile = args[1]
 if (compileCommandsFile == nil) then
     usage()
 end
+
+-- Late load to allow printing the help text with a plain invocation.
+cl = require("ljclang")
+local posix = require("posix")
+local POLL = posix.POLL
+local inotify = require("inotify")
+local IN = inotify.IN
 
 ----------
 

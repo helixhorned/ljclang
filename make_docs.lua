@@ -1,6 +1,7 @@
 #!/usr/bin/env luajit
 
 local io = io
+local os = os
 local ipairs = ipairs
 
 if (arg[1] == nil) then
@@ -56,6 +57,8 @@ for i = 1, #docLines do
     end
 end
 
+local homeDir = os.getenv("HOME")
+
 for _, docLine in ipairs(docLines) do
     local searchText = docLine:match("^@@(.*)")
 
@@ -75,6 +78,10 @@ for _, docLine in ipairs(docLines) do
 
         local command = searchText:sub(6)
         local helpText = io.popen(command):read("*a")
+        if (homeDir ~= nil) then
+            -- FIXME: 'homeDir' may (but hopefully does not) contain magic characters.
+            helpText = helpText:gsub(homeDir, "$HOME")
+        end
         io.write(helpText)
 
         io.write("~~~~~~~~~~\n")

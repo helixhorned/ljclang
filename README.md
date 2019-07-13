@@ -8,7 +8,7 @@ LJClang -- A LuaJIT-based interface to libclang
 **[Requirements](#requirements)**\
 **[Building](#building)**\
 **[Overview](#overview)**\
-**[Example program](#example-program)**\
+**[Example programs](#example-programs)**\
 **[Reference](#reference)**\
 **[License](#license)**
 
@@ -65,8 +65,10 @@ object, parse into it one or more translation units, and define a callback
 function to be invoked on each visit of a `Cursor` by libclang.
 
 
-Example program
----------------
+Example programs
+----------------
+
+### `extractdecls.lua`
 
 [`enum CXCursorKind`]:
  http://clang.llvm.org/doxygen/group__CINDEX.html#gaaccc432245b4cd9f2d470913f9ef0013
@@ -127,6 +129,62 @@ lines like
 
 ~~~~~~~~~~
 [215] = "AsmStmt";
+~~~~~~~~~~
+
+### `watch_compile_commands.lua`
+
+~~~~~~~~~~
+Usage:
+   watch_compile_commands.lua [options...] <compile_commands-file>
+
+In this help text, single quotes ("'") are for exposition purposes only.
+They are never to be spelled in actual option arguments.
+
+Options:
+  -a: Enable automatic generation and usage of precompiled headers. For each PCH configuration
+      (state of relevant compiler options) meeting a certain threshold of compile commands that
+      it is used with, a PCH file is generated that includes all standard library headers.
+      Note that this will remove errors due to forgetting to include a standard library header.
+      Only supported for C++11 upwards.
+      Precompiled headers are stored in '$HOME/.cache/ljclang'.
+  -c <concurrency>: set number of parallel parser invocations.
+     - 0 means do everything serially (do not fork).
+       Limitation: in this mode, changes to watched files lead to a re-processing only after all
+       compile commands have been processed.
+     - 'auto' means use hardware concurrency (the default).
+       With concurrecny enabled, changes to watched files lead to a re-processing of affected
+       compile commands as soon as possible.
+  -i <severity-spec>: Enable incremental mode. Stop processing further compile commands on the first
+     diagnostic matching the severity specification. Its syntax one of:
+      1. a comma-separated list, <severity>(,<severity>)*
+         where each <severity> is one of 'note', 'warning', 'error' or 'fatal'.
+      2. a single severity suffixed by '+', meaning to select the specified severity
+         and more serious ones.
+     As a convenience, the specification can also be '-', meaning 'error+'.
+  -g [includes|isIncludedBy]: Print inclusion graph as a DOT (of Graphviz) file to stdout and exit.
+     Argument specifies the relation between graph nodes (which are file names).
+  -l <number>: edge count limit for the graph produced by -g isIncludedBy.
+     If exceeded, a placeholder node is placed.
+  -r [c<commands>|<seconds>s]: report progress after the specified number of
+     processed compile commands or the given time interval.
+     Specifying any of 'c0', 'c1' or '0s' effectively prints progress with each compile command.
+  -s <selector>: Select compile command(s) to process.
+     The following specifications for <selector> are supported:
+      - '@...' or '-@...': by index (see below).
+      - '{<pattern>}': by Lua pattern matching the absolute file name in a compile command.
+      - A single file name which is compared with the suffix of the absolute file name in a
+        compile command.
+  -N: Print all diagnostics. This disables omission of:
+      - diagnostics that follow a Parse Issue error, and
+      - diagnostics that were seen in previous compile commands.
+  -P: Disable color output.
+  -x: exit after parsing and displaying diagnostics once.
+
+  If the argument to option -s starts with '@' or '-@', it must have one of the following forms,
+  where the integral <number> starts with a digit distinct from zero:
+    - '@<number>': single compile command, or
+    - '@<number>-' or '-@<number>': range starting or ending with the specified index, or
+    - '@<number>-@<number>': inclusive range.
 ~~~~~~~~~~
 
 

@@ -59,8 +59,10 @@ object, parse into it one or more translation units, and define a callback
 function to be invoked on each visit of a `Cursor` by libclang.
 
 
-Example program
----------------
+Example programs
+----------------
+
+### `extractdecls.lua`
 
 [`enum CXCursorKind`]:
  http://clang.llvm.org/doxygen/group__CINDEX.html#gaaccc432245b4cd9f2d470913f9ef0013
@@ -92,6 +94,10 @@ lines like
 ~~~~~~~~~~
 [215] = "AsmStmt";
 ~~~~~~~~~~
+
+### `watch_compile_commands.lua`
+
+@@[run]./watch_compile_commands.lua
 
 
 Reference
