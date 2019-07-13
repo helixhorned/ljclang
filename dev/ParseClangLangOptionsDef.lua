@@ -1,7 +1,7 @@
 #!/usr/bin/env luajit
 
 -- This is a development utility program: it parses LLVM's LangOptions.def and produces the
--- precursor a list of PCH-relevant options that need to be handled in addition to the
+-- precursor of a list of PCH-relevant options that need to be handled in addition to the
 -- handling of selected options in compile_commands_util.lua's sanitize_args().
 --
 -- After manually looking at the dependency semantics of the various options (default value,
@@ -110,8 +110,6 @@ local IsIgnoredLangOpt = {
     ["FixedPoint"] = true,
     ["PaddingOnUnsignedFixedPoint"] = true,
 }
-
-local IsMacro = { LANGOPT=true }
 
 while (true) do
     local l = f:read("*l")

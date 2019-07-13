@@ -101,7 +101,7 @@ local function getPchGenArgs(args)
             -- headers. Note that such definitions would cleanly be only allowed to "the
             -- implementation": otherwise, C++17 20.5.4.3.2 [macro.names] restricts *any*
             -- attempt at hooking into standard libraries via the preprocessor. For example,
-            -- LLVM has this:
+            -- building LLVM on Linux has this:
             --  -D_GNU_SOURCE -D__STDC_CONSTANT_MACROS -D__STDC_FORMAT_MACROS -D__STDC_LIMIT_MACROS
             optSeq[#optSeq + 1] = arg
         elseif (arg:find("^-stdlib=")) then
@@ -116,7 +116,7 @@ local function getPchGenArgs(args)
         else
             -- LangOpts handling
 
-            local argUptoEq = arg:match("^-f.-=")  -- NOTE: match shortest sequence up to '='
+            local argUptoEq = arg:match("^-f.-=")  -- NOTE: match *shortest* sequence up to '='
             local isNegative = arg:match("^-fno%-")
 
             local key = argUptoEq
