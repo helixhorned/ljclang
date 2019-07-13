@@ -35,13 +35,6 @@ local function checkStripArg(arg)
     local IsFixedArgToStrip = {
         ["-c"] = true,
         ["-o"] = true,  -- NOTE: stripping the argument is handled at the usage site.
-        -- PIC affects only code generation, not anything up to semantic analysis.  However,
-        -- it is relevant for generation of a precompiled header. (A PCH generated with PIC
-        -- cannot be used for a compilation without, and vice versa.) So, strip it.
-        ["-fpic"] = true,
-        ["-fPIC"] = true,
-        ["-fpie"] = true,
-        ["-fPIE"] = true,
     }
 
     return IsFixedArgToStrip[arg]

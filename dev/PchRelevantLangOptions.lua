@@ -87,6 +87,17 @@ local LangOptions = {
     { "PackStruct", "-fpack-struct=", 0 },
     { "MaxTypeAlign", "-fmax-type-align=", 0 },
     { "AlignDouble", "-malign-double", UNKNOWN },
+    -- PIC-related options are parsed in the driver and passed down to the compiler frontend by
+    -- what appear to be internal options (such as -pic-level). See LLVM's
+    --  clang/lib/Driver/ToolChains/CommonArgs.cpp
+    -- and its uses in
+    --  clang/lib/Driver/ToolChains/Clang.cpp
+    -- So, do not attempt any smartness at our side, just collect them as they are.
+    -- Note that we cannot just strip them: for example, __PIC__ is defined when PIC is enabled.
+    { "", "-fPIC", DEPENDENT },
+    { "", "-fpic", DEPENDENT },
+    { "", "-fPIE", DEPENDENT },
+    { "", "-fpie", DEPENDENT },
     --<
     { "NoInlineDefine", "-finline", DEPENDENT },
     { "NoInlineDefine", "-finline-functions", DEPENDENT },

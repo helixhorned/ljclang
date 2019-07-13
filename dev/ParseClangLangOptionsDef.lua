@@ -86,7 +86,7 @@ local IsIgnoredLangOpt = {
     -- Gave errors for C++ in my (admittedly not exhaustive) testing.
 
     -- May be partly because not applicable to C++, and partly because of incomplete
-    -- understanding. (E.g. similar to: there is no -pic-level: it is handled by -fPIC etc.)
+    -- understanding.
     ["AddressSpaceMapMangling"] = true,
     ["AlignedAllocationUnavailable"] = true,
     ["BlocksRuntimeOptional"] = true,
