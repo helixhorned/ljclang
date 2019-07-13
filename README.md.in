@@ -2,6 +2,11 @@
 LJClang -- A LuaJIT-based interface to libclang
 ===============================================
 
+### Table of Contents
+
+@@[toc]
+
+
 Introduction
 ------------
 

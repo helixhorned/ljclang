@@ -45,13 +45,31 @@ local function findText(table, searchText)
     return lineNum
 end
 
+local sections = {}
+
+for i = 1, #docLines do
+    local docLine = docLines[i]
+    local nextLine = docLines[i + 1] or ""
+    if (docLine:match("^[A-Za-z ]+$") and
+            nextLine == string.rep('-', #docLine)) then
+        sections[#sections + 1] = docLine
+    end
+end
+
 for _, docLine in ipairs(docLines) do
     local searchText = docLine:match("^@@(.*)")
 
     if (searchText == nil) then
-        io.write(docLine)
-        io.write("\n")
-    elseif searchText:sub(1,5) == "[run]" then
+        io.write(docLine, '\n')
+    elseif (searchText == "[toc]") then
+        -- Link to auto-generated anchor tags on GitHub.
+        for i, section in ipairs(sections) do
+            local str = string.format("**[%s](#%s)**%s",
+                                      section, section:lower():gsub(' ', '-'),
+                                      i < #sections and '\\' or "")
+            io.write(str, '\n')
+        end
+    elseif (searchText:sub(1,5) == "[run]") then
 
         io.write("~~~~~~~~~~\n")
 
@@ -64,8 +82,7 @@ for _, docLine in ipairs(docLines) do
         local lineNum = findText(srcLines, searchText)
 
         if (lineNum == nil) then
-            io.write(docLine)
-            io.write("\n")
+            io.write(docLine, '\n')
         else
             for i = lineNum, #srcLines do
                 local line = srcLines[i]
