@@ -22,6 +22,7 @@ ifneq ($(OS),Linux)
     $(error "Unsupported OS")
 endif
 
+bindir := $(shell $(llvm-config) --bindir)
 incdir := $(shell $(llvm-config) --includedir)
 libdir := $(shell $(llvm-config) --libdir)
 lib := -L$(libdir) -lclang
@@ -162,11 +163,11 @@ endif
 test: $(LJCLANG_SUPPORT_SO) $(GENERATED_FILES_STAGE_2)
 	LLVM_LIBDIR="$(libdir)" $(SHELL) ./run_tests.sh
 
-sed_common_commands := s|LJCLANG_DEV_DIR|$(THIS_DIR)|g; s|LLVM_LIBDIR|$(libdir)|g;
+sed_common_commands := s|@LJCLANG_DEV_DIR@|$(THIS_DIR)|g; s|@LLVM_BINDIR@|$(bindir)|g; s|@LLVM_LIBDIR@|$(libdir)|g;
 
 install: $(LJCLANG_SUPPORT_SO) $(GENERATED_FILES_STAGE_2) $(inotify_decls_lua) $(posix_decls_lua)
-	sed "$(sed_common_commands) s|APPLICATION|mgrep|g" ./app.sh.in > $(BINDIR)/mgrep
-	sed "$(sed_common_commands) s|APPLICATION|watch_compile_commands|g" ./app.sh.in > $(BINDIR)/watch_compile_commands
+	sed "$(sed_common_commands) s|@APPLICATION@|mgrep|g" ./app.sh.in > $(BINDIR)/mgrep
+	sed "$(sed_common_commands) s|@APPLICATION@|watch_compile_commands|g" ./app.sh.in > $(BINDIR)/watch_compile_commands
 	chmod +x $(BINDIR)/mgrep
 	chmod +x $(BINDIR)/watch_compile_commands
 

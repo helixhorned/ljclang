@@ -531,9 +531,7 @@ if (autoPch ~= nil) then
     end
 
     local cxxHeadersHpp, emptyCpp = getPchInputFiles()
-
-    -- TODO: pull this from the build configuration.
-    local clangpp = "/usr/lib/llvm-8/bin/clang++"
+    local clangpp = getEnv("LLVM_BINDIR", "LLVM binary directory").."/clang++"
 
     -- Functions
 
