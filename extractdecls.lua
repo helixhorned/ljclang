@@ -10,7 +10,6 @@ local math = require("math")
 local string = require("string")
 local table = require("table")
 
-local cl = require("ljclang")
 local hacks = require("hacks")
 local util = require("util")
 
@@ -96,6 +95,9 @@ local suffixString = opts['2']
 if (#args == 0) then
     usage()
 end
+
+-- Late load to allow printing the help text with a plain invocation.
+local cl = require("ljclang")
 
 if (not extractEnum and enumNameFilterPattern ~= nil) then
     usage("Option -e only available for enum extraction")

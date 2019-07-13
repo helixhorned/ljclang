@@ -51,6 +51,15 @@ for _, docLine in ipairs(docLines) do
     if (searchText == nil) then
         io.write(docLine)
         io.write("\n")
+    elseif searchText:sub(1,5) == "[run]" then
+
+        io.write("~~~~~~~~~~\n")
+
+        local command = searchText:sub(6)
+        local helpText = io.popen(command):read("*a")
+        io.write(helpText)
+
+        io.write("~~~~~~~~~~\n")
     else
         local lineNum = findText(srcLines, searchText)
 
