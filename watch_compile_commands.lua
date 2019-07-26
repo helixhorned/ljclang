@@ -365,6 +365,8 @@ local compileCommandSelection = {
     -- [selected compile command index] = <original compile command index>
 }
 
+local haveFileSelection = (selectionSpec ~= nil) and (selectionSpec:sub(1, 1) == '{')
+
 if (selectionSpec ~= nil) then
     local newCompileCommands = {}
 
@@ -397,7 +399,7 @@ if (selectionSpec ~= nil) then
         if (#newCompileCommands == 0) then
             infoAndExit("Selected empty range.")
         end
-    elseif (selectionSpec:sub(1,1) == '{') then
+    elseif (haveFileSelection) then
         if (selectionSpec:sub(-1) ~= '}') then
             abort("Invalid pattern selection specification to argument '-s'.")
         end
@@ -1112,7 +1114,9 @@ local FormattedDiagSetPrinter = class
             local cmd = compileCommands[ccIndex]
             local originalCcIndex = compileCommandSelection[ccIndex] or ccIndex
 
-            local prefix = format("Command #%d:", originalCcIndex)
+            local prefix = format("Command %s%d:",
+                                  haveFileSelection and "s" or "#",
+                                  haveFileSelection and ccIndex or originalCcIndex)
             local middle = getFileOrdinalText(cmd, ccIndex)
             local suffix = (#toPrint > 0) and "" or " ["..colorize("progress", Col.Green).."]"
 
