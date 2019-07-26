@@ -786,19 +786,29 @@ local function tryGetLanguage(cmd)
     end
 end
 
+local function ShouldEnableHack(diagsStr)
+    local fileName = diagsStr:match("fatal error: '(.*)' file not found")
+
+    -- NOTE: Ideally, we want to match system headers here (though: more insight needed into
+    -- which exactly may fail), but enumerating them seems undesirable. Plus, the matching
+    -- here should be relatively specific so as not to enable the hack when a non-system
+    -- header failed being included. (This can happen if the build system generates files
+    -- with C or C++ code, for example.)
+    return fileName ~= nil and
+        (fileName:match("^std[a-z]+%.h$") -- Attempt to match failing C headers.
+      or fileName:match("^[a-z_]+$"))     -- Attempt to match failing C++ headers.
+end
+
 local function CheckForIncludeError(tu, formattedDiagSet, cmd, additionalIncludeTab)
     if (additionalIncludeTab[1] ~= nil) then
         return
     end
 
     local plainFormattedDiags = formattedDiagSet:getString(false)
+    local enableHack = ShouldEnableHack(plainFormattedDiags)
+    assert(not enableHack or (tu ~= nil))
 
-    local haveIncludeErrors =
-        (plainFormattedDiags:match("fatal error: ") ~= nil) and
-        (plainFormattedDiags:match("'.*' file not found") ~= nil)
-    assert(not haveIncludeErrors or (tu ~= nil))
-
-    if (haveIncludeErrors) then
+    if (enableHack) then
         -- HACK so that certain system includes are found.
         local language = tryGetLanguage(cmd)
 
