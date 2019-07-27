@@ -951,16 +951,19 @@ local function GetNewCcIndexes(ccInclusionGraphs, eventFileName,
 
     local indexes = {}
 
-    -- 1. compile commands affected by the file on which we had watch event.
+    -- 1. compile commands affected by the file on which we had a watch event.
     for ccIdx = 1, #ccInclusionGraphs do
         if (ccInclusionGraphs[ccIdx]:getNode(eventFileName) ~= nil) then
             indexes[#indexes + 1] = ccIdx
         end
     end
 
-    -- 2. compileCommands left over because we stopped early in incremental mode.
-    for i = processedCommandCount + 1, #oldCcIdxs do
-        indexes[#indexes + 1] = oldCcIdxs[i]
+    -- 2. compile commands left over if we stopped early in incremental mode.
+    --  (Also see NOTE STOPPED_EARLY.)
+    if (processedCommandCount < #oldCcIdxs) then
+        for i = processedCommandCount, #oldCcIdxs do
+            indexes[#indexes + 1] = oldCcIdxs[i]
+        end
     end
 
     -- Now, sort+uniquify the two compile command index sequences, for the assert in checkCcIdxs_().
@@ -1743,6 +1746,11 @@ local function humanModeMain()
         end
 
         local currentCcIdxs = control:getCcIdxs()
+        -- NOTE [STOPPED_EARLY]: it could happen that in incremental mode, there was an
+        -- error on the very last compile command. This should be counted as early stop but
+        -- is not, among other things to keep the code simpler. This does mean however that
+        -- if a subsequent run happens due to a change of a file unrelated to the previously
+        -- failing command, the latter will not be re-processed.
         local stoppedEarly = (processedCommandCount < #currentCcIdxs)
 
         info_underline("Processed %s%s in %d seconds.",
