@@ -425,10 +425,10 @@ if (selectionSpec ~= nil) then
                 selectCompileCommand(i)
             end
         end
+    end
 
-        if (#newCompileCommands == 0) then
-            infoAndExit("Found no compile commands with file '%s'.", selectionSpec)
-        end
+    if (#newCompileCommands == 0) then
+        infoAndExit("Found no compile commands matching selection specification.")
     end
 
     compileCommands = newCompileCommands
