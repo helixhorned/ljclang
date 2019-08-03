@@ -1683,6 +1683,19 @@ local function PrintInitialInfo()
     local suffix = (usedConcurrency > 0) and
         format(" with %s", pluralize(usedConcurrency, "worker process", "es")) or ""
     info("Processing %s%s%s.", prefix, middle, suffix)
+
+    if (haveFileSelection) then
+        local selectedCount = #compileCommandSelection
+        local firstCcIdx = compileCommandSelection[1]
+        local lastCcIdx = compileCommandSelection[selectedCount]
+
+        if (selectedCount > 1) then
+            local all = (selectedCount == lastCcIdx - firstCcIdx + 1)
+
+            info("(%s compile commands in the range #%d-#%d.)",
+                 all and "All" or "A subset of", firstCcIdx, lastCcIdx)
+        end
+    end
 end
 
 local function SetSigintHandler()
