@@ -30,7 +30,13 @@ char *strerror(int);
 pid_t fork(void);
 pid_t getpid(void);
 pid_t waitpid(pid_t pid, int *stat_loc, int options);
+int execv(const char *path, char *const argv[]);
 int pipe(int pipefd[2]);
+
+struct _IO_FILE;
+typedef struct _IO_FILE FILE;
+FILE *stdin, *stdout, *stderr;
+FILE *freopen(const char *pathname, const char *mode, FILE *stream);
 ]]
 
 -- NOTE: POSIX integer types declared in ljclang.lua.
@@ -83,6 +89,31 @@ local function call(functionName, ...)
 
     return ret
 end
+
+local char_array_t = ffi.typeof("char [?]")
+local char_ptr_array_t = ffi.typeof("char * [?]")
+
+local function makeArgv(tab)
+    assert(tab[0] ~= nil)
+
+    local argc = #tab + 1
+    local charArrays = {}
+
+    for i = 0, argc - 1 do
+        local str = tab[i]
+        check(type(str) == "string", "table values must be strings", 3)
+
+        local charArray = char_array_t(#str + 1, str)
+        assert(charArray[#str] == 0)
+        charArrays[i] = charArray
+    end
+
+    local argv = char_ptr_array_t(argc + 1, charArrays)
+    argv[argc] = nil
+    return argv
+end
+
+----------
 
 do
     -- Block SIGPIPE so that the writes to pipes with no one to read it (possible only by
@@ -189,6 +220,36 @@ api.fork = function()
         return "child", nil
     else
         return "parent", ret
+    end
+end
+
+-- Example: "/bin/ls", { "-la" }
+api.exec = function(fileName, args)
+    checktype(fileName, 1, "string", 2)
+    check(#fileName > 0 and fileName:sub(1,1) == '/',
+          "argument #1 must be an absolute file name", 2)
+    checktype(args, 2, "table", 2)
+    check(args[0] == nil, "argument #2 must not contain an entry at index 0", 2)
+
+    args[0] = fileName
+
+    local argv = makeArgv(args)
+    call("execv", argv[0], argv)
+    assert(false)
+end
+
+api.freopen = function(pathname, mode, stream)
+    checktype(pathname, 1, "string", 2)
+    checktype(mode, 2, "string", 2)
+
+    check(ffi.istype("FILE *", stream), "argument #3 must be a FILE *", 2)
+    check(stream ~= nil, "argument #3 must be non-NULL")
+
+    local retPtr = C.freopen(pathname, mode, stream)
+
+    if (retPtr == nil) then
+        local message = string.format("freopen failed: %s", getErrnoString())
+        error(message)
     end
 end
 
