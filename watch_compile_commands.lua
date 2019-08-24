@@ -436,6 +436,23 @@ end
 
 local usedConcurrency = math.min(getUsedConcurrency(), #compileCommands)
 
+local function Execute(fileName, args)
+    local whoami, pid = posix.fork()
+
+    if (whoami == "child") then
+        -- Redirect the standard streams.
+        posix.freopen("/dev/null", "r", ffi.C.stdin)
+        posix.freopen("/dev/null", "w", ffi.C.stdout)
+        posix.freopen("/dev/null", "rw", ffi.C.stderr)
+
+        posix.exec(fileName, args)
+    else
+        local status, exitCode = posix.waitpid(pid, 0)
+        assert((status == "exited") == (exitCode == 0))
+        return (status == "exited") and 0 or math.huge
+    end
+end
+
 if (autoPch ~= nil) then
     -- First, determine which PCH configurations to use.
 
@@ -517,7 +534,7 @@ if (autoPch ~= nil) then
 
     -- Preparation
 
-    if (os.execute("/bin/mkdir -p "..pchDir) ~= 0) then
+    if (Execute("/bin/mkdir", {"-p", pchDir}) ~= 0) then
         abort("Failed creating directory for PCH files "..pchDir)
     end
 
@@ -538,35 +555,24 @@ if (autoPch ~= nil) then
     -- Functions
 
     local generatePch = function(pchArgs)
-        local cmdArgs = { clangpp }
+        local cmdArgs = {}
 
         for _, arg in ipairs(pchArgs) do
-            -- os.execute uses the shell, restrict characters. We do not want quotes or
-            -- spaces, nor any character that could have a special meaning to the shell.
-            -- FIXME: this is too strict. Think about a better way, or use fork & exec.
-            if (arg:match("[^-+~A-Za-z_0-9=.]")) then
-                errorInfo("Auto-PCH: generation command argument\
-  %s\
-contains a disallowed character.", arg)
-                exitRequestingBugReport()
-            end
             cmdArgs[#cmdArgs + 1] = arg
         end
 
         local fullPchFileName = pchArgs.pchFileName
         cmdArgs[#cmdArgs] = fullPchFileName
         cmdArgs[#cmdArgs + 1] = cxxHeadersHpp
-        cmdArgs[#cmdArgs + 1] = "2>/dev/null"
-
-        local cmd = table.concat(cmdArgs, ' ')
 
         -- NOTE: we could parallelize, but that does not seem worth the effort since one
         -- PCH file is generated once and used from then on until it is invalidated for
         -- some reason (like an update to standard library headers).
-        local ret = os.execute(cmd)
+        local ret = Execute(clangpp, cmdArgs)
 
         if (ret ~= 0) then
-            errorInfo("Auto-PCH: exited with code %d: %s", ret, cmd)
+            errorInfo("Auto-PCH: exited with non-zero exit code: %s %s",
+                      clangpp, table.concat(cmdArgs, ' '))
             exitRequestingBugReport()
         end
 
@@ -580,7 +586,7 @@ does not exist even though the command to generate it ran successfully.", fullPc
 
     -- Attempts to compile an empty file with the given PCH configuration.
     local testPch = function(pchArgs)
-        local cmdArgs = { clangpp, "-fsyntax-only", "-include-pch", pchArgs.pchFileName }
+        local cmdArgs = { "-fsyntax-only", "-include-pch", pchArgs.pchFileName }
 
         -- Convention of compile_commands_util's getPchGenData():
         assert(pchArgs[#pchArgs - 1] == "-o")
@@ -590,9 +596,8 @@ does not exist even though the command to generate it ran successfully.", fullPc
         end
 
         cmdArgs[#cmdArgs + 1] = emptyCpp
-        cmdArgs[#cmdArgs + 1] = "2>/dev/null"
 
-        return (os.execute(table.concat(cmdArgs, ' ')) == 0)
+        return (Execute(clangpp, cmdArgs) == 0)
     end
 
     -- PCH file generation loop.
