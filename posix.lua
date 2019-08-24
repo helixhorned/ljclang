@@ -194,13 +194,16 @@ end
 
 api.waitpid = function(pid, options)
     check(ffi.istype("pid_t", pid), 1, "argument #1 must be a pid_t", 2)
+    -- Exclude other conventions other than passing an exact PID:
+    check(pid > 0, "argument #1 must be strictly positive", 2)
     checktype(options, 2, "number", 2)
     check(options == 0, "argument #2 must be 0 (not yet implemented)", 2)
 
     local stat_loc = ffi.new("int [1]")
-    local ret = call("waitpid", pid, stat_loc, options)
+    local ret_pid = call("waitpid", pid, stat_loc, options)
+    assert(ret_pid == pid)
 
-    if (ret == 0) then
+    if (stat_loc[0] == 0) then
         return "exited", 0
     end
 
