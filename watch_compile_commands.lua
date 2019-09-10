@@ -245,7 +245,7 @@ end
 
 if (printGraphMode ~= nil) then
     if (printGraphMode ~= "includes" and printGraphMode ~= "isIncludedBy") then
-        abort("Argument to option -g must be 'includes' or 'isIncludedBy'")
+        abort("Argument to option -g must be 'includes' or 'isIncludedBy'.")
     end
 end
 
@@ -293,7 +293,7 @@ end
 
 if (edgeCountLimit ~= nil) then
     if (printGraphMode ~= GlobalInclusionGraphRelation) then
-        abort("Option -l can only be used with -g being %s", GlobalInclusionGraphRelation)
+        abort("Option -l can only be used with -g being %s.", GlobalInclusionGraphRelation)
     end
 end
 
@@ -305,7 +305,7 @@ if (progressSpec ~= nil) then
     local isSecondsSpecified = (progressSpec:sub(-1) == "s")
 
     if (not isCountSpecified and not isSecondsSpecified) then
-        abort("Argument to option -r must have the form 'c<count>' or '<seconds>s'")
+        abort("Argument to option -r must have the form 'c<count>' or '<seconds>s'.")
     end
 
     local num =
@@ -313,7 +313,7 @@ if (progressSpec ~= nil) then
         isSecondsSpecified and tonumber(progressSpec:sub(1,-2))
 
     if (type(num) ~= "number" or not (num >= 0)) then
-        abort("Number passed to option -r must be zero or greater")
+        abort("Number passed to option -r must be zero or greater.")
     end
 
     if (isCountSpecified) then
@@ -379,7 +379,7 @@ if (selectionSpec ~= nil) then
             abort("Invalid index selection specification to argument '-s'.")
         elseif (not (startIndex >= 1 and startIndex <= #compileCommands) or
                 not (endIndex >= 1 and endIndex <= #compileCommands)) then
-            abort("Compile command index for option '-s' out of range [1, %d]", #compileCommands)
+            abort("Compile command index for option '-s' out of range [1, %d].", #compileCommands)
         end
 
         for i = startIndex, endIndex do
@@ -525,7 +525,7 @@ if (autoPch ~= nil) then
     -- Preparation
 
     if (Execute("/bin/mkdir", {"-p", pchDir}) ~= 0) then
-        abort("Failed creating directory for PCH files "..pchDir)
+        abort("Failed creating directory for PCH files %s.", pchDir)
     end
 
     local getPchInputFiles = function()
