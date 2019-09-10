@@ -1149,6 +1149,14 @@ local Connection = class
             _extra = extraFd,
         }
     end,
+
+    close = function(self)
+        self.r:close()
+        self.w:close()
+        -- NOTE: assumes use from parent in PipePair:getConnection() below.
+        assert(self._extra ~= nil)
+        self._extra:close()
+    end,
 }
 
 local PipePair = class
@@ -1366,10 +1374,7 @@ local Controller = class
         local ccIdx = conn.compileCommandIndex
         local readFd = conn.r.fd
 
-        conn.r:close()
-        conn.w:close()
-        assert(conn._extra ~= nil)
-        conn._extra:close()
+        conn:close()
 
         assert(self.readFdToConnIdx[readFd] == connIdx)
         self.readFdToConnIdx[readFd] = nil
