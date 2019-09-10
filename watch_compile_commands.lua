@@ -828,7 +828,6 @@ local function ProcessCompileCommand(ccIndex, parseOptions)
     local count = 0
 
     local formattedDiagSet
-    local hadSomeSystemIncludesAdded = false
 
     repeat
         count = count + 1
@@ -851,7 +850,6 @@ local function ProcessCompileCommand(ccIndex, parseOptions)
 
         local retry = CheckForIncludeError(
             tu, formattedDiagSet, compileCommands[ccIndex], additionalIncludeTab)
-        hadSomeSystemIncludesAdded = hadSomeSystemIncludesAdded or retry
     until (not retry)
 
     local inclusionGraph = (tu ~= nil) and
@@ -863,7 +861,7 @@ local function ProcessCompileCommand(ccIndex, parseOptions)
     collectgarbage()
 
     assert(formattedDiagSet ~= nil and inclusionGraph ~= nil)
-    return formattedDiagSet, inclusionGraph, hadSomeSystemIncludesAdded
+    return formattedDiagSet, inclusionGraph
 end
 
 local OnDemandParser = class
@@ -878,7 +876,6 @@ local OnDemandParser = class
 
             formattedDiagSets = {},
             inclusionGraphs = {},
-            hadSomeSystemIncludesAdded = false,
         }
     end,
 
@@ -893,10 +890,8 @@ local OnDemandParser = class
         local tus, errorCodes = self.tus, self.errorCodes
 
         if (self.formattedDiagSets[i] == nil) then
-            local tmp
-            self.formattedDiagSets[i], self.inclusionGraphs[i], tmp =
+            self.formattedDiagSets[i], self.inclusionGraphs[i] =
                 ProcessCompileCommand(self.ccIndexes[i], self.parseOptions)
-            self.hadSomeSystemIncludesAdded = self.hadSomeSystemIncludesAdded or tmp
         end
 
         return self.formattedDiagSets[i], self.inclusionGraphs[i]
@@ -912,12 +907,6 @@ local OnDemandParser = class
         end
 
         return next, nil, 0
-    end,
-
-    getAdditionalInfo = function(self)
-        if (self.hadSomeSystemIncludesAdded) then
-            return "For some compile commands, system include directories were automatically added."
-        end
     end,
 }
 
@@ -1482,10 +1471,6 @@ local Controller = class
 
     --== Main path ==--
 
-    getAdditionalInfo = function(self)
-        return self.parser:getAdditionalInfo()
-    end,
-
     getNotifier = function(self)
         return self.notifier
     end,
@@ -1707,10 +1692,6 @@ local function humanModeMain()
         if (not exitImmediately) then
             notifier = control:getNotifier()
             info("Watching %d files.", notifier:getWatchedFileCount())
-        end
-
-        if (control:getAdditionalInfo() ~= nil) then
-            info("%s", control:getAdditionalInfo())
         end
 
         local currentCcIdxs = control:getCcIdxs()
