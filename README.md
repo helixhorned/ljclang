@@ -147,13 +147,8 @@ Options:
       Note that this will remove errors due to forgetting to include a standard library header.
       Only supported for C++11 upwards.
       Precompiled headers are stored in '$HOME/.cache/ljclang'.
-  -c <concurrency>: set number of parallel parser invocations.
-     - 0 means do everything serially (do not fork).
-       Limitation: in this mode, changes to watched files lead to a re-processing only after all
-       compile commands have been processed.
-     - 'auto' means use hardware concurrency (the default).
-       With concurrecny enabled, changes to watched files lead to a re-processing of affected
-       compile commands as soon as possible.
+  -c <concurrency>: set number of parallel parser invocations. (Minimum: 1)
+     'auto' means use hardware concurrency (the default).
   -i <severity-spec>: Enable incremental mode. Stop processing further compile commands on the first
      diagnostic matching the severity specification. Its syntax one of:
       1. a comma-separated list, <severity>(,<severity>)*

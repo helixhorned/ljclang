@@ -104,13 +104,8 @@ Options:
       Note that this will remove errors due to forgetting to include a standard library header.
       Only supported for C++11 upwards.
       Precompiled headers are stored in '%s'.
-  -c <concurrency>: set number of parallel parser invocations.
-     - 0 means do everything serially (do not fork).
-       Limitation: in this mode, changes to watched files lead to a re-processing only after all
-       compile commands have been processed.
-     - 'auto' means use hardware concurrency (the default).
-       With concurrecny enabled, changes to watched files lead to a re-processing of affected
-       compile commands as soon as possible.
+  -c <concurrency>: set number of parallel parser invocations. (Minimum: 1)
+     'auto' means use hardware concurrency (the default).
   -i <severity-spec>: Enable incremental mode. Stop processing further compile commands on the first
      diagnostic matching the severity specification. Its syntax one of:
       1. a comma-separated list, <severity>(,<severity>)*
@@ -236,19 +231,14 @@ end
 
 local function getUsedConcurrency()
     if (concurrencyOpt == "auto") then
-        return cl.hardwareConcurrency()
+        return math.max(1, cl.hardwareConcurrency())
     else
-        if (concurrencyOpt ~= "0" and not concurrencyOpt:match("^[1-9][0-9]*$")) then
-            abort("Argument to option -c must be 'auto' or an integral number")
+        if (not concurrencyOpt:match("^[1-9][0-9]*$")) then
+            abort("Argument to option -c must be 'auto' or a positive integral number.")
         end
 
         local c = tonumber(concurrencyOpt)
-        assert(c ~= nil)
-
-        if (not (c >= 0)) then
-            abort("Argument to option -c must be at least 0 if a number")
-        end
-
+        assert(c ~= nil and c >= 1)
         return c
     end
 end
@@ -1195,7 +1185,7 @@ local PipePair = class
             --[[self.toParent.w:close()--]]
             self.toChild.r:close()
             return Connection(self.toParent.r, self.toChild.w,
-                          childPid, self.toParent.w)
+                              childPid, self.toParent.w)
         end
     end,
 }
@@ -1321,26 +1311,25 @@ local Controller = class
         return {
             onDemandParserArgs = { ... },
 
-            -- If concurrency is requested, will be 'child' or 'parent' after forking:
+            -- Will be 'child' or 'parent' after forking:
             whoami = "unforked",
 
             -- Will be closed and nil'd in child.
             notifier = Notifier(),
 
-            -- Child or unforked will have:
+            --== Child will have:
             parser = nil,  -- OnDemandParser
-            printer = nil,  -- FormattedDiagSetPrinter
-
-            -- Child will have:
             connection = nil,  -- Connection
 
             --== Parent will have:
-            -- Table of Connection elements with possible holes. Indexed by the 'connection index'.
+            -- Table of Connection instances, with possible holes. Indexed by the 'connection index'.
             connections = nil,
             -- Table (read file descriptor -> index into self.connections[]).
             readFdToConnIdx = nil,
             -- Contiguous sequence table as argument to posix.poll().
             pendingFds = nil,
+            -- FormattedDiagSetPrinter:
+            printer = nil,
         }
     end,
 
@@ -1354,15 +1343,6 @@ local Controller = class
         return self.connection.w:write(obj)
     end,
 
-    receive = function(self)
-        local str = self.connection.r:read(1)
-        -- NOTE: (quoting from POSIX):
-        --  "If no process has the pipe open for writing, read() shall return 0 to indicate
-        --  end-of-file."
-        assert(#str == 1)
-        return str
-    end,
-
     sendToParent = function(self, fDiagSet, incGraph)
         local fDiagsStr = fDiagSet:serialize()
         local graphStr = incGraph:serialize()
@@ -1370,35 +1350,6 @@ local Controller = class
         self:send(header)
         self:send(fDiagsStr)
         self:send(graphStr)
-    end,
-
-    --== Unforked or parent ==--
-
-    setupParserAndPrinter = function(self, ...)
-        self.parser = OnDemandParser(...)
-        self.printer = FormattedDiagSetPrinter()
-    end,
-
-    getAdditionalInfo = function(self)
-        if (self:is("unforked")) then
-            return self.parser:getAdditionalInfo()
-        end
-    end,
-
-    getNotifier = function(self)
-        return self.notifier
-    end,
-
-    checkCcIdxs_ = function(self, ccIdxs)
-        -- Assert strict monotonicity requirement.
-        for i = 2, #ccIdxs do
-            assert(ccIdxs[i - 1] < ccIdxs[i])
-        end
-        return ccIdxs
-    end,
-
-    getCcIdxs = function(self)
-        return self:checkCcIdxs_(self.onDemandParserArgs[1])
     end,
 
     --== Parent only ==--
@@ -1471,7 +1422,7 @@ local Controller = class
             self.connection = connection
             self.notifier:close()
             self.notifier = nil
-            self:setupParserAndPrinter({ccIdx}, unpack(self.onDemandParserArgs, 2))
+            self.parser = OnDemandParser({ccIdx}, unpack(self.onDemandParserArgs, 2))
             return ChildMarker
         end
 
@@ -1513,7 +1464,7 @@ local Controller = class
             -- We should never get:
             --  - POLL.HUP: we (the parent) keep the write end of the 'child -> parent'
             --      connection open just so that the pipe is always connected.
-            --  - POLL.NVAL: we should always valid pipe file descriptors to poll().
+            --  - POLL.NVAL: we should always pass valid pipe file descriptors to poll().
             --
             -- TODO: deal with possible POLL.ERR?
             assert(pollfds[i].revents == POLL.IN)
@@ -1529,7 +1480,27 @@ local Controller = class
         return connIdxs, haveInotifyFd
     end,
 
-    --== Unforked only ==--
+    --== Main path ==--
+
+    getAdditionalInfo = function(self)
+        return self.parser:getAdditionalInfo()
+    end,
+
+    getNotifier = function(self)
+        return self.notifier
+    end,
+
+    checkCcIdxs_ = function(self, ccIdxs)
+        -- Assert strict monotonicity requirement.
+        for i = 2, #ccIdxs do
+            assert(ccIdxs[i - 1] < ccIdxs[i])
+        end
+        return ccIdxs
+    end,
+
+    getCcIdxs = function(self)
+        return self:checkCcIdxs_(self.onDemandParserArgs[1])
+    end,
 
     setupConcurrency = function(self, ccInclusionGraphs)
         local ccIdxs = self:getCcIdxs()
@@ -1573,8 +1544,7 @@ local Controller = class
                 ii = ii + 1
             end
 
-            -- Now, for each ready child in turn, first inform it that it can go ahead
-            -- printing and then wait for it to complete that.
+            -- Now, for each ready child, receive and handle the data it sent.
             for _, connIdx in ipairs(connIdxs) do
                 if (connIdx == INOTIFY_FD_MARKER) then
                     -- If any watched file has been modified, stop printing.
@@ -1642,14 +1612,12 @@ local Controller = class
     end,
 
     printDiagnostics = function(self, ccInclusionGraphs)
-        if (usedConcurrency == 0) then
-            self:setupParserAndPrinter(unpack(self.onDemandParserArgs))
-        else
-            local marker, processedCcCount = self:setupConcurrency(ccInclusionGraphs)
-            if (not marker:isChild()) then
-                return processedCcCount
-            end
+        local marker, processedCcCount = self:setupConcurrency(ccInclusionGraphs)
+        if (not marker:isChild()) then
+            return processedCcCount
         end
+
+        assert(self:is("child"))
 
         local iterationCount = 0
 
@@ -1657,27 +1625,11 @@ local Controller = class
             iterationCount = iterationCount + 1
             assert((i == 1) == (iterationCount == 1))
 
-            if (self:is("child")) then
-                self:sendToParent(fDiagSet, incGraph)
-            else
-                ccInclusionGraphs[ccIndex] = incGraph
-                self.notifier:addFilesFromGraph(incGraph)
-                self.printer:print(fDiagSet, ccIndex)
-
-                if (incrementalMode ~= nil and HasMatchingDiag(fDiagSet, incrementalMode)) then
-                    break
-                end
-            end
+            self:sendToParent(fDiagSet, incGraph)
         end
 
-        if (self:is("child")) then
-            assert(iterationCount == 1)
-            os.exit(0)
-        end
-
-        self.printer:printTrailingInfo()
-
-        return iterationCount
+        assert(iterationCount == 1)
+        os.exit(0)
     end,
 }
 
@@ -1685,8 +1637,8 @@ local function PrintInitialInfo()
     local prefix = pluralize(#compileCommands, "compile command")
     local middle = (selectionSpec ~= nil) and
         format(" (of %d)", compileCommandSelection.originalCount) or ""
-    local suffix = (usedConcurrency > 0) and
-        format(" with %s", pluralize(usedConcurrency, "worker process", "es")) or ""
+    local suffix =
+        format(" with %s", pluralize(usedConcurrency, "worker process", "es"))
     info("Processing %s%s%s.", prefix, middle, suffix)
 
     if (haveFileSelection) then
@@ -1704,13 +1656,11 @@ local function PrintInitialInfo()
 end
 
 local function SetSigintHandler()
-    if (usedConcurrency > 0) then
-        -- Set SIGINT handling to default (that is, to terminate the receiving process)
-        -- instead of the Lua debug hook set by LuaJIT in order to avoid being spammed
-        -- with backtraces from the child processes.
-        local SIG = posix.SIG
-        posix.signal(SIG.INT, SIG.DFL)
-    end
+    -- Set SIGINT handling to default (that is, to terminate the receiving process)
+    -- instead of the Lua debug hook set by LuaJIT in order to avoid being spammed
+    -- with backtraces from the child processes.
+    local SIG = posix.SIG
+    posix.signal(SIG.INT, SIG.DFL)
 end
 
 local function GetGlobalInclusionGraph(compileCommandCount, ccInclusionGraphs)
