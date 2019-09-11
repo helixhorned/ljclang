@@ -165,21 +165,19 @@ Options:
      Specifying any of 'c0', 'c1' or '0s' effectively prints progress with each compile command.
   -s <selector>: Select compile command(s) to process.
      The following specifications for <selector> are supported:
-      - '@...' or '-@...': by index (see below).
+      - '@...': by index (see below).
       - '{<pattern>}': by Lua pattern matching the absolute file name in a compile command.
-      - A single file name which is compared with the suffix of the absolute file name in a
-        compile command.
   -N: Print all diagnostics. This disables omission of:
       - diagnostics that follow a Parse Issue error, and
       - diagnostics that were seen in previous compile commands.
   -P: Disable color output.
   -x: exit after parsing and displaying diagnostics once.
 
-  If the argument to option -s starts with '@' or '-@', it must have one of the following forms,
-  where the integral <number> starts with a digit distinct from zero:
+  If the argument to option -s starts with '@', it must have one of the following forms,
+  where the integral <number> starts with a decimal digit distinct from zero:
     - '@<number>': single compile command, or
-    - '@<number>-' or '-@<number>': range starting or ending with the specified index, or
-    - '@<number>-@<number>': inclusive range.
+    - '@<number>..': range starting with the specified index, or
+    - '@<number>..<number>': inclusive range.
 ~~~~~~~~~~
 
 

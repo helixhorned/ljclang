@@ -121,21 +121,19 @@ Options:
      Specifying any of 'c0', 'c1' or '0s' effectively prints progress with each compile command.
   -s <selector>: Select compile command(s) to process.
      The following specifications for <selector> are supported:
-      - '@...' or '-@...': by index (see below).
+      - '@...': by index (see below).
       - '{<pattern>}': by Lua pattern matching the absolute file name in a compile command.
-      - A single file name which is compared with the suffix of the absolute file name in a
-        compile command.
   -N: Print all diagnostics. This disables omission of:
       - diagnostics that follow a Parse Issue error, and
       - diagnostics that were seen in previous compile commands.
   -P: Disable color output.
   -x: exit after parsing and displaying diagnostics once.
 
-  If the argument to option -s starts with '@' or '-@', it must have one of the following forms,
-  where the integral <number> starts with a digit distinct from zero:
+  If the argument to option -s starts with '@', it must have one of the following forms,
+  where the integral <number> starts with a decimal digit distinct from zero:
     - '@<number>': single compile command, or
-    - '@<number>-' or '-@<number>': range starting or ending with the specified index, or
-    - '@<number>-@<number>': inclusive range.]],
+    - '@<number>..': range starting with the specified index, or
+    - '@<number>..<number>': inclusive range.]],
 progname, CacheDirectory, GlobalInclusionGraphRelation)
     os.exit(ErrorCode.CommandLine)
 end
@@ -362,11 +360,12 @@ local function HandleSelectionSpec(compileCmds, selectSpec)
         -- [selected compile command index] = <original compile command index>
     }
 
-    local haveFileSelection = (selectSpec ~= nil) and (selectSpec:sub(1, 1) == '{')
-
     if (selectSpec == nil) then
-        return compileCmds, compileCmdSelection, haveFileSelection
+        return compileCmds, compileCmdSelection, false
     end
+
+    local haveIndexSelection = (selectSpec:sub(1, 1) == '@')
+    local haveFileSelection = (selectSpec:sub(1, 1) == '{')
 
     local newCompileCmds = {}
 
@@ -376,19 +375,29 @@ local function HandleSelectionSpec(compileCmds, selectSpec)
         compileCmdSelection[newIndex] = i
     end
 
-    if (selectSpec:match("^-?@")) then
-        local startStr = selectSpec:match("^@[1-9][0-9]*") or ""
-        local endStr = selectSpec:match("@[1-9][0-9]*$") or ""
-        local startIndex = tonumber(startStr:sub(2)) or 1
-        local endIndex = tonumber(endStr:sub(2)) or #compileCmds
+    if (haveIndexSelection) then
+        local startStr, rangeStr, endStr = selectSpec:match("^@([1-9][0-9]*)([%.]*)([0-9]*)$")
 
-        local isSingleIndex = (selectSpec == startStr and selectSpec == endStr)
-        local isRange = (selectSpec == startStr..'-'..endStr)
+        local isValid =
+            (startStr ~= nil and rangeStr ~= nil and endStr ~= nil) and
+            (rangeStr == "" or rangeStr == "..") and
+            (endStr == "" or endStr:sub(1,1) ~= '0')
 
-        if (not isSingleIndex and not isRange) then
+        if (not isValid) then
             abort("Invalid index selection specification to argument '-s'.")
-        elseif (not (startIndex >= 1 and startIndex <= #compileCmds) or
-                not (endIndex >= 1 and endIndex <= #compileCmds)) then
+        end
+
+        -- NOTE: in Lua, if assert() returns, it returns the value passed.
+        --  Check that the argument value was properly converted this way.
+        local startIndex = assert(tonumber(startStr)) or 1
+        local endIndex =
+            endStr ~= "" and assert(tonumber(endStr)) or  -- @<number>..<number>
+            rangeStr ~= "" and #compileCmds or            -- @<number>..
+            startIndex                                    -- @<number>
+
+        assert(startIndex >= 1 and endIndex >= 1)
+
+        if (not (startIndex <= #compileCmds) or not (endIndex <= #compileCmds)) then
             abort("Compile command index for option '-s' out of range [1, %d].", #compileCmds)
         end
 
@@ -419,12 +428,7 @@ local function HandleSelectionSpec(compileCmds, selectSpec)
             end
         end
     else
-        local suffix = selectSpec
-        for i, cmd in ipairs(compileCmds) do
-            if (#cmd.file >= #suffix and cmd.file:sub(-#suffix) == suffix) then
-                selectCompileCommand(i)
-            end
-        end
+        abort("Invalid selection specification to argument '-s'.")
     end
 
     if (#newCompileCmds == 0) then
