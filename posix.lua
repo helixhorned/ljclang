@@ -24,6 +24,7 @@ ffi.cdef[[
 ssize_t read(int, void *, size_t);
 ssize_t write(int, const void *, size_t);
 int close(int);
+int dup2(int oldfd, int newfd);
 
 char *strerror(int);
 
@@ -127,6 +128,9 @@ end
 
 local uint8_array_t = ffi.typeof("uint8_t [?]")
 
+api.STDOUT_FILENO = 1
+api.STDERR_FILENO = 2
+
 api.Fd = class
 {
     function(fd)
@@ -165,6 +169,14 @@ api.Fd = class
         local bytesWritten = call("write", self.fd, obj, length)
         assert(bytesWritten <= length)
         return bytesWritten
+    end,
+
+    -- Redirect 'fd' to us.
+    capture = function(self, fd)
+        checktype(fd, 1, "number", 2)
+        local ret = call("dup2", self.fd, fd)
+        assert(ret == fd)
+        return ret
     end,
 
     close = function(self)
