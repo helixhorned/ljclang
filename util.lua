@@ -99,6 +99,16 @@ function api.getCommonPrefix(getString, commonPrefix, ...)
     return commonPrefix
 end
 
+function api.copySequence(tab)
+    local newTab = {}
+
+    for i = 1,#tab do
+        newTab[i] = tab[i]
+    end
+
+    return newTab
+end
+
 ---------- Bimap ----------
 
 local BimapTags = {

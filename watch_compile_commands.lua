@@ -740,11 +740,7 @@ local function DoProcessCompileCommand(cmd, additionalSystemInclude, parseOption
         return nil, msg
     end
 
-    local args = {}
-
-    for i, arg in ipairs(cmd.arguments) do
-        args[i] = arg
-    end
+    local args = util.copySequence(cmd.arguments)
 
     -- TODO: catch a possible error at this stage.
     if (cmd.pchFileName ~= nil) then
