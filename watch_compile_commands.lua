@@ -13,7 +13,6 @@ local class = require("class").class
 local compile_commands_reader = require("compile_commands_reader")
 local compile_commands_util = require("compile_commands_util")
 local diagnostics_util = require("diagnostics_util")
-local hacks = require("hacks")
 local util = require("util")
 
 local inclusion_graph = require("inclusion_graph")
@@ -524,9 +523,8 @@ local function Execute(fileName, args)
     end
 end
 
--- FIXME: error results if pipe pair is pulled into the function.
---  (Because it is garbage collected too early? -> anchor?)
-local function ExecuteAsync(fileName, args, pipePair)
+local function ExecuteAsync(fileName, args)
+    local pipePair = PipePair()
     local whoami, pid = posix.fork()
     local conn = pipePair:getConnection(whoami)
 
@@ -734,6 +732,168 @@ did not successfully pass test usage with an empty C++ source file.", fn)
 ::end_pch::
 end
 
+-- Preparation: run 'clang -v' on the compile commands. We use it to extact and add to the
+-- search path the system include directories added by the Clang driver (see e.g. functions
+-- AddClangSystemIncludeArgs() under LLVM's clang/lib/Driver/ToolChains/*.cpp). Omitting this
+-- yields include errors on certain system includes. See
+-- http://clang.llvm.org/docs/LibTooling.html#builtin-includes
+
+do
+    local clang = getEnv("LLVM_BINDIR", "LLVM binary directory").."/clang"
+
+    local ccCount = #compileCommands
+    local localConcurrency = math.min(usedConcurrency, ccCount)
+
+    -- Second return value: argument list signature for caching results of computations on
+    --  the argument list. Note that this caching only works as long as we do not process
+    --  the include dependencies. But, by the time we do, we hopefully have a way of running
+    --  this preparation concurrently with the main parsing loop.
+    local getArgsAndSig = function(ccIdx)
+        local cmd = compileCommands[ccIdx]
+        local args = util.copySequence(cmd.arguments)
+
+        -- Get the last dot-separated component as the extension.
+        local ext = args[cmd.fileNameIdx]:match("%.([^%.]+)$")
+
+        if (ext ~= nil) then
+            -- We do not use the include dependency output, so use an empty dummy file.
+            -- (Quick test using all LLVM CCs: 2s vs 8s.)
+            local dummyFileName = CacheDirectory..'/empty.'..ext
+
+            -- Create the empty file with the same extension as the source file.
+            -- (Since Clang potentially uses the extension to decide for a language.)
+            local f = io.open(dummyFileName, 'w') or
+                errorInfoAndExit("Failed opening '%s'.", dummyFileName)
+            f:close()
+
+            args[cmd.fileNameIdx] = dummyFileName
+        end
+
+        -- Request verbose information.
+        table.insert(args, 1, "-v")
+        -- Request header dependency information, running only to the preprocessing stage.
+        -- TODO: use the output produced by this.
+        table.insert(args, 2, "-MM")
+        table.insert(args, 3, "-MG")
+
+        -- Compute arguments' signature, keeping only those on which '-v' output depends.
+        -- TODO: likely, this can be made more precise, dropping more irrelevant arguments
+        --  than just the file name.
+        local sigArgs = util.copySequence(cmd.arguments)
+        table.remove(sigArgs, cmd.fileNameIdx)
+
+        -- NOTE: the extension is considered significant to the caching mechanism!
+        return args, ext..'\0\0'..table.concat(sigArgs, '\0')
+    end
+
+    -- { [<index into compileCommands>] = Callable (blocks until process finishes) }
+    local futures = {}
+    -- { [<signature>] = false/true }
+    local seenSignature = {}
+    -- { [<signature>] = <string (output of clang command)> }
+    local resultForSignature = {}
+    -- { [<index into compileCommands>] = <signature> }
+    local signatureForCcIdx = {}
+
+    local spawnWorker = function(ccIdx)
+        local args, signature = getArgsAndSig(ccIdx)
+        signatureForCcIdx[ccIdx] = signature
+
+        if (seenSignature[signature] == nil) then
+            seenSignature[signature] = true
+            futures[ccIdx] = ExecuteAsync(clang, args)
+            return true
+        end
+    end
+
+    local headCcIdx = 1
+    local workerCount = 0
+
+    local spawnWorkers = function()
+        while (workerCount < usedConcurrency and headCcIdx <= ccCount) do
+            if (spawnWorker(headCcIdx)) then
+                workerCount = workerCount + 1
+            end
+            headCcIdx = headCcIdx + 1
+        end
+    end
+
+    local getResult = function(ccIdx)
+        local future = futures[ccIdx]
+        local ccSig = signatureForCcIdx[ccIdx]
+
+        assert((future ~= nil) == (resultForSignature[ccSig] == nil))
+
+        if (future ~= nil) then
+            local result = future()
+            workerCount = workerCount - 1
+
+            if (result == nil) then
+                local argsStr = table.concat((getArgsAndSig(ccIdx)), ' ')
+                errorInfo("Failed running preparatory step for compile command #%d:\n%s %s",
+                          ccIdx, clang, argsStr)
+                exitRequestingBugReport()
+            end
+
+            -- Retain the requested concurrency.
+            spawnWorkers()
+
+            -- Cache the result.
+            resultForSignature[ccSig] = result
+        end
+
+        return resultForSignature[ccSig]
+    end
+
+    local handleWorkerOutput = function(output, finishedCcIdx)
+        assert(type(output) == "string")
+
+        local cmd = compileCommands[finishedCcIdx]
+
+        do
+            -- NOTE: this depends on the precise formatting of the '-v' output.
+            --  Further, we assume that the command line arguments are on the same line.
+            local _, endIdx = output:find(' "'..clang..'" -cc1 ', 1, true)
+
+            if (endIdx == nil) then
+                errorInfo("For command #%d (%s), did not find clang -cc1 invocation in '-v' output.",
+                          finishedCcIdx, cmd.file:match("[^/]+$"))
+                -- NOTE: do not make this fatal. Just do not add the implicit include paths,
+                -- likely leading to errors down the road.
+            else
+                local ccArgs = cmd.arguments
+                local cc1Line = output:sub(endIdx + 1):match("^([^\n]+)\n")
+
+                for includeDir in cc1Line:gmatch("-internal[-extrnc]*-isystem ([^ ]+)") do
+                    -- NOTE: we get 'unknown argument' if we pass '-internal-...'.
+                    ccArgs[#ccArgs + 1] = "-isystem"
+                    ccArgs[#ccArgs + 1] = includeDir
+                end
+            end
+        end
+    end
+
+    ----
+
+    local startTime = os.time()
+
+    -- Initial batch.
+    spawnWorkers()
+
+    -- Handle children in a FIFO fashion.
+    -- TODO: if necessary (which seems unlikely), handle in a poll() way.
+    for ccIdx = 1, ccCount do
+        local result = getResult(ccIdx)
+        handleWorkerOutput(result, ccIdx)
+    end
+
+    local prepTime = os.difftime(os.time(), startTime)
+
+    if (prepTime >= 2) then
+        info("Prepared compile commands in %d seconds.", prepTime)
+    end
+end
+
 -----
 
 local function getCompileCommandFileCounts()
@@ -837,7 +997,7 @@ local WATCH_FLAGS = bit.bor(IN.CLOSE_WRITE, MOVE_OR_DELETE)
 
 ---------- HUMAN MODE ----------
 
-local function DoProcessCompileCommand(cmd, additionalSystemInclude, parseOptions)
+local function DoProcessCompileCommand(cmd, parseOptions)
     local fileExists, msg = exists(cmd.file)
     if (not fileExists) then
         return nil, msg
@@ -849,11 +1009,6 @@ local function DoProcessCompileCommand(cmd, additionalSystemInclude, parseOption
     if (cmd.pchFileName ~= nil) then
         table.insert(args, 1, "-include-pch")
         table.insert(args, 2, cmd.pchFileName)
-    end
-
-    if (additionalSystemInclude ~= nil) then
-        table.insert(args, 1, "-isystem")
-        table.insert(args, 2, additionalSystemInclude)
     end
 
     local index = cl.createIndex(true, false)
@@ -868,88 +1023,24 @@ local function info_underline(fmt, ...)
          colorize(": "..text, Col.Uline..Col.White))
 end
 
-local function tryGetLanguage(cmd)
-    -- Minimalistic, since only needed for a hack.
-
-    if (cmd.file:sub(-2) == ".c") then
-        return "c"
-    end
-
-    for _, arg in ipairs(cmd.arguments) do
-        if (arg:sub(1,8) == "-std=c++") then
-            return "c++"
-        end
-    end
-end
-
-local function ShouldEnableHack(diagsStr)
-    local fileName = diagsStr:match("fatal error: '(.*)' file not found")
-
-    -- NOTE: Ideally, we want to match system headers here (though: more insight needed into
-    -- which exactly may fail), but enumerating them seems undesirable. Plus, the matching
-    -- here should be relatively specific so as not to enable the hack when a non-system
-    -- header failed being included. (This can happen if the build system generates files
-    -- with C or C++ code, for example.)
-    return fileName ~= nil and
-        (fileName:match("^std[a-z]+%.h$") -- Attempt to match failing C headers.
-      or fileName:match("^[a-z_]+$"))     -- Attempt to match failing C++ headers.
-end
-
-local function CheckForIncludeError(tu, formattedDiagSet, cmd, additionalIncludeTab)
-    if (additionalIncludeTab[1] ~= nil) then
-        return
-    end
-
-    local plainFormattedDiags = formattedDiagSet:getString(false)
-    local enableHack = ShouldEnableHack(plainFormattedDiags)
-    assert(not enableHack or (tu ~= nil))
-
-    if (enableHack) then
-        -- HACK so that certain system includes are found.
-        local language = tryGetLanguage(cmd)
-
-        if (language == "c" or language == "c++") then
-            hacks.addSystemInclude(additionalIncludeTab, language)
-        else
-            -- Bail out. TODO: do not.
-            errprintf("INTERNAL ERROR: don't know how to attempt fixing includes"..
-                      " for language that was not determined automatically")
-            os.exit(ErrorCode.Internal)
-        end
-
-        return true
-    end
-end
-
 local function ProcessCompileCommand(ccIndex, parseOptions)
     local tu, errorCodeOrString
-    local additionalIncludeTab = {}
-    local count = 0
-
     local formattedDiagSet
 
-    repeat
-        count = count + 1
-        assert(count <= 2)
+    tu, errorCodeOrString = DoProcessCompileCommand(
+        compileCommands[ccIndex], parseOptions)
 
-        tu, errorCodeOrString = DoProcessCompileCommand(
-            compileCommands[ccIndex], additionalIncludeTab[2], parseOptions)
-
-        if (tu == nil) then
-            formattedDiagSet = diagnostics_util.FormattedDiagSet(not plainMode)
-            -- TODO: Extend in verbosity and/or handling?
-            local info = format("%s: index:parse() failed: %s",
-                                colorize("ERROR", Col.Bold..Col.Red),
-                                errorCodeOrString)
-            formattedDiagSet:setInfo(info)
-        else
-            formattedDiagSet = diagnostics_util.GetDiags(
-                tu:diagnosticSet(), not plainMode, printAllDiags)
-        end
-
-        local retry = CheckForIncludeError(
-            tu, formattedDiagSet, compileCommands[ccIndex], additionalIncludeTab)
-    until (not retry)
+    if (tu == nil) then
+        formattedDiagSet = diagnostics_util.FormattedDiagSet(not plainMode)
+        -- TODO: Extend in verbosity and/or handling?
+        local info = format("%s: index:parse() failed: %s",
+                            colorize("ERROR", Col.Bold..Col.Red),
+                            errorCodeOrString)
+        formattedDiagSet:setInfo(info)
+    else
+        formattedDiagSet = diagnostics_util.GetDiags(
+            tu:diagnosticSet(), not plainMode, printAllDiags)
+    end
 
     local inclusionGraph = (tu ~= nil) and
         InclusionGraph_ProcessTU(InclusionGraph(), tu) or
