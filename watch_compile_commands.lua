@@ -341,63 +341,70 @@ local IN = inotify.IN
 
 ----------
 
-local compileCommands, errorMessage =
-    compile_commands_reader.read_compile_commands(compileCommandsFile)
+local function ReadCompileCommands()
+    local compileCmds, errorMessage =
+        compile_commands_reader.read_compile_commands(compileCommandsFile)
 
-if (compileCommands == nil) then
-    errprintf("ERROR: failed loading '%s': %s", compileCommandsFile, errorMessage)
-    os.exit(ErrorCode.CompilationDatabaseLoad)
-end
-
-if (#compileCommands == 0) then
-    infoAndExit("'%s' contains zero entries.", compileCommandsFile)
-end
-
-local compileCommandSelection = {
-    originalCount = #compileCommands,
-    -- [selected compile command index] = <original compile command index>
-}
-
-local haveFileSelection = (selectionSpec ~= nil) and (selectionSpec:sub(1, 1) == '{')
-
-if (selectionSpec ~= nil) then
-    local newCompileCommands = {}
-
-    local function selectCompileCommand(i)
-        local newIndex = #newCompileCommands + 1
-        newCompileCommands[newIndex] = compileCommands[i]
-        compileCommandSelection[newIndex] = i
+    if (compileCmds == nil) then
+        errprintf("ERROR: failed loading '%s': %s", compileCommandsFile, errorMessage)
+        os.exit(ErrorCode.CompilationDatabaseLoad)
     end
 
-    if (selectionSpec:match("^-?@")) then
-        local startStr = selectionSpec:match("^@[1-9][0-9]*") or ""
-        local endStr = selectionSpec:match("@[1-9][0-9]*$") or ""
-        local startIndex = tonumber(startStr:sub(2)) or 1
-        local endIndex = tonumber(endStr:sub(2)) or #compileCommands
+    if (#compileCmds == 0) then
+        infoAndExit("'%s' contains zero entries.", compileCommandsFile)
+    end
 
-        local isSingleIndex = (selectionSpec == startStr and selectionSpec == endStr)
-        local isRange = (selectionSpec == startStr..'-'..endStr)
+    return compileCmds, #compileCmds
+end
+
+local function HandleSelectionSpec(compileCmds, selectSpec)
+    local compileCmdSelection = {
+        -- [selected compile command index] = <original compile command index>
+    }
+
+    local haveFileSelection = (selectSpec ~= nil) and (selectSpec:sub(1, 1) == '{')
+
+    if (selectSpec == nil) then
+        return compileCmds, compileCmdSelection, haveFileSelection
+    end
+
+    local newCompileCmds = {}
+
+    local function selectCompileCommand(i)
+        local newIndex = #newCompileCmds + 1
+        newCompileCmds[newIndex] = compileCmds[i]
+        compileCmdSelection[newIndex] = i
+    end
+
+    if (selectSpec:match("^-?@")) then
+        local startStr = selectSpec:match("^@[1-9][0-9]*") or ""
+        local endStr = selectSpec:match("@[1-9][0-9]*$") or ""
+        local startIndex = tonumber(startStr:sub(2)) or 1
+        local endIndex = tonumber(endStr:sub(2)) or #compileCmds
+
+        local isSingleIndex = (selectSpec == startStr and selectSpec == endStr)
+        local isRange = (selectSpec == startStr..'-'..endStr)
 
         if (not isSingleIndex and not isRange) then
             abort("Invalid index selection specification to argument '-s'.")
-        elseif (not (startIndex >= 1 and startIndex <= #compileCommands) or
-                not (endIndex >= 1 and endIndex <= #compileCommands)) then
-            abort("Compile command index for option '-s' out of range [1, %d].", #compileCommands)
+        elseif (not (startIndex >= 1 and startIndex <= #compileCmds) or
+                not (endIndex >= 1 and endIndex <= #compileCmds)) then
+            abort("Compile command index for option '-s' out of range [1, %d].", #compileCmds)
         end
 
         for i = startIndex, endIndex do
             selectCompileCommand(i)
         end
 
-        if (#newCompileCommands == 0) then
+        if (#newCompileCmds == 0) then
             infoAndExit("Selected empty range.")
         end
     elseif (haveFileSelection) then
-        if (selectionSpec:sub(-1) ~= '}') then
+        if (selectSpec:sub(-1) ~= '}') then
             abort("Invalid pattern selection specification to argument '-s'.")
         end
 
-        local pattern = selectionSpec:sub(2,-2)
+        local pattern = selectSpec:sub(2,-2)
 
         do
             local ok, msg = pcall(function() return pattern:match(pattern) end)
@@ -406,28 +413,32 @@ if (selectionSpec ~= nil) then
             end
         end
 
-        for i, cmd in ipairs(compileCommands) do
+        for i, cmd in ipairs(compileCmds) do
             if (cmd.file:match(pattern)) then
                 selectCompileCommand(i)
             end
         end
     else
-        local suffix = selectionSpec
-        for i, cmd in ipairs(compileCommands) do
+        local suffix = selectSpec
+        for i, cmd in ipairs(compileCmds) do
             if (#cmd.file >= #suffix and cmd.file:sub(-#suffix) == suffix) then
                 selectCompileCommand(i)
             end
         end
     end
 
-    if (#newCompileCommands == 0) then
+    if (#newCompileCmds == 0) then
         infoAndExit("Found no compile commands matching selection specification.")
     end
 
-    compileCommands = newCompileCommands
+    return newCompileCmds, compileCmdSelection, haveFileSelection
 end
 
+local compileCommands, originalCcCount = ReadCompileCommands()
 local usedConcurrency = math.min(getUsedConcurrency(), #compileCommands)
+
+local compileCommands, compileCommandSelection, haveFileSelection =
+    HandleSelectionSpec(compileCommands, selectionSpec)
 
 ----------
 
@@ -1767,7 +1778,7 @@ local Controller = class
 local function PrintInitialInfo()
     local prefix = pluralize(#compileCommands, "compile command")
     local middle = (selectionSpec ~= nil) and
-        format(" (of %d)", compileCommandSelection.originalCount) or ""
+        format(" (of %d)", originalCcCount) or ""
     local suffix =
         format(" with %s", pluralize(usedConcurrency, "worker process", "es"))
     info("Processing %s%s%s.", prefix, middle, suffix)
