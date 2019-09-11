@@ -546,6 +546,21 @@ local function ExecuteAsync(fileName, args, pipePair)
     end
 end
 
+local function GetPchInputFiles()
+    local luaPath = getEnv("LUA_PATH", "Lua path")
+    -- KEEPINSYNC with app.sh.in
+    local ljclangDir = luaPath:match(";;(.*)/%?%.lua")
+    if (ljclangDir == nil) then
+        abort("Failed to obtain LJClang directory from Lua path.")
+    end
+
+    return ljclangDir.."/dev/cxx_headers.hpp", ljclangDir.."/dev/empty.cpp"
+end
+
+if (Execute("/bin/mkdir", {"-p", CacheDirectory}) ~= 0) then
+    errorInfoAndExit("Failed creating cache directory %s.", CacheDirectory)
+end
+
 if (autoPch ~= nil) then
     -- First, determine which PCH configurations to use.
 
@@ -625,24 +640,9 @@ if (autoPch ~= nil) then
     assert(pchEnabledCcCount > 0)
     info("Auto-PCH: enabled %d compile commands.", pchEnabledCcCount)
 
-    -- Preparation
+    -- Files in fixed paths
 
-    if (Execute("/bin/mkdir", {"-p", pchDir}) ~= 0) then
-        abort("Failed creating directory for PCH files %s.", pchDir)
-    end
-
-    local getPchInputFiles = function()
-        local luaPath = getEnv("LUA_PATH", "Lua path")
-        -- KEEPINSYNC with app.sh.in
-        local ljclangDir = luaPath:match(";;(.*)/%?%.lua")
-        if (ljclangDir == nil) then
-            abort("Failed to obtain LJClang directory from Lua path.")
-        end
-
-        return ljclangDir.."/dev/cxx_headers.hpp", ljclangDir.."/dev/empty.cpp"
-    end
-
-    local cxxHeadersHpp, emptyCpp = getPchInputFiles()
+    local cxxHeadersHpp, emptyCpp = GetPchInputFiles()
     local clangpp = getEnv("LLVM_BINDIR", "LLVM binary directory").."/clang++"
 
     -- Functions
