@@ -430,6 +430,85 @@ end
 
 local usedConcurrency = math.min(getUsedConcurrency(), #compileCommands)
 
+----------
+
+local Connection = class
+{
+    function(readFd, writeFd, childPid, extraFd)
+        assert(readFd ~= nil)
+        assert(writeFd ~= nil)
+
+        return {
+            r = readFd,
+            w = writeFd,
+
+            -- May be nil:
+            childPid = childPid,
+            _extra = extraFd,
+        }
+    end,
+
+    close = function(self)
+        self.r:close()
+        self.w:close()
+
+        if (self._extra ~= nil) then
+            self._extra:close()
+        end
+    end,
+}
+
+local PipePair = class
+{
+    function()
+        return {
+            toParent = posix.pipe(),
+            toChild = posix.pipe(),
+        }
+    end,
+
+    getConnection = function(self, whoami, childPid)
+        assert(whoami == "child" or whoami == "parent")
+
+        if (whoami == "child") then
+            self.toParent.r:close()
+            self.toChild.w:close()
+            return Connection(self.toChild.r, self.toParent.w)
+        else
+            local toParentW = (childPid ~= nil) and self.toParent.w or nil
+
+            if (toParentW == nil) then
+                self.toParent.w:close()
+            else
+                -- Deliberately keep open the write end of the 'child -> parent'
+                -- connection in the parent so that we never get POLL.HUP from poll().
+            end
+
+            self.toChild.r:close()
+            return Connection(self.toParent.r, self.toChild.w,
+                              childPid, toParentW)
+        end
+    end,
+}
+
+local function ReadAll(readFd)
+    local readParts = {}
+
+    repeat
+        readParts[#readParts + 1] = readFd:read(8192)
+    until (#readParts[#readParts] == 0)
+
+    readParts[#readParts] = nil
+    return table.concat(readParts)
+end
+
+local function WaitForChild(pid)
+    local status, exitCode = posix.waitpid(pid, 0)
+    assert((status == "exited") == (exitCode == 0))
+    -- Return 'huge' value to signal we do not know the real return value.
+    return (status == "exited") and 0 or math.huge
+end
+
 local function Execute(fileName, args)
     local whoami, pid = posix.fork()
 
@@ -441,9 +520,29 @@ local function Execute(fileName, args)
 
         posix.exec(fileName, args)
     else
-        local status, exitCode = posix.waitpid(pid, 0)
-        assert((status == "exited") == (exitCode == 0))
-        return (status == "exited") and 0 or math.huge
+        return WaitForChild(pid)
+    end
+end
+
+-- FIXME: error results if pipe pair is pulled into the function.
+--  (Because it is garbage collected too early? -> anchor?)
+local function ExecuteAsync(fileName, args, pipePair)
+    local whoami, pid = posix.fork()
+    local conn = pipePair:getConnection(whoami)
+
+    if (whoami == "child") then
+        -- Redirect stdout and stderr to the write end of the passed pipe.
+        conn.w:capture(posix.STDOUT_FILENO)
+        conn.w:capture(posix.STDERR_FILENO)
+
+        posix.exec(fileName, args)
+    else
+        return function()
+            local str = ReadAll(conn.r)
+            conn:close()
+            local exitCode = WaitForChild(pid)
+            return (exitCode == 0) and str or nil
+        end
     end
 end
 
@@ -1134,55 +1233,6 @@ local FormattedDiagSetPrinter = class
                 pluralize(self.numCommandsWithOmittedDiags, "compile command"),
                 pluralize(self.totalOmittedDiagCounts:getTotal(), "repeated diagnostic"),
                 self.totalOmittedDiagCounts:getString())
-        end
-    end,
-}
-
-local Connection = class
-{
-    function(readFd, writeFd, childPid, extraFd)
-        return {
-            r = readFd,
-            w = writeFd,
-
-            childPid = childPid,
-            _extra = extraFd,
-        }
-    end,
-
-    close = function(self)
-        self.r:close()
-        self.w:close()
-        -- NOTE: assumes use from parent in PipePair:getConnection() below.
-        assert(self._extra ~= nil)
-        self._extra:close()
-    end,
-}
-
-local PipePair = class
-{
-    function()
-        return {
-            toParent = posix.pipe(),
-            toChild = posix.pipe(),
-        }
-    end,
-
-    getConnection = function(self, whoami, childPid)
-        assert(whoami == "child" or whoami == "parent")
-        assert((whoami == "parent") == (childPid ~= nil))
-
-        if (whoami == "child") then
-            self.toParent.r:close()
-            self.toChild.w:close()
-            return Connection(self.toChild.r, self.toParent.w)
-        else
-            -- NOTE: deliberately keep open the write end of the 'child -> parent'
-            -- connection in the parent so that we never get POLL.HUP from poll().
-            --[[self.toParent.w:close()--]]
-            self.toChild.r:close()
-            return Connection(self.toParent.r, self.toChild.w,
-                              childPid, self.toParent.w)
         end
     end,
 }
