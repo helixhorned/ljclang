@@ -265,24 +265,26 @@ api.freopen = function(pathname, mode, stream)
     end
 end
 
+local pid_t = ffi.typeof("pid_t")
+
 api.waitpid = function(pid, options)
     check(ffi.istype("pid_t", pid), 1, "argument #1 must be a pid_t", 2)
-    -- Exclude other conventions other than passing an exact PID:
-    check(pid > 0, "argument #1 must be strictly positive", 2)
+    -- Exclude other conventions other than passing -1 or an exact PID:
+    check(pid == -1 or pid > 0, "argument #1 must be -1 or strictly positive", 2)
     checktype(options, 2, "number", 2)
     check(options == 0, "argument #2 must be 0 (not yet implemented)", 2)
 
     local stat_loc = ffi.new("int [1]")
     local ret_pid = call("waitpid", pid, stat_loc, options)
-    assert(ret_pid == pid)
+    assert(pid == -1 or ret_pid == pid)
 
     if (stat_loc[0] == 0) then
-        return "exited", 0
+        return "exited", 0, ret_pid
     end
 
     -- Any other condition than exiting with status 0: not implemented.
     -- (We would have to have the W*() macros from sys/wait.h here somehow.)
-    return "NYI", -1
+    return "NYI", -1, pid_t(-1)
 end
 
 api.pipe = function()
