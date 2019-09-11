@@ -209,10 +209,14 @@ local function errorInfo(fmt, ...)
     func("%s: "..fmt, colorize("INFO", Col.Bold..Col.Red), ...)
 end
 
-local function exitRequestingBugReport()
-    errorInfo("Please report this issue as a bug.")
-    -- TODO: include URL to github, preferably to the issue tracker with the right branch.
+local function errorInfoAndExit(fmt, ...)
+    errorInfo(fmt, ...)
     os.exit(1)
+end
+
+local function exitRequestingBugReport()
+    errorInfoAndExit("Please report this issue as a bug.")
+    -- TODO: include URL to github, preferably to the issue tracker with the right branch.
 end
 
 local function infoAndExit(fmt, ...)
