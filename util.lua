@@ -150,5 +150,24 @@ function api.BimapGetCount(self)
     return self[BimapTags.COUNT]
 end
 
+---------- BoolArray ----------
+
+local function CheckIsFiniteInt(number, argIdx)
+    checktype(number, argIdx, "number", 3)
+    check(number >= 1 and number < math.huge, "argument must be a finite number", 3)
+    check(math.floor(number) == number, "argument must be an integral number", 3)
+end
+
+api.BoolArray = function(size, initialValue)
+    CheckIsFiniteInt(size, 1)
+    checktype(initialValue, 2, "boolean", 2)
+
+    local array = {}
+    for i = 1,size do
+        array[i] = initialValue
+    end
+    return array
+end
+
 -- Done!
 return api

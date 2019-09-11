@@ -119,8 +119,12 @@ Options:
   -r [c<commands>|<seconds>s]: report progress after the specified number of
      processed compile commands or the given time interval.
      Specifying any of 'c0', 'c1' or '0s' effectively prints progress with each compile command.
-  -s <selector>: Select compile command(s) to process.
-     The following specifications for <selector> are supported:
+  -s [-]<selector1> [-s [-]<selector2> ...]: Select compile command(s) to process.
+     Selectors are processed in the order they appear on the command line. Each selector can
+     be prefixed by '-', which means to remove the matching set of compile commands from the
+     current set. If a removal appears first, the initial set contains all compile commands,
+     otherwise it is empty.
+     Each <selector> can be one of:
       - '@...': by index (see below).
       - '{<pattern>}': by Lua pattern matching the absolute file name in a compile command.
   -N: Print all diagnostics. This disables omission of:
@@ -129,7 +133,7 @@ Options:
   -P: Disable color output.
   -x: exit after parsing and displaying diagnostics once.
 
-  If the argument to option -s starts with '@', it must have one of the following forms,
+  If the selector to an option -s starts with '@', it must have one of the following forms,
   where the integral <number> starts with a decimal digit distinct from zero:
     - '@<number>': single compile command, or
     - '@<number>..': range starting with the specified index, or
@@ -148,7 +152,7 @@ local opts_meta = {
     g = true,
     l = true,
     r = true,
-    s = true,
+    s = 1,  -- collect all instances
     N = false,
     P = false,
     x = false,
@@ -163,7 +167,7 @@ local incrementalMode = opts.i
 local printGraphMode = opts.g
 local edgeCountLimit = tonumber(opts.l)
 local progressSpec = opts.r
-local selectionSpec = opts.s
+local selectionSpecs = opts.s
 local printAllDiags = opts.N or false
 local plainMode = opts.P
 local exitImmediately = opts.x or printGraphMode
@@ -352,27 +356,24 @@ local function ReadCompileCommands()
         infoAndExit("'%s' contains zero entries.", compileCommandsFile)
     end
 
-    return compileCmds, #compileCmds
+    return compileCmds
 end
 
-local function HandleSelectionSpec(compileCmds, selectSpec)
-    local compileCmdSelection = {
-        -- [selected compile command index] = <original compile command index>
-    }
+local function HandleSelectionSpec(compileCmds, fullSelectSpec, specIdx,
+                                   currentIsSelected --[[modified in-place]])
+    local specPrefix, selectSpec = fullSelectSpec:match("^(%-?)(.*)$")
+    assert(selectSpec ~= nil)
 
-    if (selectSpec == nil) then
-        return compileCmds, compileCmdSelection, false
-    end
+    local isAddition = (specPrefix == "");
+    assert(isAddition or specPrefix == '-')
 
-    local haveIndexSelection = (selectSpec:sub(1, 1) == '@')
-    local haveFileSelection = (selectSpec:sub(1, 1) == '{')
-
-    local newCompileCmds = {}
+    local selType = selectSpec:sub(1, 1)
+    local haveIndexSelection = (selType == '@')
+    local haveFileSelection = (selType == '{')
+    local errorSuffix = format("at '-s' option #%d", specIdx)
 
     local function selectCompileCommand(i)
-        local newIndex = #newCompileCmds + 1
-        newCompileCmds[newIndex] = compileCmds[i]
-        compileCmdSelection[newIndex] = i
+        currentIsSelected[i] = isAddition
     end
 
     if (haveIndexSelection) then
@@ -384,7 +385,7 @@ local function HandleSelectionSpec(compileCmds, selectSpec)
             (endStr == "" or endStr:sub(1,1) ~= '0')
 
         if (not isValid) then
-            abort("Invalid index selection specification to argument '-s'.")
+            abort("Invalid index selection specification %s.", errorSuffix)
         end
 
         -- NOTE: in Lua, if assert() returns, it returns the value passed.
@@ -398,19 +399,20 @@ local function HandleSelectionSpec(compileCmds, selectSpec)
         assert(startIndex >= 1 and endIndex >= 1)
 
         if (not (startIndex <= #compileCmds) or not (endIndex <= #compileCmds)) then
-            abort("Compile command index for option '-s' out of range [1, %d].", #compileCmds)
+            abort("Compile command index out of range [1, %d] %s.",
+                  #compileCmds, errorSuffix)
+        end
+
+        if (startIndex > endIndex) then
+            infoAndExit("Selected empty range %s.", errorSuffix)
         end
 
         for i = startIndex, endIndex do
             selectCompileCommand(i)
         end
-
-        if (#newCompileCmds == 0) then
-            infoAndExit("Selected empty range.")
-        end
     elseif (haveFileSelection) then
         if (selectSpec:sub(-1) ~= '}') then
-            abort("Invalid pattern selection specification to argument '-s'.")
+            abort("Invalid pattern selection specification %s.", errorSuffix)
         end
 
         local pattern = selectSpec:sub(2,-2)
@@ -418,7 +420,7 @@ local function HandleSelectionSpec(compileCmds, selectSpec)
         do
             local ok, msg = pcall(function() return pattern:match(pattern) end)
             if (not ok) then
-                abort("Invalid pattern to argument '-s': %s.", msg)
+                abort("Invalid pattern %s: %s.", errorSuffix, msg)
             end
         end
 
@@ -428,21 +430,61 @@ local function HandleSelectionSpec(compileCmds, selectSpec)
             end
         end
     else
-        abort("Invalid selection specification to argument '-s'.")
+        abort("Invalid selection specification %s.", errorSuffix)
     end
 
-    if (#newCompileCmds == 0) then
-        infoAndExit("Found no compile commands matching selection specification.")
-    end
-
-    return newCompileCmds, compileCmdSelection, haveFileSelection
+    return haveFileSelection
 end
 
-local compileCommands, originalCcCount = ReadCompileCommands()
-local usedConcurrency = math.min(getUsedConcurrency(), #compileCommands)
+local function HandleAllSelectionSpecs()
+    assert(type(selectionSpecs) == "table")
 
-local compileCommands, compileCommandSelection, haveFileSelection =
-    HandleSelectionSpec(compileCommands, selectionSpec)
+    local allCompileCommands = ReadCompileCommands()
+
+    local selectInfo = {
+        -- [selected compile command index] = <original compile command index>
+        indexMap = {},
+
+        originalCcCount = #allCompileCommands,
+        haveFileSelection = false,
+        isContiguous = true,
+    }
+
+    if (#selectionSpecs == 0) then
+        return allCompileCommands, selectInfo
+    end
+
+    local firstSpecIsRemoval = (selectionSpecs[1]:sub(1,1) == '-')
+    local isCcSelected = util.BoolArray(#allCompileCommands, firstSpecIsRemoval)
+
+    for specIdx, spec in ipairs(selectionSpecs) do
+        selectInfo.haveFileSelection =
+            HandleSelectionSpec(allCompileCommands, spec, specIdx, isCcSelected) or
+            selectInfo.haveFileSelection
+    end
+
+    local newCompileCommands = {}
+
+    for i, cmd in ipairs(allCompileCommands) do
+        if (isCcSelected[i]) then
+            local newIdx = #newCompileCommands + 1
+            newCompileCommands[newIdx] = cmd
+            selectInfo.indexMap[newIdx] = i
+        end
+    end
+
+    if (#newCompileCommands == 0) then
+        infoAndExit("No compile commands remaining after selection.")
+    end
+
+    local sel = selectInfo.indexMap
+    selectInfo.isContiguous = (#sel == sel[#sel] - sel[1] + 1)
+
+    return newCompileCommands, selectInfo
+end
+
+local compileCommands, selectionInfo = HandleAllSelectionSpecs()
+local usedConcurrency = math.min(getUsedConcurrency(), #compileCommands)
 
 ----------
 
@@ -1304,11 +1346,13 @@ local FormattedDiagSetPrinter = class
 
         if (shouldPrint) then
             local cmd = compileCommands[ccIndex]
-            local originalCcIndex = compileCommandSelection[ccIndex] or ccIndex
+            local selInfo = selectionInfo
+            local originalCcIndex = selInfo.indexMap[ccIndex] or ccIndex
+            local printLocalIdx = (selInfo.haveFileSelection or not selInfo.isContiguous)
 
             local prefix = format("Command %s%d:",
-                                  haveFileSelection and "s" or "#",
-                                  haveFileSelection and ccIndex or originalCcIndex)
+                                  printLocalIdx and "s" or "#",
+                                  printLocalIdx and ccIndex or originalCcIndex)
             local middle = getFileOrdinalText(cmd, ccIndex)
             local suffix = (#toPrint > 0) and "" or " ["..colorize("progress", Col.Green).."]"
 
@@ -1781,23 +1825,16 @@ local Controller = class
 
 local function PrintInitialInfo()
     local prefix = pluralize(#compileCommands, "compile command")
-    local middle = (selectionSpec ~= nil) and
-        format(" (of %d)", originalCcCount) or ""
+    local middle = (#selectionSpecs > 0) and
+        format(" (of %d)", selectionInfo.originalCcCount) or ""
     local suffix =
         format(" with %s", pluralize(usedConcurrency, "worker process", "es"))
     info("Processing %s%s%s.", prefix, middle, suffix)
 
-    if (haveFileSelection) then
-        local selectedCount = #compileCommandSelection
-        local firstCcIdx = compileCommandSelection[1]
-        local lastCcIdx = compileCommandSelection[selectedCount]
-
-        if (selectedCount > 1) then
-            local all = (selectedCount == lastCcIdx - firstCcIdx + 1)
-
-            info("(%s compile commands in the range #%d-#%d.)",
-                 all and "All" or "A subset of", firstCcIdx, lastCcIdx)
-        end
+    if (selectionInfo.haveFileSelection) then
+        local sel = selectionInfo.indexMap
+        info("(%s compile commands in the range #%d-#%d.)",
+             selectionInfo.isContiguous and "All" or "A subset of", sel[1], sel[#sel])
     end
 end
 

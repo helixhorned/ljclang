@@ -163,8 +163,12 @@ Options:
   -r [c<commands>|<seconds>s]: report progress after the specified number of
      processed compile commands or the given time interval.
      Specifying any of 'c0', 'c1' or '0s' effectively prints progress with each compile command.
-  -s <selector>: Select compile command(s) to process.
-     The following specifications for <selector> are supported:
+  -s [-]<selector1> [-s [-]<selector2> ...]: Select compile command(s) to process.
+     Selectors are processed in the order they appear on the command line. Each selector can
+     be prefixed by '-', which means to remove the matching set of compile commands from the
+     current set. If a removal appears first, the initial set contains all compile commands,
+     otherwise it is empty.
+     Each <selector> can be one of:
       - '@...': by index (see below).
       - '{<pattern>}': by Lua pattern matching the absolute file name in a compile command.
   -N: Print all diagnostics. This disables omission of:
@@ -173,7 +177,7 @@ Options:
   -P: Disable color output.
   -x: exit after parsing and displaying diagnostics once.
 
-  If the argument to option -s starts with '@', it must have one of the following forms,
+  If the selector to an option -s starts with '@', it must have one of the following forms,
   where the integral <number> starts with a decimal digit distinct from zero:
     - '@<number>': single compile command, or
     - '@<number>..': range starting with the specified index, or
