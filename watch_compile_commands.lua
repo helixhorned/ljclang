@@ -80,7 +80,7 @@ end
 
 local HomeDir = getEnv("HOME", "home directory")
 
-local PchCacheDirectory = HomeDir.."/.cache/ljclang"
+local CacheDirectory = HomeDir.."/.cache/ljclang"
 local GlobalInclusionGraphRelation = "isIncludedBy"
 
 local function usage(hline)
@@ -137,7 +137,7 @@ Options:
     - '@<number>': single compile command, or
     - '@<number>-' or '-@<number>': range starting or ending with the specified index, or
     - '@<number>-@<number>': inclusive range.]],
-progname, PchCacheDirectory, GlobalInclusionGraphRelation)
+progname, CacheDirectory, GlobalInclusionGraphRelation)
     os.exit(ErrorCode.CommandLine)
 end
 
@@ -503,7 +503,7 @@ if (autoPch ~= nil) then
 
     -- Attach the PCH file name to compile commands that are going to be PCH-enabled.
 
-    local pchDir = PchCacheDirectory
+    local pchDir = CacheDirectory
     local pchEnabledCcCount = 0
 
     for i, cmd in ipairs(compileCommands) do
