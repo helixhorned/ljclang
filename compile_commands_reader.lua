@@ -157,8 +157,17 @@ local function tweak_compile_commands_table(cmds, hasCommand)
         -- NOTE: "== 1" is overly strict. I'm just curious about the situation in the wild.
         if (matchCount ~= 1) then
             return nil, PREFIX.."contains an entry for which the name of "..
-                "the compiled file is not found in the compiler arguments"
+                "the compiled file is not found exactly once in the compiler arguments"
         end
+
+        for ai, arg in ipairs(cmd.arguments) do
+            if (arg == absoluteFileName) then
+                cmd.fileNameIdx = ai
+                break
+            end
+        end
+
+        assert(cmd.fileNameIdx ~= nil)
     end
 
     return cmds
