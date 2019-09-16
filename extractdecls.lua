@@ -157,11 +157,16 @@ if (tu == nil) then
     os.exit(1)
 end
 
+local haveErrors = false
+
 if (not quiet) then
     local diags = tu:diagnosticSet()
 
     for i=1,#diags do
         local d = diags[i]
+        local severity = d:severity()
+        haveErrors = haveErrors or (severity == "error" or severity == "fatal")
+
         io.stderr:write(d:format().."\n")
     end
 end
@@ -309,4 +314,8 @@ end
 
 if (suffixString) then
     print(suffixString)
+end
+
+if (haveErrors) then
+    os.exit(1)
 end
