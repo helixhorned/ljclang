@@ -51,15 +51,20 @@ local function getopts(opt_meta, arg, usage)
         if (processOpts and arg[i]:sub(1,1)=="-") then
             local opt = arg[i]:sub(2)
             skipnext = opt_meta[opt]
+
             if (skipnext == nil) then
                 usage("Unrecognized option "..arg[i])
             elseif (skipnext) then
                 if (arg[i+1] == nil) then
                     usage()
                 end
+
                 if (skipnext~=true) then
                     opts[opt][#opts[opt]+1] = arg[i+1]
                 else
+                    if (opts[opt] ~= nil) then
+                        usage("Duplicate option "..arg[i])
+                    end
                     opts[opt] = arg[i+1]
                 end
             else
