@@ -391,6 +391,27 @@ describe("Virtual functions", function()
         assert.is.equal(sig, Fr:displayName())
     end)
 
+    -- NOTE: this thematically belongs to test case "Cross-referencing",
+    -- but fits here test-implementation-wise.
+    it("tests Cursor:referenced()", function()
+        assert.is.equal(Dc[1]:kind(), "CXXBaseSpecifier")
+        assert.is.equal(Dc[2]:kind(), "CXXBaseSpecifier")
+
+        local typeRefs = {
+            Dc[1]:children()[1],
+            Dc[2]:children()[1]
+        }
+
+        for _, typeRef in ipairs(typeRefs) do
+            assert.is_not_nil(typeRef)
+            assert.is.equal(typeRef:kind(), "TypeRef")
+            assert.is_not_nil(typeRef:referenced())
+        end
+
+        assert.is.equal(typeRefs[1]:referenced(), B)
+        assert.is.equal(typeRefs[2]:referenced(), I)
+    end)
+
     it("tests Cursor:virtualBase()", function()
         assert.has_error(function() tuCursor:isVirtualBase() end,
                          "cursor must have kind CXXBaseSpecifier")
