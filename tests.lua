@@ -8,8 +8,10 @@ local it = it
 
 local collectgarbage = collectgarbage
 local ipairs = ipairs
+local rawequal = rawequal
 local type = type
 local tostring = tostring
+local unpack = unpack
 
 local cl = require("ljclang")
 
@@ -290,14 +292,16 @@ describe("Loading a file with includes", function()
     end)
 end)
 
-describe("Enumerations", function()
-    local fileName = "test_data/enums.hpp"
-
+local function GetTU(fileName)
     local tu = cl.createIndex():parse(fileName, clangOpts)
     assert.is_not_nil(tu)
     local diags = tu:diagnosticSet()
     assert.are.equal(#diags, 0)
+    return tu
+end
 
+describe("Enumerations", function()
+    local tu = GetTU("test_data/enums.hpp")
     local tuCursor = tu:cursor()
 
     it("tests various queries on enumerations", function()
@@ -354,5 +358,44 @@ describe("Enumerations", function()
         end
 
         assert.are_same(expectedEnums, enums)
+    end)
+end)
+
+describe("Virtual functions", function()
+    local tu = GetTU("test_data/virtual.hpp")
+    local tuCursor = tu:cursor()
+
+    local classDefs = tuCursor:children()
+    assert.is.equal(#classDefs, 4)
+
+    local I, B, D, F = unpack(classDefs)
+    local Ic, Bc, Dc, Fc = I:children(), B:children(), D:children(), F:children()
+
+    it("tests the number of children of each class definition", function()
+        assert.are.same({#Ic, #Bc, #Dc, #Fc}, {2, 3, 3, 3})
+    end)
+
+    -- Obtain the cursors for our reference function "getIt()".
+    local Ir, Br, Dr, Fr = Ic[1], Bc[#Bc], Dc[#Dc], Fc[2]
+
+    it("tests that the cursors refer to functions with identical signature", function()
+        assert.are.same({Ir:kind(), Br:kind(), Dr:kind(), Fr:kind()},
+                        {"CXXMethod", "CXXMethod", "CXXMethod", "CXXMethod"})
+        local sig = Ir:displayName()
+        assert.is_true(sig == "getIt()")
+        assert.is.equal(sig, Br:displayName())
+        assert.is.equal(sig, Dr:displayName())
+        assert.is.equal(sig, Fr:displayName())
+    end)
+
+    it("tests Cursor:overriddenCursors()", function()
+        assert.are.same(Ir:overriddenCursors(), {})
+        assert.are.same(Br:overriddenCursors(), {})
+
+        local Do = Dr:overriddenCursors()
+        assert.is_true(type(Do) == "table")
+        assert.are.same(Do, {Br, Ir})
+
+        assert.are.same(Fr:overriddenCursors(), {Dr})
     end)
 end)

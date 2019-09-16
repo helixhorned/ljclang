@@ -59,6 +59,10 @@ end
 
 -----=====
 
+local CXCursor = ffi.typeof("CXCursor")
+local CXCursorPtrAr = ffi.typeof("CXCursor *[1]")
+local unsignedAr = ffi.typeof("unsigned [1]")
+
 -- Give our structs names for nicer error messages.
 ffi.cdef[[
 // NOTE: CXCursor is a struct type by itself, but we wrap it to e.g. provide a
@@ -72,7 +76,7 @@ local Cursor_t = ffi.typeof "struct LJClangCursor"
 local Type_t = ffi.typeof "struct LJClangType"
 
 -- Our wrapping type Cursor_t is seen as raw CXCursor on the C++ side.
-assert(ffi.sizeof("CXCursor") == ffi.sizeof(Cursor_t))
+assert(ffi.sizeof(CXCursor) == ffi.sizeof(Cursor_t))
 
 ffi.cdef([[
 typedef enum CXChildVisitResult (*LJCX_CursorVisitor)(
@@ -774,6 +778,25 @@ class
         for i=1,numdecls do
             tab[i] = getCursor(clang.clang_getOverloadedDecl(self._cur, i-1))
         end
+        return tab
+    end,
+
+    overriddenCursors = function(self)
+        local ptrAr = CXCursorPtrAr()
+        local countAr = unsignedAr()
+        clang.clang_getOverriddenCursors(self._cur, ptrAr, countAr)
+
+        local count = countAr[0]
+        local cursors = ptrAr[0]
+        assert((count == 0) or (cursors ~= nil))
+
+        local tab = {}
+        for i=1,count do
+            tab[i] = getCursor(cursors[i - 1])
+        end
+
+        clang.clang_disposeOverriddenCursors(cursors)
+
         return tab
     end,
 
