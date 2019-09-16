@@ -27,3 +27,6 @@ inline int badFunc()
     int i;
     return i;  // uninitialized use
 }
+
+// Declaration of the enum from enums.hpp to test USRs.
+enum BigNumbers : unsigned long long;

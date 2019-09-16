@@ -752,6 +752,10 @@ class
         return getString(clang.clang_getCursorDisplayName(self._cur))
     end,
 
+    USR = function(self)
+        return getString(clang.clang_getCursorUSR(self._cur))
+    end,
+
     kind = function(self)
         local kindnum = tonumber(self:kindnum())
         local kindstr = g_CursorKindName[kindnum]

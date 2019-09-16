@@ -141,7 +141,7 @@ describe("Loading a cpp file without includes", function()
     describe("Collection of children", function()
         local tuCursor = tu:cursor()
         local expectedKinds = {
-            "StructDecl", "FunctionDecl", "EnumDecl", "FunctionDecl"
+            "StructDecl", "FunctionDecl", "EnumDecl", "FunctionDecl", "EnumDecl"
         }
 
         it("tests the luaclang-parser convention", function()
@@ -294,11 +294,11 @@ describe("Loading a file with includes", function()
     end)
 end)
 
-local function GetTU(fileName)
+local function GetTU(fileName, expectedDiagCount)
     local tu = cl.createIndex():parse(fileName, clangOpts)
     assert.is_not_nil(tu)
     local diags = tu:diagnosticSet()
-    assert.are.equal(#diags, 0)
+    assert.are.equal(#diags, expectedDiagCount or 0)
     return tu
 end
 
@@ -368,7 +368,8 @@ describe("Virtual functions", function()
     local tuCursor = tu:cursor()
 
     local classDefs = tuCursor:children()
-    assert.is.equal(#classDefs, 4)
+    assert.is.equal(#classDefs, 5)
+    classDefs[5] = nil  -- EnumDecl for another test case
 
     local I, B, D, F = unpack(classDefs)
     local Ic, Bc, Dc, Fc = I:children(), B:children(), D:children(), F:children()
@@ -409,4 +410,26 @@ describe("Virtual functions", function()
 
         assert.are.same(Fr:overriddenCursors(), {Dr})
     end)
+end)
+
+describe("Unified Symbol Resolution (USRs)", function()
+    local tuDef = GetTU("test_data/enums.hpp")  -- contains definition of enum BigNumbers
+    local tuDecl = GetTU("test_data/simple.hpp", 1)  -- a declaration
+    local tuMisDecl = GetTU("test_data/virtual.hpp")  -- a mis-declaration (wrong underlying type)
+
+    local USRs = {}
+
+    for _, tu in ipairs({tuDef, tuDecl, tuMisDecl}) do
+        tu:cursor():children(function(cur)
+            if (cur:haskind("EnumDecl") and cur:name() == "BigNumbers") then
+                USRs[#USRs + 1] = cur:USR()
+            end
+            return cl.ChildVisitResult.Continue
+        end)
+    end
+
+    assert.is_true(#USRs == 3)
+    assert.is.equal(USRs[1], USRs[2])
+    -- The underlying type of an enum is not part of its mangling.
+    assert.is.equal(USRs[1], USRs[3])
 end)

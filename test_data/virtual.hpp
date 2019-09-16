@@ -22,3 +22,6 @@ class Final : public Derived
     int getIt() final;
     void setIt(int) final;
 };
+
+// Mis-declaration of the enum from enums.hpp to test USRs. (Wrong underlying type.)
+enum BigNumbers : int;
