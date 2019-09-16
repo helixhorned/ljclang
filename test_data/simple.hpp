@@ -3,6 +3,11 @@ struct First
 {
     int a = 1;
     long b = 2;
+
+    // ref-qualifiers
+    void refQualNone();
+    void refQualLValue() &;
+    void refQualRValue() &&;
 };
 
 inline int func()

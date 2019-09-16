@@ -25,6 +25,11 @@ ChildVisitResult = ffi.new[[struct{
     static const int Continue = CXChildVisit_Continue;
     static const int Recurse = CXChildVisit_Recurse;
 }]],
+RefQualifierKind = ffi.new[[struct{
+    static const int None = CXRefQualifier_None;
+    static const int LValue = CXRefQualifier_LValue;
+    static const int RValue = CXRefQualifier_RValue;
+}]],
 CursorKindName = {
 [1] = "UnexposedDecl";
 [2] = "StructDecl";

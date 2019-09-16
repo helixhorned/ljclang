@@ -214,11 +214,10 @@ describe("Loading a cpp file without includes", function()
         end)
 
         it("tests the ljclang convention: Recurse", function()
-            local expectedMembers = {
-                { "int", "a" }, { "long", "b" }
-            }
+            local expectedMembers = {{ "int", "a" }, { "long", "b" }}
+            local expectedRefQuals = { "none", "lvalue", "rvalue" }
 
-            local members = {}
+            local members, refQuals = {}, {}
 
             local visitor = cl.regCursorVisitor(
             function(cur)
@@ -229,6 +228,8 @@ describe("Loading a cpp file without includes", function()
 
                 if (cur:haskind("FieldDecl")) then
                     members[#members + 1] = { cur:type():name(), cur:name() }
+                elseif (cur:haskind("CXXMethod")) then
+                    refQuals[#refQuals + 1] = cur:type():refQualifier()
                 end
 
                 return V.Continue
@@ -236,6 +237,7 @@ describe("Loading a cpp file without includes", function()
 
             tuCursor:children(visitor)
             assert.are.same(members, expectedMembers)
+            assert.are.same(refQuals, expectedRefQuals)
         end)
     end)
 end)

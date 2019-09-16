@@ -91,7 +91,7 @@ CHECK_EXTRACTED_ENUMS_CMD := $(EXTRACT_CMD_ENV) $(luajit) \
 
 .SILENT: $(EXTRACTED_ENUMS_LUA)
 
-$(EXTRACTED_ENUMS_LUA): $(LJCLANG_SUPPORT_SO) $(GENERATED_FILES_STAGE_1) $(incdir)/clang-c/*
+$(EXTRACTED_ENUMS_LUA): $(LJCLANG_SUPPORT_SO) $(GENERATED_FILES_STAGE_1) ./print_extracted_enums_lua.sh $(incdir)/clang-c/*
 	echo 'return {}' > $(EXTRACTED_ENUMS_LUA)
     # Do the extraction.
 	$(EXTRACT_CMD_ENV) ./print_extracted_enums_lua.sh > $(EXTRACTED_ENUMS_LUA_TMP)

@@ -15,7 +15,7 @@ EXTRACT_OPTS_ENUM_COMMON=(-Q
  -f "return f('    static const int %s = %s;', k:sub(enumPrefixLength+1), k)")
 
 # NOTE: update counter in loop below when adding enums
-ENUM_NAMES=(ErrorCode SaveError DiagnosticSeverity ChildVisitResult)
+ENUM_NAMES=(ErrorCode SaveError DiagnosticSeverity ChildVisitResult RefQualifierKind)
 
 EXTRACT_CMD=(./extractdecls.lua -A -I"${incdir}")
 
@@ -25,7 +25,7 @@ echo 'local ffi=require"ffi"'
 echo 'return {'
 
 # Enums
-for i in {0..3}; do
+for i in {0..4}; do
     ourEnumName=${ENUM_NAMES[i]}
     cEnumName=CX${ourEnumName}
 

@@ -610,6 +610,12 @@ local LanguageEnumToString = {
     [tonumber(C.CXLanguage_CPlusPlus)] = "c++",
 }
 
+local RefQualEnumToString = {
+    [tonumber(C.CXRefQualifier_None)] = "none",
+    [tonumber(C.CXRefQualifier_LValue)] = "lvalue",
+    [tonumber(C.CXRefQualifier_RValue)] = "rvalue",
+}
+
 local function getType(cxtyp)
     return (cxtyp.kind ~= 'CXType_Invalid') and Type_t(cxtyp) or nil
 end
@@ -1090,6 +1096,12 @@ class
         else
             return self:kindnum() == kind
         end
+    end,
+
+    refQualifier = function(self)
+        -- TODO: restrict the cursor kind?
+        local cxxrefqual = clang.clang_Type_getCXXRefQualifier(self._typ)
+        return RefQualEnumToString[tonumber(cxxrefqual)]
     end,
 
     templateArguments = function(self)
