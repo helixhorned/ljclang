@@ -557,6 +557,7 @@ TranslationUnit_t = class
     cursor = function(self)
         check_tu_valid(self)
         local cxcur = clang.clang_getTranslationUnitCursor(self._tu)
+        -- NOTE: no anchoring!
         return getCursor(cxcur)
     end,
 
@@ -686,9 +687,11 @@ class
 {
     Cursor_t,
 
-    __eq = function(cur1, cur2)
-        if (ffi.istype(Cursor_t, cur1) and ffi.istype(Cursor_t, cur2)) then
-            return (clang.clang_equalCursors(cur1._cur, cur2._cur) ~= 0)
+    -- NOTE: yes, 'other' is not necessarily a Cursor_t! LuaJIT seems to behave
+    -- differently than plain Lua ("only called with identical metatables").
+    __eq = function(self, other)
+        if (ffi.istype(Cursor_t, self) and ffi.istype(Cursor_t, other)) then
+            return (clang.clang_equalCursors(self._cur, other._cur) ~= 0)
         else
             return false
         end
