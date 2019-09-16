@@ -12,7 +12,7 @@ class Base
     virtual int getIt();
 };
 
-class Derived : public Base, public Interface
+class Derived : public Base, virtual public Interface
 {
     int getIt() override;  // overrides two functions (one in each base class)
 };

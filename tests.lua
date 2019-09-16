@@ -388,6 +388,15 @@ describe("Virtual functions", function()
         assert.is.equal(sig, Fr:displayName())
     end)
 
+    it("tests Cursor:virtualBase()", function()
+        assert.has_error(function() tuCursor:isVirtualBase() end,
+                         "cursor must have kind CXXBaseSpecifier")
+        assert.is.equal(Dc[1]:displayName(), "class Base")
+        assert.is_false(Dc[1]:isVirtualBase())
+        assert.is.equal(Dc[2]:displayName(), "class Interface")
+        assert.is_true(Dc[2]:isVirtualBase())
+    end)
+
     it("tests Cursor:overriddenCursors()", function()
         assert.are.same(Ir:overriddenCursors(), {})
         assert.are.same(Br:overriddenCursors(), {})

@@ -849,6 +849,11 @@ class
         return clang.clang_CXXMethod_isVirtual(self._cur) ~= 0
     end,
 
+    isVirtualBase = function(self)
+        check(self:haskind("CXXBaseSpecifier"), "cursor must have kind CXXBaseSpecifier", 2)
+        return clang.clang_isVirtualBase(self._cur) ~= 0
+    end,
+
     isOverride = function(self)
         return clang.clang_CXXMethod_isOverride(self._cur) ~= 0
     end,
