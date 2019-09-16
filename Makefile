@@ -48,6 +48,10 @@ cxxflags += $(CXXFLAGS)
 INDEX_H_LUA := ljclang_Index_h.lua
 EXTRACTED_ENUMS_LUA := ljclang_extracted_enums.lua
 EXTRACTED_ENUMS_LUA_TMP := $(EXTRACTED_ENUMS_LUA).tmp
+inotify_decls_lua := inotify_decls.lua
+inotify_decls_lua_tmp := $(inotify_decls_lua).tmp
+posix_decls_lua := posix_decls.lua
+posix_decls_lua_tmp := $(posix_decls_lua).tmp
 
 LJCLANG_SUPPORT_SO := libljclang_support.so
 
@@ -62,7 +66,9 @@ clean:
 	rm -f $(LJCLANG_SUPPORT_SO)
 
 veryclean: clean
-	rm -f $(GENERATED_FILES_STAGE_2) $(EXTRACTED_ENUMS_LUA_TMP) $(EXTRACTED_ENUMS_LUA).reject
+	rm -f $(GENERATED_FILES_STAGE_2) $(EXTRACTED_ENUMS_LUA_TMP) $(EXTRACTED_ENUMS_LUA).reject \
+		$(inotify_decls_lua) $(inotify_decls_lua_tmp) \
+		$(posix_decls_lua) $(posix_decls_lua_tmp)
 
 bootstrap: $(EXTRACTED_ENUMS_LUA)
 
@@ -99,8 +105,6 @@ $(EXTRACTED_ENUMS_LUA): $(LJCLANG_SUPPORT_SO) $(GENERATED_FILES_STAGE_1) $(incdi
 # Linux-specific functionality exposed to us
 
 inotify_h ?= /usr/include/x86_64-linux-gnu/sys/inotify.h
-inotify_decls_lua := inotify_decls.lua
-inotify_decls_lua_tmp := $(inotify_decls_lua).tmp
 
 CHECK_EXTRACTED_INOTIFY_CMD := $(EXTRACT_CMD_ENV) $(luajit) \
     -e "require'inotify_decls'"
@@ -126,8 +130,6 @@ poll_h ?= /usr/include/x86_64-linux-gnu/sys/poll.h
 errno_h ?= /usr/include/errno.h
 fcntl_h ?= /usr/include/fcntl.h
 signal_h ?= /usr/include/signal.h
-posix_decls_lua := posix_decls.lua
-posix_decls_lua_tmp := $(posix_decls_lua).tmp
 
 CHECK_EXTRACTED_POSIX_CMD := $(EXTRACT_CMD_ENV) $(luajit) \
     -e "require'posix_decls'"
