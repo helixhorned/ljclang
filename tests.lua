@@ -412,7 +412,7 @@ describe("Virtual functions", function()
     end)
 end)
 
-describe("Unified Symbol Resolution (USRs)", function()
+describe("Cross-referencing", function()
     local tuDef = GetTU("test_data/enums.hpp")  -- contains definition of enum BigNumbers
     local tuDecl = GetTU("test_data/simple.hpp", 1)  -- a declaration
     local tuMisDecl = GetTU("test_data/virtual.hpp")  -- a mis-declaration (wrong underlying type)
@@ -431,10 +431,14 @@ describe("Unified Symbol Resolution (USRs)", function()
         end)
     end
 
-    assert.is_true(#USRs == 3)
-    assert.is.equal(USRs[1], USRs[2])
-    -- The underlying type of an enum is not part of its mangling.
-    assert.is.equal(USRs[1], USRs[3])
+    it("tests USRs", function()
+        assert.is_true(#USRs == 3)
+        assert.is.equal(USRs[1], USRs[2])
+        -- The underlying type of an enum is not part of its mangling.
+        assert.is.equal(USRs[1], USRs[3])
+    end)
 
-    assert.are.same(defCursors, {declCursors[1], nil, nil})
+    it("tests Cursor:definition()", function()
+        assert.are.same(defCursors, {declCursors[1], nil, nil})
+    end)
 end)
