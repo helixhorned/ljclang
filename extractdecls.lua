@@ -234,8 +234,12 @@ function(cur, parent)
                     -- Enumeration constants
                     local val = extractEnum and cur:enumval() or getDefStr(cur)
 
-                    -- NOTE: tonumber(val) == nil can only happen with #defines that are not
-                    -- like a literal number.
+                    -- Notes:
+                    --  - tonumber(val) == nil can only happen with #defines that are not
+                    --    like a literal number.
+                    --  - We only use tonumber() for the check here. To convert, we output
+                    --    the token as it appears in the source code. This way, numbers
+                    --    written in octal are correctly preserved.
                     if (not extractMacro or tonumber(val) ~= nil) then
                         if (fmtfunc) then
                             local str = fmtfunc(ourname, val,
