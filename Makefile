@@ -58,7 +58,7 @@ LJCLANG_SUPPORT_SO := libljclang_support.so
 GENERATED_FILES_STAGE_1 := $(INDEX_H_LUA)
 GENERATED_FILES_STAGE_2 := $(GENERATED_FILES_STAGE_1) $(EXTRACTED_ENUMS_LUA)
 
-.PHONY: all clean veryclean bootstrap doc test install
+.PHONY: all app_dependencies clean veryclean bootstrap doc test install
 
 all: $(LJCLANG_SUPPORT_SO) $(GENERATED_FILES_STAGE_2)
 
@@ -177,7 +177,9 @@ test: $(LJCLANG_SUPPORT_SO) $(GENERATED_FILES_STAGE_2)
 
 sed_common_commands := s|@LJCLANG_DEV_DIR@|$(THIS_DIR)|g; s|@LLVM_BINDIR@|$(bindir)|g; s|@LLVM_LIBDIR@|$(libdir)|g;
 
-install: $(LJCLANG_SUPPORT_SO) $(GENERATED_FILES_STAGE_2) $(inotify_decls_lua) $(posix_decls_lua)
+app_dependencies: $(inotify_decls_lua) $(posix_decls_lua)
+
+install: $(LJCLANG_SUPPORT_SO) $(GENERATED_FILES_STAGE_2) $(app_dependencies)
 	sed "$(sed_common_commands) s|@APPLICATION@|mgrep|g" ./app.sh.in > $(BINDIR)/mgrep
 	sed "$(sed_common_commands) s|@APPLICATION@|watch_compile_commands|g" ./app.sh.in > $(BINDIR)/watch_compile_commands
 	chmod +x $(BINDIR)/mgrep
