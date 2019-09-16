@@ -418,11 +418,14 @@ describe("Unified Symbol Resolution (USRs)", function()
     local tuMisDecl = GetTU("test_data/virtual.hpp")  -- a mis-declaration (wrong underlying type)
 
     local USRs = {}
+    local declCursors, defCursors = {}, {}
 
-    for _, tu in ipairs({tuDef, tuDecl, tuMisDecl}) do
+    for i, tu in ipairs({tuDef, tuDecl, tuMisDecl}) do
         tu:cursor():children(function(cur)
             if (cur:haskind("EnumDecl") and cur:name() == "BigNumbers") then
                 USRs[#USRs + 1] = cur:USR()
+                declCursors[i] = cl.Cursor(cur)
+                defCursors[i] = cur:definition()
             end
             return cl.ChildVisitResult.Continue
         end)
@@ -432,4 +435,6 @@ describe("Unified Symbol Resolution (USRs)", function()
     assert.is.equal(USRs[1], USRs[2])
     -- The underlying type of an enum is not part of its mangling.
     assert.is.equal(USRs[1], USRs[3])
+
+    assert.are.same(defCursors, {declCursors[1], nil, nil})
 end)
