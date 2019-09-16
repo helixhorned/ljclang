@@ -592,27 +592,6 @@ TranslationUnit_t = class
         local cxdiagset = clang.clang_getDiagnosticSetFromTU(self._tu)
         return DiagnosticSet(cxdiagset, self)
     end,
-
-    -- deprecated
-    diagnostics = function(self)
-        check_tu_valid(self)
-
-        local numdiags = clang.clang_getNumDiagnostics(self._tu)
-        local tab = {}
-
-        for i=0,numdiags-1 do
-            local diag = clang.clang_getDiagnostic(self._tu, i)
-            tab[i+1] = {
-                category = getString(clang.clang_getDiagnosticCategoryText(diag)),
-                text = getString(clang.clang_formatDiagnostic(
-                                     diag, clang.clang_defaultDiagnosticDisplayOptions())),
-                severity = clang.clang_getDiagnosticSeverity(diag),
-            }
-            clang.clang_disposeDiagnostic(diag)
-        end
-
-        return tab
-    end,
 }
 
 -------------------------------------------------------------------------

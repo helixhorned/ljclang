@@ -107,19 +107,6 @@ describe("Loading a cpp file without includes", function()
             assert.are.equal(tuCursor:kind(), "TranslationUnit")
         end)
 
-        it("tests diagnostics from it using tu:diagnostics()", function()
-            local diags = tu:diagnostics()
-            assert.is_table(diags)
-            assert.are.equal(#diags, 1)
-
-            local diag = diags[1]
-            assert.is_table(diag)
-
-            assert.are.equal(diag.severity, cl.DiagnosticSeverity.Warning)
-            assert.are.equal(diag.category, "Semantic Issue")
-            assert.is_string(diag.text)
-        end)
-
         it("tests diagnostics from it using tu:diagnosticSet()", function()
             local diags = tu:diagnosticSet()
             assert.are.equal(#diags, 1)
@@ -308,7 +295,8 @@ describe("Enumerations", function()
 
     local tu = cl.createIndex():parse(fileName, clangOpts)
     assert.is_not_nil(tu)
-    assert.are.same(tu:diagnostics(), {})
+    local diags = tu:diagnosticSet()
+    assert.are.equal(#diags, 0)
 
     local tuCursor = tu:cursor()
 

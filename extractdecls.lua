@@ -158,10 +158,11 @@ if (tu == nil) then
 end
 
 if (not quiet) then
-    local diags = tu:diagnostics()
+    local diags = tu:diagnosticSet()
+
     for i=1,#diags do
         local d = diags[i]
-        io.stderr:write(d.text.."\n")
+        io.stderr:write(d:format().."\n")
     end
 end
 
