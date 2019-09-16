@@ -145,11 +145,15 @@ describe("Loading a cpp file without includes", function()
         }
 
         it("tests the luaclang-parser convention", function()
-            local kinds = {}
+            local kinds, isVariadic = {}, {}
+
             for i, cur in ipairs(tuCursor:children()) do
                 kinds[i] = cur:kind()
+                isVariadic[i] = cur:isVariadic()
             end
+
             assert.are.same(kinds, expectedKinds)
+            assert.are.same(isVariadic, { false, false, false, true, false })
         end)
 
         local V = cl.ChildVisitResult

@@ -1016,6 +1016,10 @@ class
         return (clang.clang_isCursorDefinition(self._cur) ~= 0)
     end,
 
+    isVariadic = function(self)
+        return (clang.clang_Cursor_isVariadic(self._cur) ~= 0)
+    end,
+
     typedefType = function(self)
         return getType(clang.clang_getTypedefDeclUnderlyingType(self._cur))
     end,

@@ -22,7 +22,7 @@ enum Fruits
     Pear,
 };
 
-inline int badFunc()
+inline int badFunc(const char *, ...)
 {
     int i;
     return i;  // uninitialized use
