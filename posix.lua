@@ -23,6 +23,7 @@ local type = type
 ffi.cdef[[
 ssize_t read(int, void *, size_t);
 ssize_t write(int, const void *, size_t);
+int open(const char *pathname, int flags);
 int close(int);
 int dup2(int oldfd, int newfd);
 
@@ -68,6 +69,7 @@ local external_SIG = {
 }
 
 local api = {
+    O = decls.O,
     POLL = decls.POLL,
     SIG = external_SIG,
 }
@@ -89,6 +91,18 @@ local function call(functionName, ...)
     end
 
     return ret
+end
+
+local function callAllowing(isErrnoAllowed, functionName, ...)
+    local ret = C[functionName](...)
+    local errno = (ret < 0) and ffi.errno() or nil
+
+    if (ret < 0 and not isErrnoAllowed[errno]) then
+        local message = string.format("%s failed: %s", functionName, getErrnoString())
+        error(message)
+    end
+
+    return ret, errno
 end
 
 local char_array_t = ffi.typeof("char [?]")
@@ -127,6 +141,7 @@ do
 end
 
 local uint8_array_t = ffi.typeof("uint8_t [?]")
+local Allow_EAGAIN = { [decls.E.AGAIN] = true }
 
 api.STDOUT_FILENO = 1
 api.STDERR_FILENO = 2
@@ -148,6 +163,15 @@ api.Fd = class
         local bytesRead = call("read", self.fd, buf, byteCount)
         assert(bytesRead <= byteCount)
         return ffi.string(buf, bytesRead)
+    end,
+
+    readNonblocking = function(self, byteCount)
+        checktype(byteCount, 1, "number", 2)
+        check(byteCount >= 1, "argument must be at least 1", 2)
+        local buf = uint8_array_t(byteCount)
+        local bytesRead, errno = callAllowing(Allow_EAGAIN, "read", self.fd, buf, byteCount)
+        assert(bytesRead <= byteCount)
+        return (errno == nil) and ffi.string(buf, bytesRead) or nil
     end,
 
     readInto = function(self, obj)

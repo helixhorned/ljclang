@@ -123,6 +123,8 @@ $(inotify_decls_lua): $(EXTRACTED_ENUMS_LUA) $(inotify_h)
 # POSIX functionality exposed to us
 
 poll_h ?= /usr/include/x86_64-linux-gnu/sys/poll.h
+errno_h ?= /usr/include/errno.h
+fcntl_h ?= /usr/include/fcntl.h
 signal_h ?= /usr/include/signal.h
 posix_decls_lua := posix_decls.lua
 posix_decls_lua_tmp := $(posix_decls_lua).tmp
@@ -134,6 +136,14 @@ $(posix_decls_lua): $(EXTRACTED_ENUMS_LUA) $(poll_h)
 	@echo 'local ffi=require"ffi"' > $(posix_decls_lua_tmp)
 	@echo 'return { POLL = ffi.new[[struct {' >> $(posix_decls_lua_tmp)
 	@$(EXTRACT_CMD_ENV) ./extractdecls.lua -w MacroDefinition -C -p '^POLLIN' -s '^POLL' $(poll_h) >> $(posix_decls_lua_tmp)
+	@echo '}]], ' >> $(posix_decls_lua_tmp)
+	@echo 'E = ffi.new[[struct {' >> $(posix_decls_lua_tmp)
+	@$(EXTRACT_CMD_ENV) ./extractdecls.lua -w MacroDefinition -C -p '^EAGAIN' -s '^E' $(errno_h) >> $(posix_decls_lua_tmp)
+	@echo '}]], ' >> $(posix_decls_lua_tmp)
+	@echo 'O = ffi.new[[struct {' >> $(posix_decls_lua_tmp)
+	@$(EXTRACT_CMD_ENV) ./extractdecls.lua -w MacroDefinition -C -p '^O_RDONLY' -s '^O_' $(fcntl_h) >> $(posix_decls_lua_tmp)
+	@$(EXTRACT_CMD_ENV) ./extractdecls.lua -w MacroDefinition -C -p '^O_WRONLY' -s '^O_' $(fcntl_h) >> $(posix_decls_lua_tmp)
+	@$(EXTRACT_CMD_ENV) ./extractdecls.lua -w MacroDefinition -C -p '^O_NONBLOCK' -s '^O_' $(fcntl_h) >> $(posix_decls_lua_tmp)
 	@echo '}]], ' >> $(posix_decls_lua_tmp)
 	@echo 'SIG = ffi.new[[struct {' >> $(posix_decls_lua_tmp)
 	@$(EXTRACT_CMD_ENV) ./extractdecls.lua -w MacroDefinition -C -p '^SIGINT' -s '^SIG' $(signal_h) >> $(posix_decls_lua_tmp)
