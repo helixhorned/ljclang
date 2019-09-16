@@ -391,6 +391,15 @@ describe("Virtual functions", function()
         assert.is.equal(sig, Fr:displayName())
     end)
 
+    it("tests Cursor:isDefinition()", function()
+        for _, defCursor in ipairs(classDefs) do
+            assert.is_true(defCursor:isDefinition())
+        end
+        for _, declCursor in ipairs({Ir, Br, Dr, Fr}) do
+            assert.is_false(declCursor:isDefinition())
+        end
+    end)
+
     -- NOTE: this thematically belongs to test case "Cross-referencing",
     -- but fits here test-implementation-wise.
     it("tests Cursor:referenced()", function()
