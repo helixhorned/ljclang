@@ -120,6 +120,20 @@ describe("Loading a cpp file without includes", function()
             assert.is_string(diag:spelling())
         end)
 
+        it("tests obtaining and discarding diagnostics many times", function()
+            collectgarbage()
+            local memInUseBefore = collectgarbage("count")
+
+            for i = 1, 1000 do
+                tu:diagnosticSet()
+            end
+
+            collectgarbage()
+            local memUsageGrowth = collectgarbage("count") / memInUseBefore - 1.0
+
+            assert.is_true(memUsageGrowth < 0.02)
+        end)
+
         it("tests loading a nonexistent translation unit", function()
             local newIndex = cl.createIndex()
             local newTU, status = newIndex:loadTranslationUnit(nonExistentFileName)
@@ -179,7 +193,7 @@ describe("Loading a cpp file without includes", function()
             end
 
             collectgarbage()
-            local memUsageGrowth = collectgarbage("count") / memInUseBefore - 1
+            local memUsageGrowth = collectgarbage("count") / memInUseBefore - 1.0
 
             -- As determined experimentally, that value is very permissive: it was
             -- rather around one permille. Without freeing the callbacks, the
