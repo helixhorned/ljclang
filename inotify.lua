@@ -84,6 +84,10 @@ api.init = class
 
         -- TODO: read all in the queue (needs switching between nonblocking and blocking at
         -- runtime?) A: No, did not work out well.
+        --
+        -- But at least then read a handful of events so that the probabilty of losing some
+        -- is reduced! (We could have many events at once if many files were modified at
+        -- once, e.g. git stash or checkout)
 
         assert(ev.len == 0)
         return ev

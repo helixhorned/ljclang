@@ -629,26 +629,30 @@ end
 
 ---------- Command mode / Machine interface ----------
 
-local MI = {}
-
-function MI.GetClientPidFifo()
-    local O = posix.O
-
-    -- NOTE: do not use io.open():
-    --  - It would block for as long as there are no writers.
-    --  - We need the file descriptor for inotify, anyway.
-    local fifoFd = ffi.C.open(requestFifoFileName, bit.bor(O.RDONLY, O.NONBLOCK))
-
-    return (fifoFd == -1) and
-        errorInfoAndExit("Failed opening FIFO %s.", requestFifoFileName) or
-        posix.Fd(fifoFd)
-end
+local MI = {
+    FIFO_WATCH_FLAGS = IN.CLOSE_WRITE,
+}
 
 MI.State = class
 {
     function()
+        local O = posix.O
+
+        -- NOTE: do not use io.open():
+        --  - It would block for as long as there are no writers.
+        --  - We need the file descriptor for inotify, anyway.
+        local fifoFd = ffi.C.open(requestFifoFileName, bit.bor(O.RDONLY, O.NONBLOCK))
+
+        if (fifoFd == -1) then
+            errorInfoAndExit("Failed opening FIFO %s.", requestFifoFileName)
+        end
+
+        local inotifier = inotify.init()
+        inotifier:add_watch(requestFifoFileName, MI.FIFO_WATCH_FLAGS)
+
         return {
-            clientPidFifo = MI.GetClientPidFifo(),
+            clientPidFifo = posix.Fd(fifoFd),
+            clientInotifier = inotifier,
         }
     end,
 }
@@ -662,6 +666,7 @@ end
 
 function MI.HandleClientRequests()
     local fifo = mi.clientPidFifo
+    assert(fifo ~= nil)
 
     local pipeIsEmpty = function(str)
         return
@@ -1508,14 +1513,11 @@ local Notifier = class
     function()
         local inotifier = inotify.init()
         local compileCommandsWd = inotifier:add_watch(compileCommandsFile, WATCH_FLAGS)
-        local requestFifoWd = commandMode and inotifier:add_watch(
-            requestFifoFileName, IN.CLOSE_WRITE) or nil
 
         return {
             inotifier = inotifier,
             fileNameWdMap = util.Bimap("string", "number"),
             compileCommandsWd = compileCommandsWd,
-            requestFifoWd = requestFifoWd,
         }
     end,
 
@@ -1552,12 +1554,9 @@ local Notifier = class
     check_ = function(self, printfFunc)
         assert(self.inotifier ~= nil)
 
-        while (true) do
-            local event = self.inotifier:check_(printfFunc)
-            if (self:checkEvent_(event)) then
-                return event
-            end
-        end
+        local event = self.inotifier:check_(printfFunc)
+        self:checkEvent_(event)
+        return event
     end,
 
     close = function(self)
@@ -1576,14 +1575,6 @@ local Notifier = class
                       compileCommandsFile)
             os.exit(ErrorCode.CompileCommandsJsonGeneratedEvent)
         end
-
-        if (event.wd == self.requestFifoWd) then
-            assert(commandMode)
-            MI.HandleClientRequests()
-            return false
-        end
-
-        return true
     end,
 }
 
@@ -1741,13 +1732,22 @@ local Controller = class
     wait = function(self)
         assert(self:is("parent"))
 
+        local pendingFds = self.pendingFds
+        local oldPendingFdCount = #pendingFds
+
         local inotifyFd = self.notifier:getRawFd()
-        self.pendingFds[#self.pendingFds + 1] = inotifyFd
-        local pollfds = posix.poll(self.pendingFds)
-        self.pendingFds[#self.pendingFds] = nil
+        local clientInotifyFd = commandMode and mi.clientInotifier:getRawFd() or nil
+
+        pendingFds[#pendingFds + 1] = inotifyFd
+        pendingFds[#pendingFds + 1] = clientInotifyFd
+
+        local pollfds = posix.poll(pendingFds)
+
+        pendingFds[oldPendingFdCount + 2] = nil
+        pendingFds[oldPendingFdCount + 1] = nil
 
         local connIdxs = {}
-        local haveInotifyFd = false
+        local haveInotifyFd, haveClientRequest = false, false
 
         for i = 1, #pollfds do
             -- We should never get:
@@ -1759,14 +1759,19 @@ local Controller = class
             assert(pollfds[i].revents == POLL.IN)
 
             local fd = pollfds[i].fd
-            local connIdx = (fd == inotifyFd) and INOTIFY_FD_MARKER or self.readFdToConnIdx[fd]
-            assert(connIdx ~= nil)
 
-            haveInotifyFd = haveInotifyFd or (fd == inotifyFd)
-            connIdxs[i] = connIdx
+            if (fd == clientInotifyFd) then
+                haveClientRequest = true
+            else
+                local connIdx = (fd == inotifyFd) and INOTIFY_FD_MARKER or self.readFdToConnIdx[fd]
+                assert(connIdx ~= nil)
+
+                haveInotifyFd = haveInotifyFd or (fd == inotifyFd)
+                connIdxs[#connIdxs + 1] = connIdx
+            end
         end
 
-        return connIdxs, haveInotifyFd
+        return connIdxs, haveInotifyFd, haveClientRequest
     end,
 
     --== Main path ==--
@@ -1811,7 +1816,7 @@ local Controller = class
         local hadInotifyFd = false
 
         repeat
-            local connIdxs, haveInotifyFd = self:wait()
+            local connIdxs, haveInotifyFd, haveClientRequest = self:wait()
             local spawnNewChildren = not haveInotifyFd and (lastCcIdxToPrint == math.huge)
             local newChildCount = #connIdxs
 
@@ -1870,8 +1875,6 @@ local Controller = class
             end
 
             -- Print diagnostic sets in compile command order.
-            -- TODO: for command mode (where we might want to get results as soon as they
-            --  arrive), make this an option?
             for idx = firstUnprocessedIdx, #ccIdxs do
                 local ccIdx = ccIdxs[idx]
                 local fDiagSet = formattedDiagSets[ccIdx]
@@ -1884,6 +1887,11 @@ local Controller = class
                     self.printer:print(fDiagSet, ccIdx)
                     firstUnprocessedIdx = firstUnprocessedIdx + 1
                 end
+            end
+
+            -- Handle client requests that arrived in between processing child results.
+            if (haveClientRequest) then
+                MI.HandleClientRequests()
             end
         until (not self:haveActiveChildren())
 
@@ -1953,6 +1961,18 @@ end
 
 ------------------------------
 
+local function Poll(spec)
+    local isReady = {}
+    local pollfds = posix.poll(spec)
+
+    for _, event in ipairs(pollfds) do
+        assert(event.revents == POLL.IN)  -- TODO: handle POLL.ERR?
+        isReady[event.fd] = true
+    end
+
+    return isReady
+end
+
 local function main()
     PrintInitialInfo()
     SetSigintHandler()
@@ -2005,7 +2025,22 @@ local function main()
             break
         end
 
-        -- Wait for any changes to watched files.
+        if (commandMode) then
+            local fileInotifyFd = notifier:getRawFd()
+            local clientInotifyFd = mi.clientInotifier:getRawFd()
+
+            repeat
+                -- Wait for either changes to files or client requests.
+                local isReady = Poll({events=POLL.IN, fileInotifyFd, clientInotifyFd})
+
+                if (isReady[clientInotifyFd]) then
+                    MI.HandleClientRequests()
+                end
+            until (isReady[fileInotifyFd])
+        end
+
+        -- Wait for and react to changes to watched files. In command mode, the waiting part
+        -- has already been accomplished (see above).
         local event = notifier:check_(printf)
         local eventFileName = notifier:getFileName(event)
         notifier:close()
