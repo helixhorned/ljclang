@@ -355,16 +355,17 @@ local Diagnostic = class
         assert(type(parent) == "table")
 
         return {
-            -- NOTE: in LLVM 7 at least, disposition of a diagnostic is a no-op.
-            -- See libclang's CIndexDiagnostic.cpp.
-            _diag = ffi.gc(cxdiag, clang.clang_disposeDiagnostic),
+            -- NOTE: since at least LLVM 7, disposition of a diagnostic is a no-op.
+            -- (See libclang's CIndexDiagnostic.cpp.)
+            -- So, do not attach a GC finalizer.
+            _diag = cxdiag,
             _parent = parent
         }
     end,
 
     childDiagnostics = function(self)
         local cxdiagset = clang.clang_getChildDiagnostics(self._diag)
-        return DiagnosticSet(cxdiagset, self, true)
+        return DiagnosticSet(cxdiagset, self)
     end,
 
     format = function(self, opts)
@@ -409,23 +410,22 @@ local Diagnostic = class
 
 DiagnosticSet = class
 {
-    function(cxdiagset, parent, needsNoDisposal)
+    function(cxdiagset, parent)
         assert(ffi.istype("CXDiagnosticSet", cxdiagset))
 
         -- type(parent) can be: TODO?, TranslationUnit_t
         assert(type(parent) == "table")
 
-        assert(needsNoDisposal == nil or type(needsNoDisposal) == "boolean")
-        local haveDiagSet = (cxdiagset ~= nil)
-        local needsDisposal = haveDiagSet and not needsNoDisposal
-        local finalizer = needsDisposal and clang.clang_disposeDiagnosticSet or nil
+        -- NOTE: do not attach a finalizer (which would be clang_disposeDiagnosticSet()):
+        -- all our uses create "non-externally managed" CXDiagnosticSetImpl objects (see
+        -- libclang's CIndexDiagnostic.h) which are not deleted on disposition -- the TU
+        -- owns the diagnostics. In fact, doing so would be potentially harmful.
+        --
+        -- TODO: research GC order anomalies that were observed with the finalizer in place.
 
-        local tab = {
-            _set = ffi.gc(cxdiagset, finalizer),
-            _parent = parent,
-        }
+        local tab = { _parent = parent }
 
-        if (haveDiagSet) then
+        if (cxdiagset ~= nil) then
             for i = 1, clang.clang_getNumDiagnosticsInSet(cxdiagset) do
                 local cxdiag = clang.clang_getDiagnosticInSet(cxdiagset, i-1)
                 tab[i] = Diagnostic(cxdiag, tab)
