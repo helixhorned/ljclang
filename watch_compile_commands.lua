@@ -659,9 +659,68 @@ MI.State = class
 
 local mi = commandMode and MI.State() or nil
 
-local function HandleClientRequest(request)
-    -- TODO
-    miInfo("got '%s'", request)
+function MI.DoHandleClientRequest(command, args)
+    -- TODO: implement.
+    return "NYI\n"
+end
+
+function MI.HandleClientRequest(request)
+    assert(type(request) == "string")
+    assert(request:match('\n') == nil)
+
+    local args = {}
+
+    do
+        local ii = 0
+        for arg in request:gmatch("[^%s]+") do
+            ii = ii+1
+            args[ii - 2] = arg
+        end
+    end
+
+    local clientId, command = unpack(args, -1, 0)
+    args[-1] = nil
+    args[0] = nil
+
+    if (clientId == nil or not (clientId == '-' or clientId:match("^[0-9]+$"))) then
+        miInfo("Ignored client request (client ID malformed).")
+    end
+
+    local isAnonRequest = (clientId == '-')
+    local errorSuffix = isAnonRequest and
+        "request by unknown client" or
+        format("request by client %s", clientId)
+
+    -- TODO: remove or make it debug output.
+    miInfo("got %s:%s", command, table.concat(args, ","))
+
+    if (command == nil) then
+        -- NOTE: don't bother outputting anything to client-prepared FIFO.
+        miInfo("Ignoring %s: missing command.", errorSuffix)
+        return
+    end
+
+    -- Do the actual work for the request.
+    local result = MI.DoHandleClientRequest(command, args)
+    assert(type(result) == "string")
+
+    if (not isAnonRequest) then
+        -- Send the result back to the client.
+        local returnFifoName = format("%s/wcc-client-%s.fifo", TempDirectory, clientId)
+
+        local O = posix.O
+        local fifoFd = ffi.C.open(returnFifoName, bit.bor(O.WRONLY, O.NONBLOCK))
+
+        if (fifoFd == -1) then
+            miInfo("Failed opening FIFO for results of %s. Was it opened for reading?",
+                   errorSuffix)
+            return
+        end
+
+        local fifo = posix.Fd(fifoFd)
+        fifo:write(result)
+        fifo:close()
+    end
 end
 
 function MI.HandleClientRequests()
@@ -695,7 +754,7 @@ function MI.HandleClientRequests()
         end
 
         for request in requests:gmatch("(.-)\n") do
-            HandleClientRequest(request)
+            MI.HandleClientRequest(request)
         end
     end
 end
