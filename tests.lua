@@ -19,6 +19,7 @@ local ffi = require("ffi")
 
 local io = require("io")
 local math = require("math")
+local string = require("string")
 
 ffi.cdef[[
 time_t time(time_t *);
@@ -312,8 +313,9 @@ describe("Loading a file with includes", function()
     end)
 end)
 
-local function GetTU(fileName, expectedDiagCount)
-    local tu = cl.createIndex():parse(fileName, clangOpts)
+local function GetTU(fileName, expectedDiagCount, opts)
+    local tu = cl.createIndex():parse(
+        fileName, (opts ~= nil) and opts or clangOpts)
     assert.is_not_nil(tu)
     local diags = tu:diagnosticSet()
     assert.are.equal(#diags, expectedDiagCount or 0)
@@ -489,4 +491,33 @@ describe("Cross-referencing", function()
     it("tests Cursor:definition()", function()
         assert.are.same(defCursors, {declCursors[1], nil, nil})
     end)
+end)
+
+describe("Mangling", function()
+    local tu = GetTU("dev/empty.cpp", 0, {"-std=c++11", "-include", "thread"},
+                     {"Incomplete", "SkipFunctionBodies"})
+
+    local V = cl.ChildVisitResult
+    local mangling = nil
+
+    tu:cursor():children(function(cur)
+        if (cur:kind() == "Namespace" and cur:name() == "std") then
+            return V.Recurse
+        elseif (cur:kind() == "ClassDecl" and cur:name() == "thread") then
+            return V.Recurse
+        elseif (cur:kind() == "CXXMethod" and cur:name() == "hardware_concurrency") then
+            mangling = cur:mangling()
+        end
+
+        return V.Continue
+    end)
+
+    assert.is_true(type(mangling) == "string")
+
+    ffi.cdef(string.format("unsigned %s()", mangling))
+
+    local support = ffi.load("ljclang_support")
+    local func = support[mangling]
+
+    assert.is_true(type(func) == "cdata")
 end)

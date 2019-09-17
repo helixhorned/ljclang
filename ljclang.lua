@@ -969,6 +969,10 @@ class
         return getCursor(clang.clang_getCursorLexicalParent(self._cur))
     end,
 
+    mangling = function(self)
+        return getString(clang.clang_Cursor_getMangling(self._cur))
+    end,
+
     baseTemplate = function(self)
         return getCursor(clang.clang_getSpecializedCursorTemplate(self._cur))
     end,
