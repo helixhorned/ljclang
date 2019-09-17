@@ -80,6 +80,7 @@ end
 local HomeDir = getEnv("HOME", "home directory")
 
 local CacheDirectory = HomeDir.."/.cache/ljclang"
+local TempDirectory = "/tmp/ljclang"
 local GlobalInclusionGraphRelation = "isIncludedBy"
 
 local function usage(hline)
@@ -148,7 +149,7 @@ local opts_meta = {
     a = false,
     c = true,
     i = true,
-    m = false,
+    m = true,
     g = true,
     l = true,
     r = true,
@@ -162,7 +163,8 @@ local opts, args = parsecmdline.getopts(opts_meta, arg, usage)
 
 local autoPch = opts.a
 local concurrencyOpt = opts.c or "auto"
-local commandMode = opts.m
+local requestFifoFileName = opts.m
+local commandMode = (requestFifoFileName ~= nil)
 local incrementalMode = opts.i
 local printGraphMode = opts.g
 local edgeCountLimit = tonumber(opts.l)
@@ -205,6 +207,13 @@ local function info(fmt, ...)
     func("%s: "..fmt, colorize("INFO", Col.Green), ...)
 end
 
+-- NOTE: 'mi' is shorthand for "machine interface" and is (somewhat inaccurately) used
+-- synonymously with "command mode".
+local function miInfo(fmt, ...)
+    local func = printGraphMode and errprintf or printf
+    func("%s: "..fmt, colorize("INFO", Col.Bold..Col.Cyan), ...)
+end
+
 local function errorInfo(fmt, ...)
     local func = printGraphMode and errprintf or printf
     func("%s: "..fmt, colorize("INFO", Col.Bold..Col.Red), ...)
@@ -225,15 +234,6 @@ local function infoAndExit(fmt, ...)
     os.exit(0)
 end
 
-if (commandMode) then
-    for key, _ in pairs(opts_meta) do
-        if key ~= 'm' and opts[key] then
-            errprintf("ERROR: Option -%s only available without -m", key)
-            os.exit(ErrorCode.CommandLine)
-        end
-    end
-end
-
 local function getUsedConcurrency()
     if (concurrencyOpt == "auto") then
         return math.max(1, cl.hardwareConcurrency())
@@ -245,6 +245,17 @@ local function getUsedConcurrency()
         local c = tonumber(concurrencyOpt)
         assert(c ~= nil and c >= 1)
         return c
+    end
+end
+
+if (commandMode) then
+    local DisallowedOpts = {'g', 'x'}
+
+    for _, opt in ipairs(DisallowedOpts) do
+        if (opts[opt]) then
+            errprintf("ERROR: Option -%s only available without -m", opt)
+            os.exit(ErrorCode.CommandLine)
+        end
     end
 end
 
@@ -616,6 +627,76 @@ if (Execute("/bin/mkdir", {"-p", CacheDirectory}) ~= 0) then
     errorInfoAndExit("Failed creating cache directory %s.", CacheDirectory)
 end
 
+---------- Command mode / Machine interface ----------
+
+local MI = {}
+
+function MI.GetClientPidFifo()
+    local O = posix.O
+
+    -- NOTE: do not use io.open():
+    --  - It would block for as long as there are no writers.
+    --  - We need the file descriptor for inotify, anyway.
+    local fifoFd = ffi.C.open(requestFifoFileName, bit.bor(O.RDONLY, O.NONBLOCK))
+
+    return (fifoFd == -1) and
+        errorInfoAndExit("Failed opening FIFO %s.", requestFifoFileName) or
+        posix.Fd(fifoFd)
+end
+
+MI.State = class
+{
+    function()
+        return {
+            clientPidFifo = MI.GetClientPidFifo(),
+        }
+    end,
+}
+
+local mi = commandMode and MI.State() or nil
+
+local function HandleClientRequest(request)
+    -- TODO
+    miInfo("got '%s'", request)
+end
+
+function MI.HandleClientRequests()
+    local fifo = mi.clientPidFifo
+
+    local pipeIsEmpty = function(str)
+        return
+            -- we got errno EAGAIN: pipe is empty and some process has it open for writing.
+            (str == nil) or
+            -- we got return 0: pipe is empty and no process has the pipe open for writing.
+            (str == "")
+    end
+
+    local ChunkSize = 4096
+
+    while (true) do
+        local requests = fifo:readNonblocking(ChunkSize)
+
+        if (pipeIsEmpty(requests)) then
+            break
+        end
+
+        if (#requests == ChunkSize) then
+            -- Bail out: the tail might straddle a message.
+            errorInfoAndExit("Client request FIFO overflow.")
+        end
+
+        if (requests:sub(-1) ~= "\n") then
+            miInfo("Client request FIFO: possible message loss.")
+        end
+
+        for request in requests:gmatch("(.-)\n") do
+            HandleClientRequest(request)
+        end
+    end
+end
+
+---------- Automatic precompiled headers ----------
+
 if (autoPch ~= nil) then
     -- First, determine which PCH configurations to use.
 
@@ -978,7 +1059,7 @@ local function getFileOrdinal(ccIndex)
     return ord
 end
 
----------- Common to both human and command mode ----------
+----------
 
 local function getSite(location)
     -- Assert that the different location:*Site() functions return the same site (which
@@ -1052,7 +1133,7 @@ end
 local MOVE_OR_DELETE = bit.bor(IN.MOVE_SELF, IN.DELETE_SELF)
 local WATCH_FLAGS = bit.bor(IN.CLOSE_WRITE, MOVE_OR_DELETE)
 
----------- HUMAN MODE ----------
+---------- Main ----------
 
 local function DoProcessCompileCommand(cmd, parseOptions)
     local fileExists, msg = exists(cmd.file)
@@ -1427,11 +1508,14 @@ local Notifier = class
     function()
         local inotifier = inotify.init()
         local compileCommandsWd = inotifier:add_watch(compileCommandsFile, WATCH_FLAGS)
+        local requestFifoWd = commandMode and inotifier:add_watch(
+            requestFifoFileName, IN.CLOSE_WRITE) or nil
 
         return {
             inotifier = inotifier,
             fileNameWdMap = util.Bimap("string", "number"),
             compileCommandsWd = compileCommandsWd,
+            requestFifoWd = requestFifoWd,
         }
     end,
 
@@ -1467,8 +1551,13 @@ local Notifier = class
 
     check_ = function(self, printfFunc)
         assert(self.inotifier ~= nil)
-        local event = self.inotifier:check_(printfFunc)
-        return self:checkEvent_(event)
+
+        while (true) do
+            local event = self.inotifier:check_(printfFunc)
+            if (self:checkEvent_(event)) then
+                return event
+            end
+        end
     end,
 
     close = function(self)
@@ -1488,7 +1577,13 @@ local Notifier = class
             os.exit(ErrorCode.CompileCommandsJsonGeneratedEvent)
         end
 
-        return event
+        if (event.wd == self.requestFifoWd) then
+            assert(commandMode)
+            MI.HandleClientRequests()
+            return false
+        end
+
+        return true
     end,
 }
 
@@ -1858,7 +1953,7 @@ end
 
 ------------------------------
 
-local function humanModeMain()
+local function main()
     PrintInitialInfo()
     SetSigintHandler()
 
@@ -1931,16 +2026,4 @@ local function humanModeMain()
     until (false)
 end
 
----------- COMMAND MODE ----------
-
-local function commandModeMain()
-    -- TODO
-end
-
-----------------------------------
-
-if (commandMode) then
-    commandModeMain()
-else
-    humanModeMain()
-end
+main()
