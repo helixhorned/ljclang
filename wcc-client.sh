@@ -11,11 +11,15 @@ REQUEST_SINK=$TEMPDIR/wcc-request.sink
 
 function usage()
 {
-    echo "Usage: $0 [-n] <command> [command options...]"
-    echo " Send command to be processed by the watch_compile_commands server."
+    echo "Usage:"
+    echo " $0 check [<command> [command options...]]"
+    echo "   Validate client invocation (and optionally, the well-formedness"
+    echo "   of the command and its arguments)."
+    echo " $0 [-n] <command> [command options...]"
+    echo "   Send command to be processed by the watch_compile_commands server."
     echo ""
     echo "Recognized options:"
-    echo " '-n': exit immediately after sending the command."
+    echo "  '-n': exit immediately after sending the command."
     exit 1
 }
 
@@ -80,6 +84,13 @@ done
 cmdLine="$@"
 
 setup
+
+if [ x"$1" == x"check" ]; then
+    # Output *something* as a workaround for the fact wrapping Emacs's
+    # (process-lines) in (with-demoted-errors) was not successful.
+    echo "OK"
+    exit 0
+fi
 
 ## Send the command
 
