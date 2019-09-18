@@ -1668,10 +1668,10 @@ local Notifier = class
         return self.inotifier:getRawFd()
     end,
 
-    check_ = function(self, printfFunc)
+    check_ = function(self)
         assert(self.inotifier ~= nil)
 
-        local event = self.inotifier:check_(printfFunc)
+        local event = self.inotifier:check_()
         self:checkEvent_(event)
         return event
     end,
@@ -2167,7 +2167,7 @@ local function main()
 
         -- Wait for and react to changes to watched files. In command mode, the waiting part
         -- has already been accomplished (see above).
-        local event = notifier:check_(printf)
+        local event = notifier:check_()
         local eventFileName = notifier:getFileName(event)
         notifier:close()
 

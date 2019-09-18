@@ -79,7 +79,7 @@ api.init = class
         return wd
     end,
 
-    check_ = function(self, printf) -- TEMP
+    check_ = function(self) -- TEMP
         local ev = self.fd:readInto(inotify_event_t())
 
         -- TODO: read all in the queue (needs switching between nonblocking and blocking at
