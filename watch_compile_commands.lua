@@ -497,6 +497,19 @@ end
 local compileCommands, selectionInfo = HandleAllSelectionSpecs()
 local usedConcurrency = math.min(getUsedConcurrency(), #compileCommands)
 
+do
+    -- [<absolute file name>] = { sIdx1 [, sIdx2, ...] }  (selected CC indexes)
+    local ccIdxsFor = {}
+
+    for ccIdx, cmd in ipairs(compileCommands) do
+        ccIdxsFor[cmd.file] = ccIdxsFor[cmd.file] or {}
+        local idxsForCc = ccIdxsFor[cmd.file]
+        idxsForCc[#idxsForCc + 1] = ccIdx
+    end
+
+    selectionInfo.ccIdxsFor = ccIdxsFor
+end
+
 ----------
 
 local Connection = class
@@ -659,12 +672,55 @@ MI.State = class
 
 local mi = commandMode and MI.State() or nil
 
-function MI.DoHandleClientRequest(command, args)
-    -- TODO: implement.
-    return "NYI\n"
+function MI.GetDiagsString(fDiagSets, ccIdx)
+    local fDiagSet = fDiagSets[ccIdx]
+    local originalCcIdx = selectionInfo.indexMap[ccIdx] or ccIdx
+
+    local tab = {
+        format("CC #%d:", originalCcIdx)
+    }
+
+    if (fDiagSet == nil) then
+        -- TODO: feed back: start processing.
+        tab[1] = tab[1].." unprocessed"
+    elseif (fDiagSet:isEmpty()) then
+        tab[1] = tab[1].." clean"
+    else
+        -- TODO: elaborate. Share or make similar logic with FormattedDiagSetPrinter.
+        tab[2] = fDiagSet:getString(false)
+    end
+
+    return table.concat(tab, '\n')
 end
 
-function MI.HandleClientRequest(request)
+function MI.DoHandleClientRequest(command, args, fDiagSets)
+    if (command == "diags") then
+        if (args[1] == nil) then
+            return nil, "missing file name"
+        end
+
+        local realName, errorMsg = posix.realpath(args[1])
+        if (realName == nil) then
+            return nil, "failed resolving file name"
+        end
+
+        -- TODO: handle non-sources.
+        local idxsForCc = selectionInfo.ccIdxsFor[realName]
+        if (idxsForCc == nil) then
+            return nil, "no compile commands for file name"
+        end
+
+        local tab = {}
+        for _, ccIdx in ipairs(idxsForCc) do
+            tab[#tab + 1] = MI.GetDiagsString(fDiagSets, ccIdx)
+        end
+        return table.concat(tab, '\n')
+    end
+
+    return nil, "unrecognized command"
+end
+
+function MI.HandleClientRequest(request, fDiagSets)
     assert(type(request) == "string")
     assert(request:match('\n') == nil)
 
@@ -701,8 +757,10 @@ function MI.HandleClientRequest(request)
     end
 
     -- Do the actual work for the request.
-    local result = MI.DoHandleClientRequest(command, args)
-    assert(type(result) == "string")
+    local result, errorMsg = MI.DoHandleClientRequest(command, args, fDiagSets)
+    assert(result == nil or type(result) == "string")
+    -- TODO: elaborate error mechanism.
+    result = (result and result.."\n") or "ERROR: "..errorMsg.."\n"
 
     if (not isAnonRequest) then
         -- Send the result back to the client.
@@ -723,7 +781,7 @@ function MI.HandleClientRequest(request)
     end
 end
 
-function MI.HandleClientRequests()
+function MI.HandleClientRequests(fDiagSets)
     local fifo = mi.clientPidFifo
     assert(fifo ~= nil)
 
@@ -754,7 +812,7 @@ function MI.HandleClientRequests()
         end
 
         for request in requests:gmatch("(.-)\n") do
-            MI.HandleClientRequest(request)
+            MI.HandleClientRequest(request, fDiagSets)
         end
     end
 end
@@ -1625,6 +1683,7 @@ local Notifier = class
 
     checkEvent_ = function(self, event)
         if (bit.band(event.mask, MOVE_OR_DELETE) ~= 0) then
+            -- TODO: handle. Happens with e.g. 'git stash pop'.
             errprintf("Exiting: a watched file was moved or deleted. (Handling not implemented.)")
             os.exit(ErrorCode.WatchedFileMovedOrDeleted)
         end
@@ -1672,6 +1731,8 @@ local Controller = class
             pendingFds = nil,
             -- FormattedDiagSetPrinter:
             printer = nil,
+            -- Will be filled only in command mode:
+            miFormattedDiagSets = {},
         }
     end,
 
@@ -1912,9 +1973,15 @@ local Controller = class
                 -- self.connections[].
                 local ccIdx = self:closeConnection(connIdx)
 
-                formattedDiagSets[ccIdx] = diagnostics_util.FormattedDiagSet_Deserialize(
+                local fDiagSet = diagnostics_util.FormattedDiagSet_Deserialize(
                     serializedDiags, not plainMode)
+
+                formattedDiagSets[ccIdx] = fDiagSet;
                 ccInclusionGraphs[ccIdx] = inclusion_graph.Deserialize(serializedGraph)
+
+                if (commandMode) then
+                    self.miFormattedDiagSets[ccIdx] = fDiagSet
+                end
 
                 if (incrementalMode ~= nil) then
                     if (HasMatchingDiag(formattedDiagSets[ccIdx], incrementalMode)) then
@@ -1950,7 +2017,7 @@ local Controller = class
 
             -- Handle client requests that arrived in between processing child results.
             if (haveClientRequest) then
-                MI.HandleClientRequests()
+                MI.HandleClientRequests(self.miFormattedDiagSets)
             end
         until (not self:haveActiveChildren())
 
@@ -2093,7 +2160,7 @@ local function main()
                 local isReady = Poll({events=POLL.IN, fileInotifyFd, clientInotifyFd})
 
                 if (isReady[clientInotifyFd]) then
-                    MI.HandleClientRequests()
+                    MI.HandleClientRequests(control.miFormattedDiagSets)
                 end
             until (isReady[fileInotifyFd])
         end
@@ -2115,6 +2182,7 @@ local function main()
              earlyStopCount > 0 and format(" (including %d due to prior early stop)", earlyStopCount) or "")
 
         -- Finally, re-process them.
+        -- TODO: smartly take over miFormattedDiagSets from the old controller.
         startTime = os.time()
         control = Controller(newCcIdxs, parserOpts)
     until (false)
