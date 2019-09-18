@@ -168,6 +168,7 @@ api.Fd = class
         return ffi.string(buf, bytesRead)
     end,
 
+    -- Read from a file descriptor previously opened with O_NONBLOCK.
     readNonblocking = function(self, byteCount)
         checktype(byteCount, 1, "number", 2)
         check(byteCount >= 1, "argument must be at least 1", 2)

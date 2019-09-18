@@ -782,6 +782,11 @@ function MI.HandleClientRequest(request, fDiagSets)
 end
 
 function MI.HandleClientRequests(fDiagSets)
+    -- Read from the client inotify file descriptor (to clear the poll()
+    -- status) and discard. We are only interested in the data arrived in
+    -- the client request FIFO.
+    mi.clientInotifier:check_()
+
     local fifo = mi.clientPidFifo
     assert(fifo ~= nil)
 
