@@ -21,6 +21,8 @@ local type = type
 ----------
 
 ffi.cdef[[
+void free(void *ptr);
+
 ssize_t read(int, void *, size_t);
 ssize_t write(int, const void *, size_t);
 int open(const char *pathname, int flags);
@@ -39,6 +41,7 @@ struct _IO_FILE;
 typedef struct _IO_FILE FILE;
 FILE *stdin, *stdout, *stderr;
 FILE *freopen(const char *pathname, const char *mode, FILE *stream);
+char *realpath(const char *path, char *resolved_path);
 ]]
 
 -- NOTE: POSIX integer types declared in ljclang.lua.
@@ -287,6 +290,20 @@ api.freopen = function(pathname, mode, stream)
         local message = string.format("freopen failed: %s", getErrnoString())
         error(message)
     end
+end
+
+api.realpath = function(pathname)
+    checktype(pathname, 1, "string", 2)
+
+    local retPtr = C.realpath(pathname, nil)
+
+    if (retPtr == nil) then
+        return nil, getErrnoString()
+    end
+
+    local str = ffi.string(retPtr)
+    C.free(retPtr)
+    return str
 end
 
 local pid_t = ffi.typeof("pid_t")
