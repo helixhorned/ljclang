@@ -92,26 +92,73 @@ if [ x"$1" == x"check" ]; then
     exit 0
 fi
 
-## Send the command
+## Handle the command
 
 if [ $block == yes ]; then
     # The FIFO must *first* be opened for reading: the server opens it with
-    # O_NONBLOCK | O_WRONLY (thus failing with ENXIO otherwise).
+    # O_NONBLOCK | O_WRONLY, thus failing with ENXIO otherwise.
+    # Also, dummy-open it for writing because otherwise we would hang (chicken & egg).
+    exec {resultFd}<> "$FIFO"
 
-    # Start background process to get and print the result sent by the server.
-    /bin/cat "$FIFO" &
-
-    # FIXME: the above is still not adequate and the sleep "solution" is of course a hack.
-    #  Since the background process runs asynchronously, we now have a race. This seems like
-    #  a sufficient reason to implement this in Lua. (Then, using O_NONBLOCK for
-    #  read-opening the FIFO, sending the request, and then poll().)
-    sleep 0.1
-
+    # Send the command, informing the server of our ID.
     echo -E $pid "$cmdLine" >> "$REQUEST_SINK"
 
-    # Wait for the background process to finish.
-    # NOTE: if the server terminates before closing the FIFO on its side, this will hang.
-    wait
+    # Read the server's acknowledgement of the request receival, waiting for merely a
+    # second. (The expectation is that the server sends the acknowledgement immediately.)
+    read -rs -N 3 -u ${resultFd} -t 1.0 ack
+
+    if [ $? -gt 128 ]; then
+        echo "ERROR: receival of the request acknowledgement timed out."
+        exit 100
+    elif [ x"$ack" != x"ACK" ]; then
+        echo "ERROR: malformed acknowledgement message."
+        exit 101
+    fi
+
+    # Read the success status of the request, waiting for a bit longer.
+    #
+    # TODO: elaborate timing expectations/requirements (e.g. it may be OK for the server to
+    #  delay a computation until the respective compile command has been processed).
+    read -rs -N 3 -u ${resultFd} -t 10.0 res
+
+    if [ $? -gt 128 ]; then
+        echo "ERROR: timed out waiting for the result."
+        exit 110
+    elif [[ x"$res" != x"rOK" && x"$res" != x"rER" ]]; then
+        echo "ERROR: malformed success status message."
+        exit 111
+    fi
+
+    if [ "$res" == rER ]; then
+        echo -n "remote: ERROR: "
+    fi
+
+    # The server has sent all data (2 items of header data checked above and the payload) in
+    # a single write(). Hence, we can read in a loop with timeout 0 (meaning, to check for
+    # data availability) at the outer level.
+    #
+    # The background of doing it this way is that attempts to plainly read it from bash or
+    # using /bin/cat led to the read *hanging*, even if 'resultFd' was previously closed.
+    # [In the /bin/cat case, that is; in the 'read' builtin case, the distinction of closing
+    #  "for reading" or "for writing" ('<&-' or '>&-', respectively) seems to be merely
+    #  decorative: in either case, the *single* previously open file descriptor is closed].
+    #
+    # NOTE: There could be data lost if the total message size exceeds 'PIPE_BUF' bytes (in
+    #  which case the OS is allowed to split up the message, see POSIX).
+    # TODO: detect data loss?
+
+    readArgs=(-rs -u ${resultFd})
+
+    while read ${readArgs[@]} -t 0 data_available_check_; do
+        read ${readArgs[@]} -t 0.1 line
+        # NOTE: do not guard against 'line' being '-n', '-e' or '-E' (options to 'echo').
+        echo "$line"
+    done
+
+    if [ "$res" == rER ]; then
+        exit 200
+    fi
 else
+    # Send the command as an anonymous request.
     echo -E - "$cmdLine" >> "$REQUEST_SINK"
 fi

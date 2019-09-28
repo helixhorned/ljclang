@@ -726,6 +726,21 @@ function MI.DoHandleClientRequest(command, args, fDiagSets)
     return nil, "unrecognized command"
 end
 
+function MI.GetOutputFifo(clientId, errorSuffix)
+    local returnFifoName = format("%s/wcc-client-%s.fifo", TempDirectory, clientId)
+
+    local O = posix.O
+    local fifoFd = ffi.C.open(returnFifoName, bit.bor(O.WRONLY, O.NONBLOCK))
+
+    if (fifoFd == -1) then
+        miInfo("Failed opening FIFO for results of %s. Was it opened for reading?",
+               errorSuffix)
+        return
+    end
+
+    return posix.Fd(fifoFd)
+end
+
 function MI.HandleClientRequest(request, fDiagSets)
     assert(type(request) == "string")
     assert(request:match('\n') == nil)
@@ -757,32 +772,32 @@ function MI.HandleClientRequest(request, fDiagSets)
     miInfo("got %s:%s", command, table.concat(args, ","))
 
     if (command == nil) then
-        -- NOTE: don't bother outputting anything to client-prepared FIFO.
+        -- NOTE: don't bother outputting anything to the client-prepared FIFO.
         miInfo("Ignoring %s: missing command.", errorSuffix)
         return
+    end
+
+    local fifo = (not isAnonRequest) and MI.GetOutputFifo(clientId, errorSuffix) or nil
+    if (fifo ~= nil) then
+        -- Send an acknowledgement of the request receival (3 bytes).
+        fifo:writePipe("ACK")
     end
 
     -- Do the actual work for the request.
     local result, errorMsg = MI.DoHandleClientRequest(command, args, fDiagSets)
     assert(result == nil or type(result) == "string")
-    -- TODO: elaborate error mechanism.
-    result = (result and result.."\n") or "ERROR: "..errorMsg.."\n"
 
-    if (not isAnonRequest) then
-        -- Send the result back to the client.
-        local returnFifoName = format("%s/wcc-client-%s.fifo", TempDirectory, clientId)
+    if (fifo ~= nil) then
+        local output = {
+            -- Success status (3 bytes).
+            (errorMsg ~= nil) and "rER" or "rOK",
+            -- Result text.
+            (errorMsg ~= nil) and errorMsg or result,
+            -- Newline.
+            '\n',
+        }
 
-        local O = posix.O
-        local fifoFd = ffi.C.open(returnFifoName, bit.bor(O.WRONLY, O.NONBLOCK))
-
-        if (fifoFd == -1) then
-            miInfo("Failed opening FIFO for results of %s. Was it opened for reading?",
-                   errorSuffix)
-            return
-        end
-
-        local fifo = posix.Fd(fifoFd)
-        fifo:write(result)
+        fifo:writePipe(table.concat(output))
         fifo:close()
     end
 end
