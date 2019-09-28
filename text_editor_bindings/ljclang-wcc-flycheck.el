@@ -24,21 +24,34 @@
 ;; TODO:
 ;;  make usable with 'require'.
 
-;; NOTE/TODO this may not yet work as intended: Flycheck intercepts a non-zero exit status
-;;  from wcc-client and displays a lengthy message. Note though that 'C-c ! v' does show
-;;   - wcc-client check: failed (for not further known reasons)
-;;  as expected if the server is not running. So, it seems partially working.
-(defun ljclang-wcc-check-diags-request ()
+(defun ljclang-wcc-check-diags-request (_)
   (let*
-      ;; NOTE: with-demoted-errors did not work reliably in interactive testing, either
-      ;; erroring or giving back nil from one call to the next. (However, that state seemed
-      ;; sticky: once it was the nil, it was nil forever.)
-      ;; What's up with it? Emacs bug?
-      ;;
-      ;; FIXME: address the above. It is quite crucial to get precise information here.
-      ((lines (ignore-errors (process-lines "wcc-client" "-c")))
-       (all-ok (equal lines '("OK"))))
-    all-ok)
+      ((res
+        ;; Execute 'wcc-client -c' to check it being properly set up.
+        ;; ignore-errors is used so that we catch the case when the executable is not found.
+        ;;  TODO: find out: redundant because flycheck checks this before?
+        (ignore-errors (call-process "wcc-client" nil nil nil "-c")))
+       (message
+        (cond
+         ((null res) "failed to execute wcc-client")
+         ((stringp res) (concat "wcc-client exited with signal: " res))
+         ((numberp res)
+          (case res
+            ;; KEEPINSYNC with wcc-client's exit codes.
+            (0 "success")
+            (1 "failed creating FIFO")
+            (2 "UNEXPECTED ERROR")  ; malformed command/args, shouldn't happen with '-c'.
+            (3 "server not running")
+            (t "UNEXPECTED EXIT CODE")  ; may indicate that an update here is necessary.
+            ))
+         )))
+    (list
+     (flycheck-verification-result-new
+      :label "wcc-client check"
+      :message message
+      :face (if (equal message "success") 'success '(bold error))
+      ))
+    )
 )
 
 (flycheck-define-checker c/c++-wcc
@@ -48,23 +61,38 @@ See URL `https://github.com/helixhorned/ljclang/tree/staging'."
   ;; TODO: remove 'staging' once it is merged to master.
   :command ("wcc-client" "diags" source-original)
 
-  :error-patterns  ; same as for 'c/c++-clang' checker, but with '<stdin>' removed.
-  ((info line-start (file-name) ":" line ":" column
+  :error-patterns
+  (
+   ;;; Same as for 'c/c++-clang' checker, but with '<stdin>' removed.
+
+   ;; TODO: if possible, make known to Flycheck:
+   ;;  - the error group, e.g. [Semantic Issue] or [Parse Issue]
+   ;;  - the warning ID, e.g. [-W#warnings]
+   (info line-start (file-name) ":" line ":" column
          ": note: " (optional (message)) line-end)
    (warning line-start (file-name) ":" line ":" column
             ": warning: " (optional (message)) line-end)
    (error line-start (file-name) ":" line ":" column
-          ": " (or "fatal error" "error") ": " (optional (message)) line-end))
+          ": " (or "fatal error" "error") ": " (optional (message)) line-end)
+
+   ;;; Specific to ljclang-wcc-flycheck.el
+
+   ;; NOTE: Flycheck flags an invocation of a checker as "suspicious" (and outputs a lengthy
+   ;;  user-facing message asking to update Flycheck and/or file a Flycheck bug report) if
+   ;;  its exit code is non-zero but no errors were found (using the matching rules defined
+   ;;  in the checker). So, make the client error states known to Flycheck.
+   ;;
+   ;; TODO: however, why does Flycheck not enter the 'errored' ("FlyC!") state when
+   ;;  wcc-client exits with a non-zero code? We do not want to miss any kind of errors!
+   ;;  Need to research Flycheck error handling further.
+
+   ;; Error occurring in the client.
+   (error "ERROR: " (message) line-end)
+   ;; Error reported back by the server.
+   (error "remote: ERROR: " (message) line-end)
+   )
 
   :modes (c-mode c++-mode)
   :predicate flycheck-buffer-saved-p
-
-  :verify
-  (lambda (_)
-    (let ((all-ok (ljclang-wcc-check-diags-request)))
-      (list
-       (flycheck-verification-result-new
-        :label "wcc-client check"
-        :message (if all-ok "success" "failed (for not further known reasons)")
-        :face (if all-ok 'success '(bold error))))))
+  :verify ljclang-wcc-check-diags-request
 )

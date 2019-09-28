@@ -86,9 +86,6 @@ cmdLine="$@"
 setup
 
 if [ x"$1" == x"-c" ]; then
-    # Output *something* as a workaround for the fact wrapping Emacs's
-    # (process-lines) in (with-demoted-errors) was not successful.
-    echo "OK"
     exit 0
 fi
 
