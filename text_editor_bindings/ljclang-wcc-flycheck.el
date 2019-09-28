@@ -36,7 +36,7 @@
       ;; What's up with it? Emacs bug?
       ;;
       ;; FIXME: address the above. It is quite crucial to get precise information here.
-      ((lines (ignore-errors (process-lines "wcc-client" "check")))
+      ((lines (ignore-errors (process-lines "wcc-client" "-c")))
        (all-ok (equal lines '("OK"))))
     all-ok)
 )

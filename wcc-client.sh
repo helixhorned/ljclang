@@ -12,7 +12,7 @@ REQUEST_SINK=$TEMPDIR/wcc-request.sink
 function usage()
 {
     echo "Usage:"
-    echo " $0 check [<command> [command options...]]"
+    echo " $0 -c [<command> [command options...]]"
     echo "   Validate client invocation (and optionally, the well-formedness"
     echo "   of the command and its arguments)."
     echo " $0 [-n] <command> [command options...]"
@@ -25,7 +25,7 @@ function usage()
 
 block=yes
 
-if [ x"$1" = x-n ]; then
+if [ x"$1" = x"-n" ]; then
     block=no
     shift
 fi
@@ -85,7 +85,7 @@ cmdLine="$@"
 
 setup
 
-if [ x"$1" == x"check" ]; then
+if [ x"$1" == x"-c" ]; then
     # Output *something* as a workaround for the fact wrapping Emacs's
     # (process-lines) in (with-demoted-errors) was not successful.
     echo "OK"
