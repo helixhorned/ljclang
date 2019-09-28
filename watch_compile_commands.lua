@@ -695,11 +695,17 @@ end
 
 function MI.DoHandleClientRequest(command, args, fDiagSets)
     if (command == "diags") then
-        if (args[1] == nil) then
+        local fileName = args[1]
+        if (fileName == nil) then
             return nil, "missing file name"
         end
 
-        local realName, errorMsg = posix.realpath(args[1])
+        assert(#fileName > 0)  -- because we matched with '+'
+        if (fileName:sub(1,1) ~= '/') then
+            return nil, "file name must be absolute"
+        end
+
+        local realName, errorMsg = posix.realpath(fileName)
         if (realName == nil) then
             return nil, "failed resolving file name"
         end
