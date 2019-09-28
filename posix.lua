@@ -145,6 +145,7 @@ end
 
 local uint8_array_t = ffi.typeof("uint8_t [?]")
 local Allow_EAGAIN = { [decls.E.AGAIN] = true }
+local Allow_EPIPE = { [decls.E.PIPE] = true }
 
 api.STDOUT_FILENO = 1
 api.STDERR_FILENO = 2
@@ -197,6 +198,17 @@ api.Fd = class
         local bytesWritten = call("write", self.fd, obj, length)
         assert(bytesWritten <= length)
         return bytesWritten
+    end,
+
+    -- Write to a file descriptor, catching EPIPE instead of propagating it as Lua error.
+    writePipe = function(self, obj)
+        check(type(obj) == "string" or type(obj) == "cdata",
+              "argument #1 must be a string or cdata", 2)
+        local length = (type(obj) == "string") and #obj or ffi.sizeof(obj)
+        check(length > 0, "argument must have non-zero length", 2)
+        local bytesWritten, errno = callAllowing(Allow_EPIPE, "write", self.fd, obj, length)
+        assert(bytesWritten <= length)
+        return (errno == nil) and bytesWritten or nil
     end,
 
     -- Redirect 'fd' to us.
