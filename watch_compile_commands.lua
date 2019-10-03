@@ -694,7 +694,10 @@ function MI.GetDiagsString(fDiagSets, ccIdx)
 end
 
 function MI.DoHandleClientRequest(command, args, fDiagSets)
-    if (command == "diags") then
+    if (command == "-C") then
+        -- NOTE: arguments are completely ignored.
+        return ""
+    elseif (command == "diags") then
         local fileName = args[1]
         if (fileName == nil) then
             return nil, "missing file name"
@@ -769,7 +772,7 @@ function MI.HandleClientRequest(request, fDiagSets)
         format("request by client %s", clientId)
 
     -- TODO: remove or make it debug output.
-    miInfo("got %s:%s", command, table.concat(args, ","))
+    miInfo("got: %s %s", command, table.concat(args, ' '))
 
     if (command == nil) then
         -- NOTE: don't bother outputting anything to the client-prepared FIFO.

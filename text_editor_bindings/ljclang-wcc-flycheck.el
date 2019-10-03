@@ -30,7 +30,7 @@
         ;; Execute 'wcc-client -c' to check it being properly set up.
         ;; ignore-errors is used so that we catch the case when the executable is not found.
         ;;  TODO: find out: redundant because flycheck checks this before?
-        (ignore-errors (call-process "wcc-client" nil nil nil "-c")))
+        (ignore-errors (call-process "wcc-client" nil nil nil "-C")))
        (message
         (cond
          ((null res) "failed to execute wcc-client")
@@ -42,7 +42,10 @@
             (1 "failed creating FIFO")
             (2 "UNEXPECTED ERROR")  ; malformed command/args, shouldn't happen with '-c'.
             (3 "server not running")
-            (t "UNEXPECTED EXIT CODE")  ; may indicate that an update here is necessary.
+            ;; May indicate that:
+            ;;  - it is an exit code >=100 (malformed/unexpected reply from server), or
+            ;;  - an update here is necessary.
+            (t "UNEXPECTED EXIT CODE")
             ))
          )))
     (list
@@ -94,5 +97,7 @@ See URL `https://github.com/helixhorned/ljclang/tree/staging'."
 
   :modes (c-mode c++-mode)
   :predicate flycheck-buffer-saved-p
+
+  ;; NOTE: this is called only on a manual flycheck-verify-setup invocation.
   :verify ljclang-wcc-check-diags-request
 )

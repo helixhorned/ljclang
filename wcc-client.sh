@@ -12,9 +12,12 @@ REQUEST_SINK=$TEMPDIR/wcc-request.sink
 function usage()
 {
     echo "Usage:"
-    echo " $0 -c [<command> [command options...]]"
-    echo "   Validate client invocation (and optionally, the well-formedness"
+    echo " $0 -c [<command> [command options...]]  (ignored)"
+    echo "   Validate client invocation (and if present, the well-formedness"
     echo "   of the command and its arguments)."
+    echo " $0 -C [<command> [command options...]]  (ignored)"
+    echo "   In addition to the effects of '-c', actually send the command to"
+    echo "   the server (which treats it as a no-op) and wait for the response."
     echo " $0 [-n] <command> [command options...]"
     echo "   Send command to be processed by the watch_compile_commands server."
     echo ""
@@ -81,13 +84,13 @@ for ((i=0; i < $numArgs; i++)); do
     fi
 done
 
-cmdLine="$@"
-
 setup
 
 if [ x"$1" == x"-c" ]; then
     exit 0
 fi
+
+cmdLine="$@"
 
 ## Handle the command
 
