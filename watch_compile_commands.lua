@@ -1118,7 +1118,8 @@ do
                 local argsStr = table.concat((getArgsAndSig(ccIdx)), ' ')
                 errorInfo("Failed running preparatory step for compile command #%d:\n%s %s",
                           ccIdx, clang, argsStr)
-                exitRequestingBugReport()
+                errorInfo("Please make sure that the original compile command invocation succeeds.")
+                errorInfoAndExit("If the issue persists after that, please report it as a bug.")
             end
 
             -- Retain the requested concurrency.
