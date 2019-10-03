@@ -1745,7 +1745,7 @@ local INOTIFY_FD_MARKER = -math.huge
 
 local Controller = class
 {
-    function(...)
+    function(notifier, ...)
         return {
             onDemandParserArgs = { ... },
 
@@ -1753,7 +1753,7 @@ local Controller = class
             whoami = "unforked",
 
             -- Will be closed and nil'd in child.
-            notifier = Notifier(),
+            notifier = notifier or Notifier(),
 
             --== Child will have:
             parser = nil,  -- OnDemandParser
@@ -2146,7 +2146,7 @@ local function main()
     local ccInclusionGraphs = {}
 
     local parserOpts = printGraphMode and {"SkipFunctionBodies", "Incomplete"} or {}
-    local control = Controller(range(#compileCommands), parserOpts)
+    local control = Controller(nil, range(#compileCommands), parserOpts)
 
     repeat
         -- Print current diagnostics.
@@ -2209,7 +2209,6 @@ local function main()
         for _, event in ipairs(events) do
             eventFileNames[#eventFileNames + 1] = notifier:getFileName(event)
         end
-        notifier:close()
 
         -- Determine the set of compile commands to re-process.
         local newCcIdxs, earlyStopCount = GetNewCcIndexes(
@@ -2233,7 +2232,9 @@ local function main()
         -- Finally, re-process them.
         -- TODO: smartly take over miFormattedDiagSets from the old controller.
         startTime = os.time()
-        control = Controller(newCcIdxs, parserOpts)
+        -- NOTE: reuse the notifier. We may not have seen all events that are due to arrive
+        --  in the immediate future, so make sure they are not lost.
+        control = Controller(notifier, newCcIdxs, parserOpts)
     until (false)
 end
 
