@@ -9,6 +9,7 @@ local posix = require("posix")
 
 local assert = assert
 local error = error
+local tonumber = tonumber
 local tostring = tostring
 local type = type
 
@@ -30,6 +31,9 @@ local api = { IN=IN }
 local getErrnoString = posix.getErrnoString
 
 local inotify_event_t = ffi.typeof("struct inotify_event")
+local sizeof_inotify_event_t = tonumber(ffi.sizeof(inotify_event_t))
+local MaxEventsInBatch = 128
+local EventBatch = ffi.typeof("$ [$]", inotify_event_t, MaxEventsInBatch)
 
 api.init = class
 {
@@ -79,18 +83,20 @@ api.init = class
         return wd
     end,
 
-    check_ = function(self) -- TEMP
-        local ev = self.fd:readInto(inotify_event_t())
+    waitForEvents = function(self)
+        local events, bytesRead = self.fd:readInto(EventBatch(), true)
+        assert(bytesRead % sizeof_inotify_event_t == 0)
+        local eventCount = tonumber(bytesRead) / sizeof_inotify_event_t
 
-        -- TODO: read all in the queue (needs switching between nonblocking and blocking at
-        -- runtime?) A: No, did not work out well.
-        --
-        -- But at least then read a handful of events so that the probabilty of losing some
-        -- is reduced! (We could have many events at once if many files were modified at
-        -- once, e.g. git stash or checkout)
+        local tab = {}
 
-        assert(ev.len == 0)
-        return ev
+        for i = 1, eventCount do
+            local event = events[i - 1]
+            assert(event.len == 0)
+            tab[i] = event
+        end
+
+        return tab
     end
 }
 

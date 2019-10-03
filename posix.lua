@@ -179,15 +179,19 @@ api.Fd = class
         return (errno == nil) and ffi.string(buf, bytesRead) or nil
     end,
 
-    readInto = function(self, obj)
+    readInto = function(self, obj, allowPartial)
         checktype(obj, 1, "cdata", 2)
+        checktype(allowPartial, 2, "boolean", 2)
+
         local length = ffi.sizeof(obj)
-        check(length ~= nil, "argument must have ffi.sizeof() ~= nil", 2)
-        check(length >= 1, "argument must have ffi.sizeof() >= 1", 2)
+        check(length ~= nil, "argument #1 must have ffi.sizeof() ~= nil", 2)
+        check(length >= 1, "argument #1 must have ffi.sizeof() >= 1", 2)
+
         local bytesRead = call("read", self.fd, obj, length)
-        -- Partial reads not yet handled.
-        check(bytesRead == length, "partial read occurred", 2)
-        return obj
+        assert(bytesRead >= 0 and bytesRead <= length)
+        check(allowPartial or bytesRead == length, "partial read occurred", 2)
+
+        return obj, bytesRead
     end,
 
     write = function(self, obj)

@@ -806,7 +806,7 @@ function MI.HandleClientRequests(fDiagSets)
     -- Read from the client inotify file descriptor (to clear the poll()
     -- status) and discard. We are only interested in the data arrived in
     -- the client request FIFO.
-    mi.clientInotifier:check_()
+    mi.clientInotifier:waitForEvents()
 
     local fifo = mi.clientPidFifo
     assert(fifo ~= nil)
@@ -1404,16 +1404,25 @@ local function PrintInclusionGraphAsGraphvizDot(graph)
     graph:printAsGraphvizDot(title, reverse, commonPrefix, edgeCountLimit, printf)
 end
 
-local function GetNewCcIndexes(ccInclusionGraphs, eventFileName,
+local function GetNewCcIndexes(ccInclusionGraphs, eventFileNames,
                                processedCommandCount, oldCcIdxs)
     assert(#ccInclusionGraphs <= #compileCommands)
     assert(processedCommandCount <= #oldCcIdxs)
 
+    local isCompileCommandAffected = function(ccIdx)
+        local incGraph = ccInclusionGraphs[ccIdx]
+        for i = 1, #eventFileNames do
+            if (incGraph:getNode(eventFileNames[i]) ~= nil) then
+                return true
+            end
+        end
+    end
+
     local indexes = {}
 
-    -- 1. compile commands affected by the file on which we had a watch event.
+    -- 1. compile commands affected by the files on which we had a watch event.
     for ccIdx = 1, #ccInclusionGraphs do
-        if (ccInclusionGraphs[ccIdx]:getNode(eventFileName) ~= nil) then
+        if (isCompileCommandAffected(ccIdx)) then
             indexes[#indexes + 1] = ccIdx
         end
     end
@@ -1697,9 +1706,11 @@ local Notifier = class
     check_ = function(self)
         assert(self.inotifier ~= nil)
 
-        local event = self.inotifier:check_()
-        self:checkEvent_(event)
-        return event
+        local events = self.inotifier:waitForEvents()
+        for i = 1, #events do
+            self:checkEvent_(events[i])
+        end
+        return events
     end,
 
     close = function(self)
@@ -1798,7 +1809,7 @@ local Controller = class
 
     receiveData = function(self, connIdx, cdata)
         local conn = self.connections[connIdx]
-        return conn.r:readInto(cdata)
+        return conn.r:readInto(cdata, false)
     end,
 
     closeConnection = function(self, connIdx)
@@ -2193,17 +2204,29 @@ local function main()
 
         -- Wait for and react to changes to watched files. In command mode, the waiting part
         -- has already been accomplished (see above).
-        local event = notifier:check_()
-        local eventFileName = notifier:getFileName(event)
+        local events = notifier:check_()
+        local eventFileNames = {}
+        for _, event in ipairs(events) do
+            eventFileNames[#eventFileNames + 1] = notifier:getFileName(event)
+        end
         notifier:close()
 
         -- Determine the set of compile commands to re-process.
         local newCcIdxs, earlyStopCount = GetNewCcIndexes(
-            ccInclusionGraphs, eventFileName,
+            ccInclusionGraphs, eventFileNames,
             processedCommandCount, currentCcIdxs)
 
+        local getFileStr = function(i)
+            return colorize(eventFileNames[i], Col.Bold..Col.White)
+        end
+
+        local modifiedFilesStr =
+            (#eventFileNames == 1) and getFileStr(1) or
+            (#eventFileNames == 2) and format("%s and %s", getFileStr(1), getFileStr(2)) or
+            format("%s and %d more files", getFileStr(1), #eventFileNames - 1)
+
         info("Detected modification of %s. Processing %s%s.",
-             colorize(eventFileName, Col.Bold..Col.White),
+             modifiedFilesStr,
              pluralize(#newCcIdxs, "compile command"),
              earlyStopCount > 0 and format(" (including %d due to prior early stop)", earlyStopCount) or "")
 
