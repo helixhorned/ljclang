@@ -672,26 +672,7 @@ MI.State = class
 
 local mi = commandMode and MI.State() or nil
 
-function MI.GetDiagsString(fDiagSets, ccIdx)
-    local fDiagSet = fDiagSets[ccIdx]
-    local originalCcIdx = selectionInfo.indexMap[ccIdx] or ccIdx
-
-    local tab = {
-        format("CC #%d:", originalCcIdx)
-    }
-
-    if (fDiagSet == nil) then
-        -- TODO: feed back: start processing.
-        tab[1] = tab[1].." unprocessed"
-    elseif (fDiagSet:isEmpty()) then
-        tab[1] = tab[1].." clean"
-    else
-        -- TODO: elaborate. Share or make similar logic with FormattedDiagSetPrinter.
-        tab[2] = fDiagSet:getString(false)
-    end
-
-    return table.concat(tab, '\n')
-end
+local FormattedDiagSetPrinter  -- "forward-declare"
 
 function MI.DoHandleClientRequest(command, args, fDiagSets)
     if (command == "-C") then
@@ -719,9 +700,13 @@ function MI.DoHandleClientRequest(command, args, fDiagSets)
             return nil, "no compile commands for file name"
         end
 
+        local printer = FormattedDiagSetPrinter()
+
         local tab = {}
         for _, ccIdx in ipairs(idxsForCc) do
-            tab[#tab + 1] = MI.GetDiagsString(fDiagSets, ccIdx)
+            -- TODO: if the CC has not been processed yet, feed back: start processing.
+            local fDiagSet = fDiagSets[ccIdx] or diagnostics_util.FormattedDiagSet(false)
+            tab[#tab + 1] = printer:emulatePrint(fDiagSet, ccIdx)
         end
         return table.concat(tab, '\n')
     end
@@ -1519,7 +1504,7 @@ local SeverityCounts = class
     end,
 }
 
-local FormattedDiagSetPrinter = class
+FormattedDiagSetPrinter = class
 {
     function()
         return {
@@ -1549,7 +1534,7 @@ local FormattedDiagSetPrinter = class
         local IsTrackedSeverity = { fatal=true, error=true, warning=true }
 
         for i, fDiag in ipairs(fDiags) do
-            local str = fDiag:getString(true)
+            local str = fDiag:getString(not plainMode)
             local normStr = getNormalizedDiag(str)
 
             if (printAllDiags or not self.seenDiags[normStr]) then
@@ -1572,13 +1557,30 @@ local FormattedDiagSetPrinter = class
 
         local info = formattedDiagSet:getInfo()
         if (info ~= nil and not omittedLastDiag) then
-            toPrint[#toPrint+1] = format("%s", info:getString(true))
+            toPrint[#toPrint+1] = format("%s", info:getString(not plainMode))
         end
 
         return toPrint
     end,
 
-    print = function(self, formattedDiagSet, ccIndex)
+    emulatePrint = function(self, ...)
+        local oldGlobals = { plainMode, printProgressAfterSeconds, printProgressAfterCcCount }
+        -- Set up (1) no colors and (2) printing for each compile command.
+        plainMode, printProgressAfterSeconds, printProgressAfterCcCount = true, nil, 0
+
+        local lines = {}
+        local capturePrintf = function(fmt, ...)
+            lines[#lines + 1] = format(fmt, ...)
+        end
+
+        self:print(capturePrintf, ...)
+
+        plainMode, printProgressAfterSeconds, printProgressAfterCcCount = unpack(oldGlobals)
+
+        return table.concat(lines, '\n')
+    end,
+
+    print = function(self, printfFunc, formattedDiagSet, ccIndex)
         local toPrint = self:getStringsToPrint_(formattedDiagSet)
         local pSecs, pCount = printProgressAfterSeconds, printProgressAfterCcCount
 
@@ -1598,14 +1600,14 @@ local FormattedDiagSetPrinter = class
             local middle = getFileOrdinalText(cmd, ccIndex)
             local suffix = (#toPrint > 0) and "" or " ["..colorize("progress", Col.Green).."]"
 
-            errprintf("%s %s%s%s",
-                      colorize(prefix, Col.Bold..Col.Uline..Col.Green),
-                      middle,
-                      colorize(cmd.file, Col.Bold..Col.Green),
-                      suffix)
+            printfFunc("%s %s%s%s",
+                       colorize(prefix, Col.Bold..Col.Uline..Col.Green),
+                       middle,
+                       colorize(cmd.file, Col.Bold..Col.Green),
+                       suffix)
 
             if (#toPrint > 0) then
-                errprintf("%s\n", table.concat(toPrint, '\n'))
+                printfFunc("%s\n", table.concat(toPrint, '\n'))
             end
 
             self.lastProgressPrintTime = os.time()
@@ -2052,7 +2054,7 @@ local Controller = class
                     break
                 elseif (ccIdx <= lastCcIdxToPrint) then
                     self.notifier:addFilesFromGraph(ccInclusionGraphs[ccIdx])
-                    self.printer:print(fDiagSet, ccIdx)
+                    self.printer:print(errprintf, fDiagSet, ccIdx)
                     firstUnprocessedIdx = firstUnprocessedIdx + 1
                 end
             end
