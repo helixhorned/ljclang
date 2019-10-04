@@ -1749,7 +1749,8 @@ local INOTIFY_FD_MARKER = -math.huge
 
 local Controller = class
 {
-    function(notifier, ...)
+    -- <members>: table of certain members that can be taken over from run to run.
+    function(members, ...)
         return {
             onDemandParserArgs = { ... },
 
@@ -1757,7 +1758,7 @@ local Controller = class
             whoami = "unforked",
 
             -- Will be closed and nil'd in child.
-            notifier = notifier or Notifier(),
+            notifier = members.notifier or Notifier(),
 
             --== Child will have:
             parser = nil,  -- OnDemandParser
@@ -1773,7 +1774,7 @@ local Controller = class
             -- FormattedDiagSetPrinter:
             printer = nil,
             -- Will be filled only in command mode:
-            miFormattedDiagSets = {},
+            miFormattedDiagSets = members.miFormattedDiagSets or {},
         }
     end,
 
@@ -2150,7 +2151,7 @@ local function main()
     local ccInclusionGraphs = {}
 
     local parserOpts = printGraphMode and {"SkipFunctionBodies", "Incomplete"} or {}
-    local control = Controller(nil, range(#compileCommands), parserOpts)
+    local control = Controller({}, range(#compileCommands), parserOpts)
 
     repeat
         -- Print current diagnostics.
@@ -2234,11 +2235,24 @@ local function main()
              earlyStopCount > 0 and format(" (including %d due to prior early stop)", earlyStopCount) or "")
 
         -- Finally, re-process them.
-        -- TODO: smartly take over miFormattedDiagSets from the old controller.
+
+        local filter = function(fDiagSets)
+            for _, ccIdx in ipairs(newCcIdxs) do
+                fDiagSets[ccIdx] = nil
+            end
+            return fDiagSets
+        end
+
+        local membersTakenOver = {
+            -- We may not have seen all events that are due to arrive in the immediate
+            -- future, so make sure they are not lost.
+            notifier = notifier,
+
+            miFormattedDiagSets = filter(control.miFormattedDiagSets),
+        }
+
         startTime = os.time()
-        -- NOTE: reuse the notifier. We may not have seen all events that are due to arrive
-        --  in the immediate future, so make sure they are not lost.
-        control = Controller(notifier, newCcIdxs, parserOpts)
+        control = Controller(membersTakenOver, newCcIdxs, parserOpts)
     until (false)
 end
 
