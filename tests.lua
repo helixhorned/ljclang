@@ -494,7 +494,9 @@ describe("Cross-referencing", function()
 end)
 
 describe("Mangling", function()
-    local tu = GetTU("dev/empty.cpp", 0, {"-std=c++11", "-include", "thread"},
+    local tu = GetTU("dev/empty.cpp", 0,
+                     {"-std=c++11", "-include", "thread",
+                      "-isystem", "/usr/lib/llvm-9/lib/clang/9.0.1/include"},  -- HACK
                      {"Incomplete", "SkipFunctionBodies"})
 
     local V = cl.ChildVisitResult

@@ -1,10 +1,10 @@
 require('ffi').cdef[==========[
 	/*===-- clang-c/CXString.h - C Index strings  --------------------*- C -*-===*\
 |*                                                                            *|
-|*                     The LLVM Compiler Infrastructure                       *|
-|*                                                                            *|
-|* This file is distributed under the University of Illinois Open Source      *|
-|* License. See LICENSE.TXT for details.                                      *|
+|* Part of the LLVM Project, under the Apache License v2.0 with LLVM          *|
+|* Exceptions.                                                                *|
+|* See https://llvm.org/LICENSE.txt for license information.                  *|
+|* SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception                    *|
 |*                                                                            *|
 |*===----------------------------------------------------------------------===*|
 |*                                                                            *|
@@ -24,10 +24,10 @@ typedef struct {
  void clang_disposeStringSet(CXStringSet *set);
 	/*===-- clang-c/CXCompilationDatabase.h - Compilation database  ---*- C -*-===*\
 |*                                                                            *|
-|*                     The LLVM Compiler Infrastructure                       *|
-|*                                                                            *|
-|* This file is distributed under the University of Illinois Open Source      *|
-|* License. See LICENSE.TXT for details.                                      *|
+|* Part of the LLVM Project, under the Apache License v2.0 with LLVM          *|
+|* Exceptions.                                                                *|
+|* See https://llvm.org/LICENSE.txt for license information.                  *|
+|* SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception                    *|
 |*                                                                            *|
 |*===----------------------------------------------------------------------===*|
 |*                                                                            *|
@@ -79,10 +79,10 @@ clang_CompileCommand_getMappedSourcePath(CXCompileCommand, unsigned I);
 clang_CompileCommand_getMappedSourceContent(CXCompileCommand, unsigned I);
 	/*===-- clang-c/CXErrorCode.h - C Index Error Codes  --------------*- C -*-===*\
 |*                                                                            *|
-|*                     The LLVM Compiler Infrastructure                       *|
-|*                                                                            *|
-|* This file is distributed under the University of Illinois Open Source      *|
-|* License. See LICENSE.TXT for details.                                      *|
+|* Part of the LLVM Project, under the Apache License v2.0 with LLVM          *|
+|* Exceptions.                                                                *|
+|* See https://llvm.org/LICENSE.txt for license information.                  *|
+|* SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception                    *|
 |*                                                                            *|
 |*===----------------------------------------------------------------------===*|
 |*                                                                            *|
@@ -103,10 +103,10 @@ enum CXErrorCode {
 };
 	/*===-- clang-c/Index.h - Indexing Public C Interface -------------*- C -*-===*\
 |*                                                                            *|
-|*                     The LLVM Compiler Infrastructure                       *|
-|*                                                                            *|
-|* This file is distributed under the University of Illinois Open Source      *|
-|* License. See LICENSE.TXT for details.                                      *|
+|* Part of the LLVM Project, under the Apache License v2.0 with LLVM          *|
+|* Exceptions.                                                                *|
+|* See https://llvm.org/LICENSE.txt for license information.                  *|
+|* SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception                    *|
 |*                                                                            *|
 |*===----------------------------------------------------------------------===*|
 |*                                                                            *|
@@ -163,7 +163,9 @@ enum CXCursor_ExceptionSpecificationKind {
 
   CXCursor_ExceptionSpecificationKind_Uninstantiated,
 
-  CXCursor_ExceptionSpecificationKind_Unparsed
+  CXCursor_ExceptionSpecificationKind_Unparsed,
+
+  CXCursor_ExceptionSpecificationKind_NoThrow
 };
  CXIndex clang_createIndex(int excludeDeclarationsFromPCH,
                                          int displayDiagnostics);
@@ -380,7 +382,9 @@ enum CXTranslationUnit_Flags {
 
   CXTranslationUnit_IncludeAttributedTypes = 0x1000,
 
-  CXTranslationUnit_VisitImplicitAttributes = 0x2000
+  CXTranslationUnit_VisitImplicitAttributes = 0x2000,
+
+  CXTranslationUnit_IgnoreNonErrorsFromIncludedFiles = 0x4000
 };
  unsigned clang_defaultEditingTranslationUnitOptions(void);
  CXTranslationUnit
@@ -869,7 +873,9 @@ enum CXCursorKind {
   CXCursor_OMPTargetTeamsDistributeParallelForSimdDirective = 278,
 
   CXCursor_OMPTargetTeamsDistributeSimdDirective = 279,
-  CXCursor_LastStmt = CXCursor_OMPTargetTeamsDistributeSimdDirective,
+
+  CXCursor_BuiltinBitCastExpr = 280,
+  CXCursor_LastStmt = CXCursor_BuiltinBitCastExpr,
 
   CXCursor_TranslationUnit               = 300,
   /* Attributes */
@@ -913,7 +919,11 @@ enum CXCursorKind {
   CXCursor_ObjCRuntimeVisible            = 435,
   CXCursor_ObjCBoxable                   = 436,
   CXCursor_FlagEnum                      = 437,
-  CXCursor_LastAttr                      = CXCursor_FlagEnum,
+  CXCursor_ConvergentAttr                = 438,
+  CXCursor_WarnUnusedAttr                = 439,
+  CXCursor_WarnUnusedResultAttr          = 440,
+  CXCursor_AlignedAttr                   = 441,
+  CXCursor_LastAttr                      = CXCursor_AlignedAttr,
   /* Preprocessing */
   CXCursor_PreprocessingDirective        = 500,
   CXCursor_MacroDefinition               = 501,
@@ -1161,7 +1171,8 @@ enum CXTypeKind {
   CXType_OCLIntelSubgroupAVCImeResultSingleRefStreamout = 172,
   CXType_OCLIntelSubgroupAVCImeResultDualRefStreamout = 173,
   CXType_OCLIntelSubgroupAVCImeSingleRefStreamin = 174,
-  CXType_OCLIntelSubgroupAVCImeDualRefStreamin = 175
+  CXType_OCLIntelSubgroupAVCImeDualRefStreamin = 175,
+  CXType_ExtVector = 176
 };
 enum CXCallingConv {
   CXCallingConv_Default = 0,
@@ -1277,7 +1288,9 @@ enum CXTypeLayoutError {
 
   CXTypeLayoutError_NotConstantSize = -4,
 
-  CXTypeLayoutError_InvalidFieldName = -5
+  CXTypeLayoutError_InvalidFieldName = -5,
+
+  CXTypeLayoutError_Undeduced = -6
 };
  long long clang_Type_getAlignOf(CXType T);
  CXType clang_Type_getClassType(CXType T);
@@ -1286,6 +1299,8 @@ enum CXTypeLayoutError {
  CXType clang_Type_getModifiedType(CXType T);
  long long clang_Cursor_getOffsetOfField(CXCursor C);
  unsigned clang_Cursor_isAnonymous(CXCursor C);
+ unsigned clang_Cursor_isAnonymousRecordDecl(CXCursor C);
+ unsigned clang_Cursor_isInlineNamespace(CXCursor C);
 enum CXRefQualifierKind {
 
   CXRefQualifier_None = 0,

@@ -16,7 +16,7 @@ function api.addSystemInclude(compilerArgs, language)
 
     compilerArgs[#compilerArgs + 1] = "-isystem"
     -- Fixes extractdecls.lua on <signal.h>:
-    compilerArgs[#compilerArgs + 1] = "/usr/lib/llvm-8/lib/clang/8.0.1/include"
+    compilerArgs[#compilerArgs + 1] = "/usr/lib/llvm-9/lib/clang/9.0.1/include"
 end
 
 -- Done!
