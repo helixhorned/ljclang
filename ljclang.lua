@@ -2,7 +2,7 @@
 -- https://github.com/mkottman/luaclang-parser
 --
 -- See LICENSE for the Copyright Notice of LJClang.
--- LLVM_LICENSE.TXT is the license for libclang.
+-- License for LLVM: https://llvm.org/LICENSE.txt
 
 local assert = assert
 local error = error
