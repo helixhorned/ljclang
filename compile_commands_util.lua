@@ -1,7 +1,12 @@
 local check = require("error_util").check
 local LangOptions = require("dev.PchRelevantLangOptions")
 
+local io = require("io")
+local os = require("os")
+local math = require("math")
 local table = require("table")
+
+local util = require("util")
 
 local assert = assert
 local ipairs = ipairs
@@ -249,4 +254,170 @@ function api.sanitize_args(args, directory)
     return absifyIncludeOptions(localArgs, directory), getPchGenArgs(localArgs)
 end
 
+----------
+
+-- Preparation: run 'clang -v' on the compile commands. We use it to extact and add to the
+-- search path the system include directories added by the Clang driver (see e.g. functions
+-- AddClangSystemIncludeArgs() under LLVM's clang/lib/Driver/ToolChains/*.cpp). Omitting this
+-- yields include errors on certain system includes. See
+-- http://clang.llvm.org/docs/LibTooling.html#builtin-includes
+
+function api.obtainSystemIncludes(clang, concurrency,
+                                  compileCommands,  -- elements modified in-place
+                                  cacheDirectory, F)
+    local ccCount = #compileCommands
+    local localConcurrency = math.min(concurrency, ccCount)
+
+    -- Second return value: argument list signature for caching results of computations on
+    --  the argument list. Note that this caching only works as long as we do not process
+    --  the include dependencies. But, by the time we do, we hopefully have a way of running
+    --  this preparation concurrently with the main parsing loop.
+    local getArgsAndSig = function(ccIdx)
+        local cmd = compileCommands[ccIdx]
+        local args = util.copySequence(cmd.arguments)
+
+        -- Get the last dot-separated component as the extension.
+        local ext = args[cmd.fileNameIdx]:match("%.([^%.]+)$")
+
+        if (ext ~= nil) then
+            -- We do not use the include dependency output, so use an empty dummy file.
+            -- (Quick test using all LLVM CCs: 2s vs 8s.)
+            local dummyFileName = cacheDirectory..'/empty.'..ext
+
+            -- Create the empty file with the same extension as the source file.
+            -- (Since Clang potentially uses the extension to decide for a language.)
+            local f = io.open(dummyFileName, 'w') or
+                F.errorInfoAndExit("Failed opening '%s'.", dummyFileName)
+            f:close()
+
+            args[cmd.fileNameIdx] = dummyFileName
+        end
+
+        -- Request verbose information.
+        table.insert(args, 1, "-v")
+        -- Request header dependency information, running only to the preprocessing stage.
+        -- TODO: use the output produced by this.
+        table.insert(args, 2, "-MM")
+        table.insert(args, 3, "-MG")
+
+        -- Compute arguments' signature, keeping only those on which '-v' output depends.
+        -- TODO: likely, this can be made more precise, dropping more irrelevant arguments
+        --  than just the file name.
+        local sigArgs = util.copySequence(cmd.arguments)
+        table.remove(sigArgs, cmd.fileNameIdx)
+
+        -- NOTE: the extension is considered significant to the caching mechanism!
+        return args, ext..'\0\0'..table.concat(sigArgs, '\0')
+    end
+
+    -- { [<index into compileCommands>] = Callable (blocks until process finishes) }
+    local futures = {}
+    -- { [<signature>] = false/true }
+    local seenSignature = {}
+    -- { [<signature>] = <string (output of clang command)> }
+    local resultForSignature = {}
+    -- { [<index into compileCommands>] = <signature> }
+    local signatureForCcIdx = {}
+
+    local spawnWorker = function(ccIdx)
+        local args, signature = getArgsAndSig(ccIdx)
+        signatureForCcIdx[ccIdx] = signature
+
+        if (seenSignature[signature] == nil) then
+            seenSignature[signature] = true
+            futures[ccIdx] = F.ExecuteAsync(clang, args)
+            return true
+        end
+    end
+
+    local headCcIdx = 1
+    local workerCount = 0
+
+    local spawnWorkers = function()
+        while (workerCount < concurrency and headCcIdx <= ccCount) do
+            if (spawnWorker(headCcIdx)) then
+                workerCount = workerCount + 1
+            end
+            headCcIdx = headCcIdx + 1
+        end
+    end
+
+    local getResult = function(ccIdx)
+        local future = futures[ccIdx]
+        local ccSig = signatureForCcIdx[ccIdx]
+
+        assert((future ~= nil) == (resultForSignature[ccSig] == nil))
+
+        if (future ~= nil) then
+            local result = future()
+            workerCount = workerCount - 1
+
+            if (result == nil) then
+                local argsStr = table.concat((getArgsAndSig(ccIdx)), ' ')
+                F.errorInfo("Failed running preparatory step for compile command #%d:\n%s %s",
+                          ccIdx, clang, argsStr)
+                F.errorInfo("Please make sure that the original compile command invocation succeeds.")
+                F.errorInfoAndExit("If the issue persists after that, please report it as a bug.")
+            end
+
+            -- Retain the requested concurrency.
+            spawnWorkers()
+
+            -- Cache the result.
+            resultForSignature[ccSig] = result
+        end
+
+        return resultForSignature[ccSig]
+    end
+
+    local handleWorkerOutput = function(output, finishedCcIdx)
+        assert(type(output) == "string")
+
+        local cmd = compileCommands[finishedCcIdx]
+
+        do
+            -- NOTE: this depends on the precise formatting of the '-v' output.
+            --  Further, we assume that the command line arguments are on the same line.
+            local _, endIdx = output:find(' "'..clang..'" -cc1 ', 1, true)
+
+            if (endIdx == nil) then
+                F.errorInfo("For command #%d (%s), did not find clang -cc1 invocation in '-v' output.",
+                            finishedCcIdx, cmd.file:match("[^/]+$"))
+                -- NOTE: do not make this fatal. Just do not add the implicit include paths,
+                -- likely leading to errors down the road.
+            else
+                local ccArgs = cmd.arguments
+                local cc1Line = output:sub(endIdx + 1):match("^([^\n]+)\n")
+
+                for includeDir in cc1Line:gmatch("-internal[-extrnc]*-isystem ([^ ]+)") do
+                    -- NOTE: we get 'unknown argument' if we pass '-internal-...'.
+                    ccArgs[#ccArgs + 1] = "-isystem"
+                    ccArgs[#ccArgs + 1] = includeDir
+                end
+            end
+        end
+    end
+
+    ----
+
+    local startTime = os.time()
+
+    -- Initial batch.
+    spawnWorkers()
+
+    -- Handle children in a FIFO fashion.
+    -- TODO: if necessary (which seems unlikely), handle in a poll() way.
+    for ccIdx = 1, ccCount do
+        local result = getResult(ccIdx)
+        handleWorkerOutput(result, ccIdx)
+    end
+
+    local prepTime = os.difftime(os.time(), startTime)
+
+    if (prepTime >= 2) then
+        F.info("Prepared compile commands in %d seconds.", prepTime)
+    end
+end
+
+---------- Done!
 return api
