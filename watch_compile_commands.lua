@@ -831,6 +831,19 @@ function MI.HandleClientRequests(fDiagSets)
     end
 end
 
+---------- Preparation ----------
+
+compile_commands_util.obtainSystemIncludes(
+    getEnv("LLVM_BINDIR", "LLVM binary directory").."/clang",
+    usedConcurrency, compileCommands, CacheDirectory,
+    {
+        errorInfo = errorInfo,
+        errorInfoAndExit = errorInfoAndExit,
+        ExecuteAsync = ExecuteAsync,
+        info = info,
+    }
+)
+
 ---------- Automatic precompiled headers ----------
 
 if (autoPch ~= nil) then
@@ -1005,17 +1018,6 @@ did not successfully pass test usage with an empty C++ source file.", fn)
 
 ::end_pch::
 end
-
-compile_commands_util.obtainSystemIncludes(
-    getEnv("LLVM_BINDIR", "LLVM binary directory").."/clang",
-    usedConcurrency, compileCommands, CacheDirectory,
-    {
-        errorInfo = errorInfo,
-        errorInfoAndExit = errorInfoAndExit,
-        ExecuteAsync = ExecuteAsync,
-        info = info,
-    }
-)
 
 -----
 
