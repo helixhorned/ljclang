@@ -681,7 +681,9 @@ local mi = commandMode and MI.State() or nil
 
 local FormattedDiagSetPrinter  -- "forward-declare"
 
-function MI.DoHandleClientRequest(command, args, fDiagSets)
+function MI.DoHandleClientRequest(command, args, control)
+    local fDiagSets = control.miFormattedDiagSets
+
     if (command == "-C") then
         -- NOTE: arguments are completely ignored.
         return ""
@@ -736,7 +738,7 @@ function MI.GetOutputFifo(clientId, errorSuffix)
     return posix.Fd(fifoFd)
 end
 
-function MI.HandleClientRequest(request, fDiagSets)
+function MI.HandleClientRequest(request, control)
     assert(type(request) == "string")
     assert(request:match('\n') == nil)
 
@@ -779,7 +781,7 @@ function MI.HandleClientRequest(request, fDiagSets)
     end
 
     -- Do the actual work for the request.
-    local result, errorMsg = MI.DoHandleClientRequest(command, args, fDiagSets)
+    local result, errorMsg = MI.DoHandleClientRequest(command, args, control)
     assert(result == nil or type(result) == "string")
 
     if (fifo ~= nil) then
@@ -797,7 +799,7 @@ function MI.HandleClientRequest(request, fDiagSets)
     end
 end
 
-function MI.HandleClientRequests(fDiagSets)
+function MI.HandleClientRequests(control)
     -- Read from the client inotify file descriptor (to clear the poll()
     -- status) and discard. We are only interested in the data arrived in
     -- the client request FIFO.
@@ -833,7 +835,7 @@ function MI.HandleClientRequests(fDiagSets)
         end
 
         for request in requests:gmatch("(.-)\n") do
-            MI.HandleClientRequest(request, fDiagSets)
+            MI.HandleClientRequest(request, control)
         end
     end
 end
@@ -1941,7 +1943,7 @@ local Controller = class
 
             -- Handle client requests that arrived in between processing child results.
             if (haveClientRequest) then
-                MI.HandleClientRequests(self.miFormattedDiagSets)
+                MI.HandleClientRequests(self)
             end
         until (not self:haveActiveChildren())
 
@@ -2084,7 +2086,7 @@ local function main()
                 local isReady = Poll({events=POLL.IN, fileInotifyFd, clientInotifyFd})
 
                 if (isReady[clientInotifyFd]) then
-                    MI.HandleClientRequests(control.miFormattedDiagSets)
+                    MI.HandleClientRequests(control)
                 end
             until (isReady[fileInotifyFd])
         end
