@@ -132,6 +132,7 @@ Options:
       - diagnostics that follow a Parse Issue error, and
       - diagnostics that were seen in previous compile commands.
   -P: Disable color output.
+  -v: Be verbose. Currently: output compiler invocations for Auto-PCH generation failures.
   -x: exit after parsing and displaying diagnostics once.
 
   If the selector to an option -s starts with '@', it must have one of the following forms,
@@ -156,6 +157,7 @@ local opts_meta = {
     s = 1,  -- collect all instances
     N = false,
     P = false,
+    v = false,
     x = false,
 }
 
@@ -217,6 +219,11 @@ end
 local function errorInfo(fmt, ...)
     local func = printGraphMode and errprintf or printf
     func("%s: "..fmt, colorize("INFO", Col.Bold..Col.Red), ...)
+end
+
+local function warnInfo(fmt, ...)
+    local func = printGraphMode and errprintf or printf
+    func("%s: "..fmt, colorize("INFO", Col.Bold..Col.Purple), ...)
 end
 
 local function errorInfoAndExit(fmt, ...)
@@ -882,6 +889,7 @@ if (autoPch ~= nil) then
             -- use the PCH configuration.
             if (oldCount == countThreshold) then
                 usedPchArgs[#usedPchArgs + 1] = pchArgs
+                -- Tentatively use. We may still disable usage if PCH generation fails.
                 isPchFileUsed[fn] = true
             end
         end
@@ -903,27 +911,6 @@ if (autoPch ~= nil) then
     if (#usedPchArgs == 0) then
         goto end_pch
     end
-
-    -- Attach the PCH file name to compile commands that are going to be PCH-enabled.
-
-    local pchDir = CacheDirectory
-    local pchEnabledCcCount = 0
-
-    for i, cmd in ipairs(compileCommands) do
-        local pchArgs = cmd.pchArguments
-        assert(cmd.pchFileName == nil)
-
-        if (type(pchArgs) == "table") then
-            local fn = pchArgs[#pchArgs]
-            if (isPchFileUsed[fn]) then
-                cmd.pchFileName = pchDir..'/'..fn
-                pchEnabledCcCount = pchEnabledCcCount + 1
-            end
-        end
-    end
-
-    assert(pchEnabledCcCount > 0)
-    info("Auto-PCH: enabled %d compile commands.", pchEnabledCcCount)
 
     -- Files in fixed paths
 
@@ -949,9 +936,11 @@ if (autoPch ~= nil) then
         local ret = Execute(clangpp, cmdArgs)
 
         if (ret ~= 0) then
-            errorInfo("Auto-PCH: exited with non-zero exit code: %s %s",
-                      clangpp, table.concat(cmdArgs, ' '))
-            exitRequestingBugReport()
+            if (opts.v) then
+                warnInfo("Auto-PCH: generation of PCH file failed: %s %s",
+                         clangpp, table.concat(cmdArgs, ' '))
+            end
+            return false
         end
 
         if (not exists(fullPchFileName)) then
@@ -960,6 +949,8 @@ if (autoPch ~= nil) then
 does not exist even though the command to generate it ran successfully.", fullPchFileName)
             exitRequestingBugReport()
         end
+
+        return true
     end
 
     -- Attempts to compile an empty file with the given PCH configuration.
@@ -980,14 +971,21 @@ does not exist even though the command to generate it ran successfully.", fullPc
 
     -- PCH file generation loop.
 
-    local genCount, regenCount = 0, 0
+    local pchDir = CacheDirectory
+    local genCount, regenCount, failCount = 0, 0, 0
 
     for _, pchArgs in ipairs(usedPchArgs) do
-        local fn = pchDir..'/'..pchArgs[#pchArgs]
-        pchArgs.pchFileName = fn
+        local fn = pchArgs[#pchArgs]
+        local absFileName = pchDir..'/'..fn
+        pchArgs.pchFileName = absFileName
 
-        if (not exists(fn)) then
-            generatePch(pchArgs)
+        if (not exists(absFileName)) then
+            if (not generatePch(pchArgs)) then
+                isPchFileUsed[fn] = false
+                failCount = failCount + 1
+                goto nextPch
+            end
+
             genCount = genCount + 1
         end
 
@@ -996,7 +994,12 @@ does not exist even though the command to generate it ran successfully.", fullPc
         local ok = testPch(pchArgs)
 
         if (not ok) then
-            generatePch(pchArgs)
+            if (not generatePch(pchArgs)) then
+                isPchFileUsed[fn] = false
+                failCount = failCount + 1
+                goto nextPch
+            end
+
             regenCount = regenCount + 1
 
             if (not testPch(pchArgs)) then
@@ -1006,6 +1009,8 @@ did not successfully pass test usage with an empty C++ source file.", fn)
                 exitRequestingBugReport()
             end
         end
+
+        ::nextPch::
     end
 
     if (genCount == 0 and regenCount == 0) then
@@ -1015,6 +1020,31 @@ did not successfully pass test usage with an empty C++ source file.", fn)
              pluralize(genCount, "PCH file"),
              regenCount > 0 and format(", regenerated %d", regenCount) or "")
     end
+
+    if (failCount > 0 and not opts.v) then
+        warnInfo("Auto-PCH: generation of %s failed. Use -v for details.",
+                 pluralize(failCount, "PCH file"))
+    end
+
+    -- Attach the PCH file name to compile commands that are going to be PCH-enabled.
+
+    local pchEnabledCcCount = 0
+
+    for i, cmd in ipairs(compileCommands) do
+        local pchArgs = cmd.pchArguments
+        assert(cmd.pchFileName == nil)
+
+        if (type(pchArgs) == "table") then
+            local fn = pchArgs[#pchArgs]
+            if (isPchFileUsed[fn]) then
+                cmd.pchFileName = pchDir..'/'..fn
+                pchEnabledCcCount = pchEnabledCcCount + 1
+            end
+        end
+    end
+
+    assert(pchEnabledCcCount > 0)
+    info("Auto-PCH: enabled %d compile commands.", pchEnabledCcCount)
 
 ::end_pch::
 end

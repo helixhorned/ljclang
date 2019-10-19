@@ -175,6 +175,7 @@ Options:
       - diagnostics that follow a Parse Issue error, and
       - diagnostics that were seen in previous compile commands.
   -P: Disable color output.
+  -v: Be verbose. Currently: output compiler invocations for Auto-PCH generation failures.
   -x: exit after parsing and displaying diagnostics once.
 
   If the selector to an option -s starts with '@', it must have one of the following forms,
