@@ -1386,6 +1386,16 @@ local SeverityCounts = class
     end,
 }
 
+local function getCcIdxString(ccIndex)
+    local selInfo = selectionInfo
+    local originalCcIndex = selInfo.indexMap[ccIndex] or ccIndex
+    local printLocalIdx = (selInfo.haveFileSelection or not selInfo.isContiguous)
+
+    return format("%s%d",
+                  printLocalIdx and "s" or "#",
+                  printLocalIdx and ccIndex or originalCcIndex)
+end
+
 FormattedDiagSetPrinter = class
 {
     function()
@@ -1473,13 +1483,7 @@ FormattedDiagSetPrinter = class
 
         if (shouldPrint) then
             local cmd = compileCommands[ccIndex]
-            local selInfo = selectionInfo
-            local originalCcIndex = selInfo.indexMap[ccIndex] or ccIndex
-            local printLocalIdx = (selInfo.haveFileSelection or not selInfo.isContiguous)
-
-            local prefix = format("Command %s%d:",
-                                  printLocalIdx and "s" or "#",
-                                  printLocalIdx and ccIndex or originalCcIndex)
+            local prefix = format("Command %s:", getCcIdxString(ccIndex))
             local middle = getFileOrdinalText(cmd, ccIndex)
             local suffix = (#toPrint > 0) and "" or " ["..colorize("progress", Col.Green).."]"
 
