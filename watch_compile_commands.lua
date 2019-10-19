@@ -775,8 +775,7 @@ function MI.HandleClientRequest(request, crTab)
         "request by unknown client" or
         format("request by client %s", clientId)
 
-    -- TODO: remove or make it debug output.
-    miInfo("got: %s %s", command, table.concat(args, ' '))
+    miInfo("client: %s %s", command, table.concat(args, ' '))
 
     if (command == nil) then
         -- NOTE: don't bother outputting anything to the client-prepared FIFO.
