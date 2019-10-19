@@ -1467,7 +1467,7 @@ FormattedDiagSetPrinter = class
 
         self:print(capturePrintf, ...)
 
-        plainMode, printProgressAfterSeconds, printProgressAfterCcCount = unpack(oldGlobals)
+        plainMode, printProgressAfterSeconds, printProgressAfterCcCount = unpack(oldGlobals, 1, 3)
 
         return table.concat(lines, '\n')
     end,
