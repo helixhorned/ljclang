@@ -340,6 +340,10 @@ if (progressSpec ~= nil) then
     end
 
     if (isCountSpecified) then
+        if (commandMode) then
+            -- See MONOTONIC_PRINT for why.
+            abort("'c<count>' form of -r not allowed in command mode.")
+        end
         printProgressAfterCcCount = num
     else
         printProgressAfterSeconds = num
@@ -681,8 +685,8 @@ local mi = commandMode and MI.State() or nil
 
 local FormattedDiagSetPrinter  -- "forward-declare"
 
-function MI.DoHandleClientRequest(command, args, control)
-    local fDiagSets = control.miFormattedDiagSets
+function MI.DoHandleClientRequest(command, args, crTab)
+    local control, prioritizeCcFunc = unpack(crTab)
 
     if (command == "-C") then
         -- NOTE: arguments are completely ignored.
@@ -709,14 +713,20 @@ function MI.DoHandleClientRequest(command, args, control)
             return nil, "no compile commands for file name"
         end
 
+        local nullFDiagSet = diagnostics_util.FormattedDiagSet(false)
         local printer = FormattedDiagSetPrinter()
-
         local tab = {}
+
         for _, ccIdx in ipairs(idxsForCc) do
-            -- TODO: if the CC has not been processed yet, feed back: start processing.
-            local fDiagSet = fDiagSets[ccIdx] or diagnostics_util.FormattedDiagSet(false)
-            tab[#tab + 1] = printer:emulatePrint(fDiagSet, ccIdx)
+            local fDiagSet = control.miFormattedDiagSets[ccIdx]
+            if (fDiagSet == nil) then
+                -- Compile command not yet processed, so:
+                prioritizeCcFunc(ccIdx)
+            end
+
+            tab[#tab + 1] = printer:emulatePrint(fDiagSet or nullFDiagSet, ccIdx)
         end
+
         return table.concat(tab, '\n')
     end
 
@@ -738,7 +748,7 @@ function MI.GetOutputFifo(clientId, errorSuffix)
     return posix.Fd(fifoFd)
 end
 
-function MI.HandleClientRequest(request, control)
+function MI.HandleClientRequest(request, crTab)
     assert(type(request) == "string")
     assert(request:match('\n') == nil)
 
@@ -781,7 +791,7 @@ function MI.HandleClientRequest(request, control)
     end
 
     -- Do the actual work for the request.
-    local result, errorMsg = MI.DoHandleClientRequest(command, args, control)
+    local result, errorMsg = MI.DoHandleClientRequest(command, args, crTab)
     assert(result == nil or type(result) == "string")
 
     if (fifo ~= nil) then
@@ -799,7 +809,9 @@ function MI.HandleClientRequest(request, control)
     end
 end
 
-function MI.HandleClientRequests(control)
+function MI.HandleClientRequests(crTab)
+    assert(#crTab == 2)
+
     -- Read from the client inotify file descriptor (to clear the poll()
     -- status) and discard. We are only interested in the data arrived in
     -- the client request FIFO.
@@ -835,7 +847,7 @@ function MI.HandleClientRequests(control)
         end
 
         for request in requests:gmatch("(.-)\n") do
-            MI.HandleClientRequest(request, control)
+            MI.HandleClientRequest(request, crTab)
         end
     end
 end
@@ -1478,7 +1490,10 @@ FormattedDiagSetPrinter = class
 
         local shouldPrint = (#toPrint > 0) or
             pSecs ~= nil and os.difftime(os.time(), self.lastProgressPrintTime) >= pSecs or
-            -- NOTE: in command mode, sequence of 'ccIndex'es is not necessarily monotonic.
+            -- NOTE [MONOTONIC_PRINT]: in command mode, the sequence of 'ccIndex'es is not
+            --  necessarily monotonic. A large one (for a command that got prioritized)
+            --  would suppress progress printing until commands with larger indexes or
+            --  diagnostics.
             pCount ~= nil and ccIndex - self.lastProgressPrintCcIndex >= pCount
 
         if (shouldPrint) then
@@ -1840,7 +1855,9 @@ local Controller = class
     end,
 
     getCcIdxs = function(self)
-        return self:checkCcIdxs_(self.onDemandParserArgs[1])
+        local ccIdxs = self.onDemandParserArgs[1]
+        assert(type(ccIdxs) == "table")
+        return commandMode and ccIdxs or self:checkCcIdxs_(ccIdxs)
     end,
 
     setupConcurrency = function(self, ccInclusionGraphs)
@@ -1867,6 +1884,25 @@ local Controller = class
 
         local lastCcIdxToPrint = math.huge
         local hadInotifyFd = false
+
+        local prioritizeCcFunc = function(ccIdxToBump)
+            -- TODO: wait for the compile command to process, only then send the result.
+            for i = ii, #ccIdxs do
+                if (ccIdxs[i] == ccIdxToBump) then
+                    -- NOTE: this makes 'ccIdxs' non-monotonic when i > ii.
+                    table.remove(ccIdxs, i)
+                    table.insert(ccIdxs, ii, ccIdxToBump)
+                    miInfo("Prioritized compile command %s.", getCcIdxString(ccIdxToBump))
+                    return
+                end
+            end
+
+            -- A prioritize request must be for a compile command that is to be processed,
+            -- but has not yet been.
+            assert(false
+                   -- FIXME: fails if compile command to be prioritized is outstanding.
+                   or miInfo("FIXME") or true)
+        end
 
         repeat
             local connIdxs, haveInotifyFd, haveClientRequest = self:wait()
@@ -1950,7 +1986,7 @@ local Controller = class
                 end
             elseif (haveClientRequest) then
                 -- Handle client requests that arrived in between processing child results.
-                MI.HandleClientRequests(self)
+                MI.HandleClientRequests{self, prioritizeCcFunc}
             end
         until (not self:haveActiveChildren())
 
@@ -2093,7 +2129,10 @@ local function main()
                 local isReady = Poll({events=POLL.IN, fileInotifyFd, clientInotifyFd})
 
                 if (isReady[clientInotifyFd]) then
-                    MI.HandleClientRequests(control)
+                    MI.HandleClientRequests{control, function(_)
+                        -- A prioritize request can only happen while processing.
+                        assert(false)
+                    end}
                 end
             until (isReady[fileInotifyFd])
         end
