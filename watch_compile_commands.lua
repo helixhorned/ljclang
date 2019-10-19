@@ -256,7 +256,7 @@ local function getUsedConcurrency()
 end
 
 if (commandMode) then
-    local DisallowedOpts = {'g', 'x'}
+    local DisallowedOpts = {'i', 'g', 'x'}
 
     for _, opt in ipairs(DisallowedOpts) do
         if (opts[opt]) then
@@ -1468,6 +1468,7 @@ FormattedDiagSetPrinter = class
 
         local shouldPrint = (#toPrint > 0) or
             pSecs ~= nil and os.difftime(os.time(), self.lastProgressPrintTime) >= pSecs or
+            -- NOTE: in command mode, sequence of 'ccIndex'es is not necessarily monotonic.
             pCount ~= nil and ccIndex - self.lastProgressPrintCcIndex >= pCount
 
         if (shouldPrint) then
@@ -1856,8 +1857,10 @@ local Controller = class
 
         local ii = localConcurrency + 1
 
+        -- Human mode only.
         local firstUnprocessedIdx = 1
         local formattedDiagSets = {}
+
         local lastCcIdxToPrint = math.huge
         local hadInotifyFd = false
 
@@ -1907,9 +1910,9 @@ local Controller = class
 
                 if (commandMode) then
                     self.miFormattedDiagSets[ccIdx] = fDiagSet
-                end
-
-                if (incrementalMode ~= nil) then
+                    -- Print diagnostic set immediately on arrival.
+                    self.printer:print(errprintf, fDiagSet, ccIdx)
+                elseif (incrementalMode ~= nil) then
                     if (HasMatchingDiag(formattedDiagSets[ccIdx], incrementalMode)) then
                         -- We are in incremental mode and have detected a diagnostic severity
                         -- for which the user wants us to stop. So:
@@ -1926,23 +1929,23 @@ local Controller = class
                 ::nextIteration::
             end
 
-            -- Print diagnostic sets in compile command order.
-            for idx = firstUnprocessedIdx, #ccIdxs do
-                local ccIdx = ccIdxs[idx]
-                local fDiagSet = formattedDiagSets[ccIdx]
-                formattedDiagSets[ccIdx] = nil
+            if (not commandMode) then
+                -- Print diagnostic sets in compile command order.
+                for idx = firstUnprocessedIdx, #ccIdxs do
+                    local ccIdx = ccIdxs[idx]
+                    local fDiagSet = formattedDiagSets[ccIdx]
+                    formattedDiagSets[ccIdx] = nil
 
-                if (fDiagSet == nil) then
-                    break
-                elseif (ccIdx <= lastCcIdxToPrint) then
-                    self.notifier:addFilesFromGraph(ccInclusionGraphs[ccIdx])
-                    self.printer:print(errprintf, fDiagSet, ccIdx)
-                    firstUnprocessedIdx = firstUnprocessedIdx + 1
+                    if (fDiagSet == nil) then
+                        break
+                    elseif (ccIdx <= lastCcIdxToPrint) then
+                        self.notifier:addFilesFromGraph(ccInclusionGraphs[ccIdx])
+                        self.printer:print(errprintf, fDiagSet, ccIdx)
+                        firstUnprocessedIdx = firstUnprocessedIdx + 1
+                    end
                 end
-            end
-
-            -- Handle client requests that arrived in between processing child results.
-            if (haveClientRequest) then
+            elseif (haveClientRequest) then
+                -- Handle client requests that arrived in between processing child results.
                 MI.HandleClientRequests(self)
             end
         until (not self:haveActiveChildren())
