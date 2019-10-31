@@ -1720,9 +1720,13 @@ local Controller = class
         return conn.r:readInto(cdata, false)
     end,
 
-    closeConnection = function(self, connIdx)
+    getConnectionAndCcIdx = function(self, connIdx)
         local conn = self.connections[connIdx]
-        local ccIdx = conn.compileCommandIndex
+        return conn, conn.compileCommandIndex
+    end,
+
+    closeConnection = function(self, connIdx)
+        local conn, ccIdx = self:getConnectionAndCcIdx(connIdx)
         local readFd = conn.r.fd
 
         conn:close()
@@ -1791,6 +1795,17 @@ local Controller = class
         self.pendingFds = pendingFds
 
         return ParentMarker
+    end,
+
+    isOutstanding = function(self, ccIdxToCheck)
+        for _, readFd in ipairs(self.pendingFds) do
+            local _, ccIdx = self:getConnectionAndCcIdx(self.readFdToConnIdx[readFd])
+            if (ccIdx == ccIdxToCheck) then
+                return true
+            end
+        end
+
+        return false
     end,
 
     -- TODO: watch inotify descriptor, too.
@@ -1897,9 +1912,7 @@ local Controller = class
 
             -- A prioritize request must be for a compile command that is to be processed,
             -- but has not yet been.
-            assert(false
-                   -- FIXME: fails if compile command to be prioritized is outstanding.
-                   or miInfo("FIXME") or true)
+            assert(self:isOutstanding(ccIdxToBump))
         end
 
         repeat
