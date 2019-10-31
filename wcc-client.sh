@@ -98,6 +98,10 @@ if [ $block == yes ]; then
     # The FIFO must *first* be opened for reading: the server opens it with
     # O_NONBLOCK | O_WRONLY, thus failing with ENXIO otherwise.
     # Also, dummy-open it for writing because otherwise we would hang (chicken & egg).
+    #
+    # NOTE: opening a FIFO for reading and writing simultaneously is *undefined* according
+    #  to POSIX (IEEE 1003.1-2008, see open()). Using O_RDWR seems to be Linux-specific,
+    #  see e.g. https://stackoverflow.com/questions/15055065/o-rdwr-on-named-pipes-with-poll
     exec {resultFd}<> "$FIFO"
 
     # Send the command, informing the server of our ID.
