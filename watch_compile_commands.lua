@@ -1373,6 +1373,19 @@ local function GetNewCcIndexes(ccInclusionGraphs, eventFileNames,
         end
     end
 
+    if (commandMode) then
+        -- Put the compile commands affected by a file change to the front.
+        local cmNewIndexes = util.copySequence(affectedIndexes)
+
+        for _, ccIdx in ipairs(newIndexes) do
+            if (not isCompileCommandAffected(ccIdx)) then
+                cmNewIndexes[#cmNewIndexes + 1] = ccIdx
+            end
+        end
+
+        newIndexes = cmNewIndexes
+    end
+
     return newIndexes, affectedIndexes, #oldCcIdxs - processedCommandCount
 end
 
