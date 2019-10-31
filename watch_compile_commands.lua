@@ -723,6 +723,7 @@ function MI.DoHandleClientRequest(command, args, crTab)
 
         local nullFDiagSet = diagnostics_util.FormattedDiagSet(false)
         local printer = FormattedDiagSetPrinter()
+        local haveUnprocessed = false
         local tab = {}
 
         for _, ccIdx in ipairs(idxsForCc) do
@@ -730,9 +731,14 @@ function MI.DoHandleClientRequest(command, args, crTab)
             if (fDiagSet == nil) then
                 -- Compile command not yet processed, so:
                 prioritizeCcFunc(ccIdx)
+                haveUnprocessed = true
+            else
+                tab[#tab + 1] = printer:emulatePrint(fDiagSet, ccIdx)
             end
+        end
 
-            tab[#tab + 1] = printer:emulatePrint(fDiagSet or nullFDiagSet, ccIdx)
+        if (haveUnprocessed) then
+            table.insert(tab, 1, "INFO: one or more compile commands not yet processed.")
         end
 
         return table.concat(tab, '\n')
