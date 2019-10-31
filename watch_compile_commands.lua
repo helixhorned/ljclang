@@ -685,6 +685,24 @@ local mi = commandMode and MI.State() or nil
 
 local FormattedDiagSetPrinter  -- "forward-declare"
 
+function MI.GetRealNameFor(fileName)
+    if (fileName == nil) then
+        return nil, "missing file name"
+    end
+
+    assert(#fileName > 0)  -- because we matched with '+'
+    if (fileName:sub(1,1) ~= '/') then
+        return nil, "file name must be absolute"
+    end
+
+    local realName, errorMsg = posix.realpath(fileName)
+    if (realName == nil) then
+        return nil, "failed resolving file name: "..errorMsg
+    end
+
+    return realName
+end
+
 function MI.DoHandleClientRequest(command, args, crTab)
     local control, prioritizeCcFunc = unpack(crTab)
 
@@ -692,19 +710,9 @@ function MI.DoHandleClientRequest(command, args, crTab)
         -- NOTE: arguments are completely ignored.
         return ""
     elseif (command == "diags") then
-        local fileName = args[1]
-        if (fileName == nil) then
-            return nil, "missing file name"
-        end
-
-        assert(#fileName > 0)  -- because we matched with '+'
-        if (fileName:sub(1,1) ~= '/') then
-            return nil, "file name must be absolute"
-        end
-
-        local realName, errorMsg = posix.realpath(fileName)
+        local realName, errorMsg = MI.GetRealNameFor(args[1])
         if (realName == nil) then
-            return nil, "failed resolving file name"
+            return nil, errorMsg
         end
 
         -- TODO: handle non-sources.
