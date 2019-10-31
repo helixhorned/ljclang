@@ -1323,8 +1323,8 @@ local function GetNewCcIndexes(ccInclusionGraphs, eventFileNames,
         end
     end
 
-    -- 2. compile commands left over if we stopped early in incremental mode.
-    --  (Also see NOTE STOPPED_EARLY.)
+    -- 2. compile commands left over if we stopped early in incremental mode or due to a
+    --  detected file change. (Also see NOTE STOPPED_EARLY.)
     if (processedCommandCount < #oldCcIdxs) then
         for i = processedCommandCount, #oldCcIdxs do
             indexes[#indexes + 1] = oldCcIdxs[i]
@@ -1482,7 +1482,8 @@ FormattedDiagSetPrinter = class
 
     emulatePrint = function(self, ...)
         local oldGlobals = { plainMode, printProgressAfterSeconds, printProgressAfterCcCount }
-        -- Set up (1) no colors and (2) printing for each compile command.
+        -- Set up (1) no colors and (2) printing for each compile command, even if it has no
+        -- diagnostics.
         plainMode, printProgressAfterSeconds, printProgressAfterCcCount = true, nil, 0
 
         local lines = {}
