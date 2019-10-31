@@ -1877,9 +1877,8 @@ local Controller = class
 
         local ii = localConcurrency + 1
 
-        -- Human mode only.
         local firstUnprocessedIdx = 1
-        local formattedDiagSets = {}
+        local formattedDiagSets = {}  -- in command mode, only used for control flow
 
         local lastCcIdxToPrint = math.huge
         local hadInotifyFd = false
@@ -1943,12 +1942,15 @@ local Controller = class
 
                 local fDiagSet = diagnostics_util.FormattedDiagSet_Deserialize(
                     serializedDiags, not plainMode)
+                assert(fDiagSet ~= nil)
 
                 formattedDiagSets[ccIdx] = fDiagSet;
+                -- TODO: immediately add files to the include graph here?
                 ccInclusionGraphs[ccIdx] = inclusion_graph.Deserialize(serializedGraph)
 
                 if (commandMode) then
                     self.miFormattedDiagSets[ccIdx] = fDiagSet
+                    self.notifier:addFilesFromGraph(ccInclusionGraphs[ccIdx])
                     -- Print diagnostic set immediately on arrival.
                     self.printer:print(errprintf, fDiagSet, ccIdx)
                 elseif (incrementalMode ~= nil) then
@@ -1968,22 +1970,26 @@ local Controller = class
                 ::nextIteration::
             end
 
-            if (not commandMode) then
-                -- Print diagnostic sets in compile command order.
-                for idx = firstUnprocessedIdx, #ccIdxs do
-                    local ccIdx = ccIdxs[idx]
-                    local fDiagSet = formattedDiagSets[ccIdx]
-                    formattedDiagSets[ccIdx] = nil
+            -- In human mode, print diagnostic sets in compile command order.
+            -- In command mode, run the loop only to update 'firstUnprocessedIdx'
+            -- which is returned later.
+            for idx = firstUnprocessedIdx, #ccIdxs do
+                local ccIdx = ccIdxs[idx]
+                local fDiagSet = formattedDiagSets[ccIdx]
+                formattedDiagSets[ccIdx] = nil
 
-                    if (fDiagSet == nil) then
-                        break
-                    elseif (ccIdx <= lastCcIdxToPrint) then
+                if (fDiagSet == nil) then
+                    break
+                elseif (ccIdx <= lastCcIdxToPrint) then
+                    if (not commandMode) then
                         self.notifier:addFilesFromGraph(ccInclusionGraphs[ccIdx])
                         self.printer:print(errprintf, fDiagSet, ccIdx)
-                        firstUnprocessedIdx = firstUnprocessedIdx + 1
                     end
+                    firstUnprocessedIdx = firstUnprocessedIdx + 1
                 end
-            elseif (haveClientRequest) then
+            end
+
+            if (haveClientRequest) then
                 -- Handle client requests that arrived in between processing child results.
                 MI.HandleClientRequests{self, prioritizeCcFunc}
             end
