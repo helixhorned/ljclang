@@ -1302,22 +1302,41 @@ end
 
 local function GetNewCcIndexes(ccInclusionGraphs, eventFileNames,
                                processedCommandCount, oldCcIdxs)
-    assert(#ccInclusionGraphs <= #compileCommands)
     assert(processedCommandCount <= #oldCcIdxs)
+
+    -- [SEQ_REAP] In command mode, we are not necessarily reaping the results sequentially
+    -- because we can prioritize compile commands much later than the current "head"!
+    -- However, in human mode we do: using '#' (the length operator), we depend on the
+    -- sequence table having no "holes".
+    local ccEndIdx = commandMode and #compileCommands or #ccInclusionGraphs
+
+    if (not commandMode) then
+        assert(ccEndIdx <= #compileCommands)
+        for ccIdx = 1, #compileCommands do
+            assert((ccInclusionGraphs[ccIdx] ~= nil) == (ccIdx <= ccEndIdx))
+        end
+    end
 
     local isCompileCommandAffected = function(ccIdx)
         local incGraph = ccInclusionGraphs[ccIdx]
+        if (incGraph == nil) then
+            assert(commandMode)
+            return false
+        end
+
         for i = 1, #eventFileNames do
             if (incGraph:getNode(eventFileNames[i]) ~= nil) then
                 return true
             end
         end
+
+        return false
     end
 
     local indexes, affectedIndexes = {}, {}
 
     -- 1. compile commands affected by the files on which we had a watch event.
-    for ccIdx = 1, #ccInclusionGraphs do
+    for ccIdx = 1, ccEndIdx do
         if (isCompileCommandAffected(ccIdx)) then
             affectedIndexes[#affectedIndexes + 1] = ccIdx
             indexes[#indexes + 1] = ccIdx
@@ -1335,7 +1354,15 @@ local function GetNewCcIndexes(ccInclusionGraphs, eventFileNames,
     -- Now, sort+uniquify the two compile command index sequences, for the assert in checkCcIdxs_().
     -- Violation can only happen if we stopped early on a re-process that was due to an early stop.
     -- (Because we get the same compile command twice -- once from 1. and once from 2.)
-
+    --
+    -- In command mode where there is no guarantee of sequentiality things get even more
+    -- complicated. Note that 'processedCommandCount' is a conservative figure in the
+    -- command mode case: we might have actually already handled a compile command we would
+    -- now have re-processed again, but deviating into this direction is OK. (Wrongly not
+    -- re-processing is not OK.)
+    --
+    -- TODO: rewrite to pass (conceptually) a set of indexes of handled compile commands?
+    --  Get rid of the sequentiality requirement altogether?
     table.sort(indexes)
 
     local newIndexes = {}
@@ -1974,7 +2001,10 @@ local Controller = class
                 assert(fDiagSet ~= nil)
 
                 formattedDiagSets[ccIdx] = fDiagSet;
-                -- TODO: immediately add files to the include graph here?
+
+                -- TODO: immediately add files to the include graph here? (We are already
+                --  effectively doing this in command mode, but not otherwise. In human mode
+                --  we depend on 'ccInclusionGraphs' being a hole-less sequence: SEQ_REAP.)
                 ccInclusionGraphs[ccIdx] = inclusion_graph.Deserialize(serializedGraph)
 
                 if (commandMode) then
