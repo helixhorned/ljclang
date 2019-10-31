@@ -1314,11 +1314,12 @@ local function GetNewCcIndexes(ccInclusionGraphs, eventFileNames,
         end
     end
 
-    local indexes = {}
+    local indexes, affectedIndexes = {}, {}
 
     -- 1. compile commands affected by the files on which we had a watch event.
     for ccIdx = 1, #ccInclusionGraphs do
         if (isCompileCommandAffected(ccIdx)) then
+            affectedIndexes[#affectedIndexes + 1] = ccIdx
             indexes[#indexes + 1] = ccIdx
         end
     end
@@ -1339,13 +1340,13 @@ local function GetNewCcIndexes(ccInclusionGraphs, eventFileNames,
 
     local newIndexes = {}
 
-    for i, ccIdx in ipairs(indexes) do
+    for _, ccIdx in ipairs(indexes) do
         if (newIndexes[#newIndexes] ~= ccIdx) then
             newIndexes[#newIndexes + 1] = ccIdx
         end
     end
 
-    return newIndexes, #oldCcIdxs - processedCommandCount
+    return newIndexes, affectedIndexes, #oldCcIdxs - processedCommandCount
 end
 
 local function range(n)
@@ -2179,7 +2180,7 @@ local function main()
         end
 
         -- Determine the set of compile commands to re-process.
-        local newCcIdxs, earlyStopCount = GetNewCcIndexes(
+        local newCcIdxs, affectedCcIdxs, earlyStopCount = GetNewCcIndexes(
             ccInclusionGraphs, eventFileNames,
             processedCommandCount, currentCcIdxs)
 
@@ -2213,6 +2214,11 @@ local function main()
 
             miFormattedDiagSets = filter(control.miFormattedDiagSets),
         }
+
+        for _, ccIdx in ipairs(affectedCcIdxs) do
+            -- Clear cached diagnostic sets for the change-affected compile commands.
+            membersTakenOver.miFormattedDiagSets[ccIdx] = nil
+        end
 
         startTime = os.time()
         control = Controller(membersTakenOver, newCcIdxs, parserOpts)
