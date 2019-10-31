@@ -41,7 +41,7 @@ fi
 
 function cleanup()
 {
-    rm "$FIFO"
+    rm -f "$FIFO"
 }
 
 function setup()
@@ -94,6 +94,12 @@ cmdLine="$@"
 
 ## Handle the command
 
+function exitWithTimeout()
+{
+    echo "ERROR: timed out waiting for the result."
+    exit 110
+}
+
 if [ $block == yes ]; then
     # The FIFO must *first* be opened for reading: the server opens it with
     # O_NONBLOCK | O_WRONLY, thus failing with ENXIO otherwise.
@@ -126,8 +132,7 @@ if [ $block == yes ]; then
     read -rs -N 3 -u ${resultFd} -t 10.0 res
 
     if [ $? -gt 128 ]; then
-        echo "ERROR: timed out waiting for the result."
-        exit 110
+        exitWithTimeout
     elif [[ x"$res" != x"rOK" && x"$res" != x"rER" ]]; then
         echo "ERROR: malformed success status message."
         exit 111
@@ -154,7 +159,34 @@ if [ $block == yes ]; then
     readArgs=(-rs -u ${resultFd})
 
     while read ${readArgs[@]} -t 0 data_available_check_; do
+        # NOTE: fractional argument seems to be a feature of GNU coreutils 'sleep'.
         read ${readArgs[@]} -t 0.1 line
+
+        if [ x"$line" == x"INFO: one or more compile commands not yet processed." ]; then
+            ## HACK (maybe better than having this logic in watch_compile_commands though):
+            ## retry a few times after sleeping.
+
+            # First, delete the FIFO (to be recreated with the same name!).
+            cleanup
+
+            # NOTE: initial argument count is 2 (for "diags <fileName>").
+            argCount=${#@}
+            msToWait=$((2 ** argCount))
+            secs=$((msToWait / 10))
+            ms=$((msToWait % 10))
+            /bin/sleep "${secs}.${ms}"
+
+            # NOTE: the EXIT trap ('cleanup') will not execute before an 'exec'.
+            #  It will before an 'exit' though, hence the '-f' argument to 'rm'.
+            #  (We have cleaned up above already.)
+            if [ $argCount -le 6 ]; then
+                exec "$0" "$@" -
+            else
+                # Tried too many times.
+                exitWithTimeout
+            fi
+        fi
+
         # NOTE: do not guard against 'line' being '-n', '-e' or '-E' (options to 'echo').
         echo "$line"
     done
