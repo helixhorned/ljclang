@@ -726,7 +726,6 @@ function MI.DoHandleClientRequest(command, args, crTab)
             return nil, "no compile commands for file name"
         end
 
-        local nullFDiagSet = diagnostics_util.FormattedDiagSet(false)
         local printer = FormattedDiagSetPrinter()
         local haveUnprocessed = false
         local tab = {}

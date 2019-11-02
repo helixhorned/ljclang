@@ -181,7 +181,7 @@ if [ $block == yes ]; then
             #  It will before an 'exit' though, hence the '-f' argument to 'rm'.
             #  (We have cleaned up above already.)
             if [ $argCount -le 6 ]; then
-                exec "$0" "$@" -
+                exec "$0" "$@" .
             else
                 # Tried too many times.
                 exitWithTimeout
