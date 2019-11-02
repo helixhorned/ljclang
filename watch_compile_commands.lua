@@ -710,6 +710,11 @@ function MI.DoHandleClientRequest(command, args, crTab)
         -- NOTE: arguments are completely ignored.
         return ""
     elseif (command == "diags") then
+        local keepColors = (args[1] == "-k")
+        if (keepColors) then
+            table.remove(args, 1)
+        end
+
         local realName, errorMsg = MI.GetRealNameFor(args[1])
         if (realName == nil) then
             return nil, errorMsg
@@ -733,7 +738,7 @@ function MI.DoHandleClientRequest(command, args, crTab)
                 prioritizeCcFunc(ccIdx)
                 haveUnprocessed = true
             else
-                tab[#tab + 1] = printer:emulatePrint(fDiagSet, ccIdx)
+                tab[#tab + 1] = printer:emulatePrint(keepColors, fDiagSet, ccIdx)
             end
         end
 
@@ -1521,11 +1526,11 @@ FormattedDiagSetPrinter = class
         return toPrint
     end,
 
-    emulatePrint = function(self, ...)
+    emulatePrint = function(self, keepColors, ...)
         local oldGlobals = { plainMode, printProgressAfterSeconds, printProgressAfterCcCount }
         -- Set up (1) no colors and (2) printing for each compile command, even if it has no
         -- diagnostics.
-        plainMode, printProgressAfterSeconds, printProgressAfterCcCount = true, nil, 0
+        plainMode, printProgressAfterSeconds, printProgressAfterCcCount = not keepColors, nil, 0
 
         local lines = {}
         local capturePrintf = function(fmt, ...)

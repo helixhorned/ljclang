@@ -169,7 +169,8 @@ if [ $block == yes ]; then
             # First, delete the FIFO (to be recreated with the same name!).
             cleanup
 
-            # NOTE: initial argument count is 2 (for "diags <fileName>").
+            # NOTE: initial argument count should be 2 (for "diags <fileName>") or 3 (for
+            #  "diags -k <fileName>").
             argCount=${#@}
             msToWait=$((2 ** argCount))
             secs=$((msToWait / 10))
