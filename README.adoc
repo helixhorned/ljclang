@@ -15,6 +15,9 @@ LJClang is an interface to {libclang}[libclang] for {LuaJIT}[LuaJIT], modeled
 after and mostly API-compatible with {luaclang-parser}[luaclang-parser] by
 Michal Kottman.
 
+NOTE: Development currently happens on the `staging` branch. It is planned that it is
+eventually merged back to `master`.
+
 Requirements
 ------------
 
