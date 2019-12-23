@@ -325,8 +325,16 @@ end
 
 local pid_t = ffi.typeof("pid_t")
 
+local function isPid(v)
+    if (ffi.sizeof("void *") == 4) then
+        return (type(v) == "number")
+    else
+        return ffi.istype("pid_t", v)
+    end
+end
+
 api.waitpid = function(pid, options)
-    check(ffi.istype("pid_t", pid), 1, "argument #1 must be a pid_t", 2)
+    check(isPid(pid), "argument #1 must be a pid", 2)
     -- Exclude other conventions other than passing -1 or an exact PID:
     check(pid == -1 or pid > 0, "argument #1 must be -1 or strictly positive", 2)
     checktype(options, 2, "number", 2)
