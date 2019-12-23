@@ -34,13 +34,12 @@ local support = ffi.load("ljclang_support")
 
 ffi.cdef[[
 const char *ljclang_getLLVMVersion();
-const char *ljclang_getTypeDefs();
 unsigned ljclang_getHardwareConcurrency();
 ]]
 
-ffi.cdef(ffi.string(support.ljclang_getTypeDefs()))
 local supportLLVMVersion = ffi.string(support.ljclang_getLLVMVersion())
 
+require("posix_types")
 require("ljclang_Index_h")
 
 local ExtractedEnums = require("ljclang_extracted_enums")

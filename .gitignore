@@ -3,3 +3,4 @@
 .#*
 
 libljclang_support.so
+libljposix.so

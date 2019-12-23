@@ -5,10 +5,10 @@ local string = require("string")
 
 local class = require("class").class
 local error_util = require("error_util")
-local decls = require("posix_decls")
 
-local _ljclang_USED_ONLY_FOR_typedefs = require("ljclang")
-local support = ffi.load("ljclang_support")
+local ljposix = ffi.load("ljposix")
+require("posix_types")
+local decls = require("posix_decls")
 
 local assert = assert
 local check = error_util.check
@@ -367,7 +367,7 @@ end
 api.signal = function(sig, handler)
     check(sig == SIG.INT, "argument #1 must be SIG.INT", 2)
     check(handler == SIG_DFL, "argument #2 must be SIG.DFL", 2)
-    support.ljclang_setSigintHandlingToDefault()
+    ljposix.ljclang_setSigintHandlingToDefault()
 end
 
 -- Done!

@@ -60,16 +60,18 @@ posix_decls_lua := posix_decls.lua
 posix_decls_lua_tmp := $(posix_decls_lua).tmp
 
 LJCLANG_SUPPORT_SO := libljclang_support.so
+LJPOSIX_SO := libljposix.so
+SHARED_LIBRARIES := $(LJCLANG_SUPPORT_SO) $(LJPOSIX_SO)
 
 GENERATED_FILES_STAGE_1 := $(INDEX_H_LUA) $(LIBDIR_INCLUDE_LUA)
 GENERATED_FILES_STAGE_2 := $(GENERATED_FILES_STAGE_1) $(EXTRACTED_ENUMS_LUA)
 
 .PHONY: all app_dependencies clean veryclean bootstrap doc test install
 
-all: $(LJCLANG_SUPPORT_SO) $(GENERATED_FILES_STAGE_2)
+all: $(SHARED_LIBRARIES) $(GENERATED_FILES_STAGE_2)
 
 clean:
-	rm -f $(LJCLANG_SUPPORT_SO)
+	rm -f $(SHARED_LIBRARIES)
 
 veryclean: clean
 	rm -f $(GENERATED_FILES_STAGE_2) $(EXTRACTED_ENUMS_LUA_TMP) $(EXTRACTED_ENUMS_LUA).reject \
@@ -82,6 +84,9 @@ bootstrap: $(EXTRACTED_ENUMS_LUA)
 
 $(LJCLANG_SUPPORT_SO): ljclang_support.cpp Makefile
 	$(CXX) $(cxxflags) -shared $< $(lib) -o $@
+
+$(LJPOSIX_SO): ljposix.cpp Makefile
+	$(CXX) $(cxxflags) -shared $< -o $@
 
 $(INDEX_H_LUA): ./createheader.lua $(incdir)/clang-c/*
 	@$(luajit) ./createheader.lua $(incdir)/clang-c > $@
