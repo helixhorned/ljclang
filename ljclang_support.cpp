@@ -44,7 +44,8 @@ namespace
     template <> struct TypeString<uint32_t> { static constexpr const char *value = "uint32_t"; };
     template <> struct TypeString<uint64_t> { static constexpr const char *value = "uint64_t"; };
 
-    constexpr bool LongIntIsInt64 = std::is_same_v<int64_t, long int>;
+    // NOTE: do not use 'is_same_v', it is absent in Raspbian's libstdc++.
+    constexpr bool LongIntIsInt64 = std::is_same<int64_t, long int>::value;
     struct DummyType {};
     using LongInt = std::conditional_t<LongIntIsInt64, DummyType, long int>;
     template <> struct TypeString<LongInt> { static constexpr const char *value = "long int"; };
