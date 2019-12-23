@@ -871,8 +871,22 @@ end
 
 ---------- Preparation ----------
 
+local function resolveClangBinary(name)
+    local binDir = getEnv("LLVM_BINDIR", "LLVM binary directory")
+    local fileName = binDir .. "/" .. name
+    local realName, errMsg = posix.realpath(fileName)
+
+    if (realName == nil) then
+        abort("Failed resolving %s: %s.", fileName, errMsg)
+    end
+
+    return realName
+end
+
 compile_commands_util.obtainSystemIncludes(
-    getEnv("LLVM_BINDIR", "LLVM binary directory").."/clang",
+    -- NOTE: here, the real name of the binary is required because it is matched in the
+    --  output of the program invocation.
+    resolveClangBinary("clang"),
     usedConcurrency, compileCommands, CacheDirectory,
     {
         errorInfo = errorInfo,
@@ -946,7 +960,7 @@ if (autoPch ~= nil) then
     -- Files in fixed paths
 
     local cxxHeadersHpp, emptyCpp = GetPchInputFiles()
-    local clangpp = getEnv("LLVM_BINDIR", "LLVM binary directory").."/clang++"
+    local clangpp = resolveClangBinary("clang++")
 
     -- Functions
 
