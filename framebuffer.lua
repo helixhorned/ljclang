@@ -50,15 +50,9 @@ end
 
 local api = {}
 
-local function GetPixelPointerType(bitsPerPixel, writable)
-    local IntTypeNames = { [16]="uint16_t", [32]="uint32_t" }
-    local intTypeName = IntTypeNames[bitsPerPixel]
-    if (intTypeName == nil) then
-        return nil
-    end
-
-    local uintType = ffi.typeof(writable and intTypeName or "const "..intTypeName)
-    return ffi.typeof("$ *", uintType)
+local function GetPixelType(bitsPerPixel, writable)
+    local prefix = writable and "const " or "";
+    return ffi.typeof(prefix.."uint"..bitsPerPixel.."_t")
 end
 
 local function GetOffsets(vi)
@@ -104,8 +98,9 @@ local Mapping = class
               "Only offset-less format supported", 2)
         assert(vinfo.xres == vinfo.xres_virtual and vinfo.yres == vinfo.yres_virtual)
 
-        local pixelPtrType = GetPixelPointerType(vinfo.bits_per_pixel, fb.writable)
-        check(pixelPtrType ~= nil, "Only 16 and 32 bits per pixel supported", 3)
+        -- NOTE: this will error if there is no uint<BPP>_t type.
+        local pixelType = GetPixelType(vinfo.bits_per_pixel, fb.writable)
+        local pixelPtrType = ffi.typeof("$ *", pixelType)
 
         local fbSize = fb.line_length * vinfo.yres_virtual
         check(fbSize > 0, "INTERNAL ERROR: framebuffer has size zero", 1)
@@ -120,6 +115,7 @@ local Mapping = class
         return {
             voidPtr_ = voidPtr,
             ptr = pixelPtrType(voidPtr),
+            pxType = pixelType,
             pxSize = pixelSize,
             unpackPxFunc = GetUnpackPixelFunc(vinfo),
 
@@ -136,6 +132,10 @@ local Mapping = class
 
     getPixelSize = function(self)
         return self.pxSize
+    end,
+
+    getPixelType = function(self)
+        return self.pxType
     end,
 
     getSize = function(self)
