@@ -175,6 +175,7 @@ $(linux_decls_lua): $(EXTRACT_ENUMS_LUA) $(linux_fb_h) Makefile
 
 errno_h ?= /usr/include/errno.h
 fcntl_h ?= /usr/include/fcntl.h
+mman_h ?= /usr/include/asm-generic/mman.h
 signal_h ?= /usr/include/signal.h
 
 CHECK_EXTRACTED_POSIX_CMD := $(EXTRACT_CMD_ENV) $(luajit) \
@@ -189,11 +190,18 @@ $(posix_decls_lua): $(EXTRACTED_ENUMS_LUA) $(sys_h) Makefile
 	@$(EXTRACT_CMD_ENV) ./extractdecls.lua -w MacroDefinition -C -p '^EAGAIN' -s '^E' $(errno_h) >> $(posix_decls_lua_tmp)
 	@$(EXTRACT_CMD_ENV) ./extractdecls.lua -w MacroDefinition -C -p '^EPIPE' -s '^E' $(errno_h) >> $(posix_decls_lua_tmp)
 	@echo '}]], ' >> $(posix_decls_lua_tmp)
+	@echo 'MAP = ffi.new[[struct {' >> $(posix_decls_lua_tmp)
+	@$(EXTRACT_CMD_ENV) ./extractdecls.lua -w MacroDefinition -C -p '^MAP_SHARED' -s '^MAP_' $(mman_h) >> $(posix_decls_lua_tmp)
+	@$(EXTRACT_CMD_ENV) ./extractdecls.lua -w MacroDefinition -C -p '^MAP_PRIVATE' -s '^MAP_' $(mman_h) >> $(posix_decls_lua_tmp)
+	@echo '}]], ' >> $(posix_decls_lua_tmp)
 	@echo 'O = ffi.new[[struct {' >> $(posix_decls_lua_tmp)
 	@$(EXTRACT_CMD_ENV) ./extractdecls.lua -w MacroDefinition -C -p '^O_RDONLY' -s '^O_' $(fcntl_h) >> $(posix_decls_lua_tmp)
 	@$(EXTRACT_CMD_ENV) ./extractdecls.lua -w MacroDefinition -C -p '^O_WRONLY' -s '^O_' $(fcntl_h) >> $(posix_decls_lua_tmp)
 	@$(EXTRACT_CMD_ENV) ./extractdecls.lua -w MacroDefinition -C -p '^O_RDWR' -s '^O_' $(fcntl_h) >> $(posix_decls_lua_tmp)
 	@$(EXTRACT_CMD_ENV) ./extractdecls.lua -w MacroDefinition -C -p '^O_NONBLOCK' -s '^O_' $(fcntl_h) >> $(posix_decls_lua_tmp)
+	@echo '}]], ' >> $(posix_decls_lua_tmp)
+	@echo 'PROT = ffi.new[[struct {' >> $(posix_decls_lua_tmp)
+	@$(EXTRACT_CMD_ENV) ./extractdecls.lua -w MacroDefinition -C -p '^PROT_[RW]' -s '^PROT_' $(mman_h) >> $(posix_decls_lua_tmp)
 	@echo '}]], ' >> $(posix_decls_lua_tmp)
 	@echo 'SIG = ffi.new[[struct {' >> $(posix_decls_lua_tmp)
 	@$(EXTRACT_CMD_ENV) ./extractdecls.lua -w MacroDefinition -C -p '^SIGINT' -s '^SIG' $(signal_h) >> $(posix_decls_lua_tmp)

@@ -1,6 +1,7 @@
 local ffi = require("ffi")
 local C = ffi.C
 
+local bit = require("bit")
 local string = require("string")
 
 local class = require("class").class
@@ -28,6 +29,10 @@ ssize_t write(int, const void *, size_t);
 int open(const char *pathname, int flags);
 int close(int);
 int dup2(int oldfd, int newfd);
+
+void *mmap(void *addr, size_t length, int prot, int flags,
+           int fd, off_t offset);
+int munmap(void *addr, size_t length);
 
 char *strerror(int);
 
@@ -73,7 +78,9 @@ local external_SIG = {
 
 local api = {
     O = decls.O,
+    MAP = decls.MAP,
     POLL = decls.POLL,
+    PROT = decls.PROT,
     SIG = external_SIG,
 }
 
@@ -266,6 +273,37 @@ api.poll = function(tab)
 
     assert(#events == eventCount)
     return events
+end
+
+-- NOTE: Linux's "man mmap" explicitly mentions this value.
+local MAP_FAILED = ffi.cast("void *", -1)
+
+api.mmap = function(addr, length, prot, flags, fd, offset)
+    check(addr == nil, "argument #1 must be nil", 2)
+
+    checktype(length, 2, "number", 2)
+    check(length > 0, "argument #2 must be greater than zero", 2)
+
+    checktype(prot, 3, "number", 2)
+    checktype(flags, 4, "number", 2)
+
+    local MAP, PROT = decls.MAP, decls.PROT
+    check(bit.band(prot, bit.bnot(PROT.READ + PROT.WRITE)) == 0,
+          "Only PROT.READ and/or PROT.WRITE allowed", 2)
+    check(bit.band(prot, bit.bnot(MAP.SHARED + MAP.PRIVATE)) == 0,
+          "Only MAP.SHARED or MAP.PRIVATE allowed", 2)
+
+    checktype(fd, 5, "number", 2)
+    checktype(offset, 6, "number", 2)
+
+    local ptr = C.mmap(addr, length, prot, flags, fd, offset)
+    if (ptr == MAP_FAILED) then
+        error("mmap failed: "..getErrnoString())
+    end
+
+    return ffi.gc(ptr, function(p)
+        C.munmap(p, length)
+    end)
 end
 
 api.fork = function()
