@@ -1,16 +1,24 @@
 local ffi = require("ffi")
 local C = ffi.C
 
+local bit = require("bit")
+
 local class = require("class").class
 local error_util = require("error_util")
 local linux_decls = require("linux_decls")
 local posix = require("posix")
 
+local check = error_util.check
 local checktype = error_util.checktype
 
 local FBIO = linux_decls.FBIO
+local MAP = posix.MAP
 local O = posix.O
+local PROT = posix.PROT
+local FB_TYPE = linux_decls.FB_TYPE
+local FB_VISUAL = linux_decls.FB_VISUAL
 
+local assert = assert
 local error = error
 local unpack = unpack
 
@@ -41,6 +49,103 @@ end
 ----------
 
 local api = {}
+
+local function GetPixelPointerType(bitsPerPixel, writable)
+    local IntTypeNames = { [16]="uint16_t", [32]="uint32_t" }
+    local intTypeName = IntTypeNames[bitsPerPixel]
+    if (intTypeName == nil) then
+        return nil
+    end
+
+    local uintType = ffi.typeof(writable and intTypeName or "const "..intTypeName)
+    return ffi.typeof("$ *", uintType)
+end
+
+local function GetOffsets(vi)
+    check(vi.red.msb_right == 0 and vi.green.msb_right == 0 and vi.blue.msb_right == 0,
+          "Most-significant-bit-is-right unsupported", 5)
+
+    return vi.red.offset, vi.green.offset, vi.blue.offset, vi.transp.offset
+end
+
+local function GetLengths(vi)
+    return vi.red.length, vi.green.length, vi.blue.length, vi.transp.length
+end
+
+local function ExtractComponent(px, off, len)
+    assert(off >= 0)
+    assert(len >= 1)
+    local mask = bit.lshift(1, len) - 1
+    return bit.band(bit.rshift(px, off), mask)
+end
+
+local function GetUnpackPixelFunc(vi)
+    local oR, oG, oB, oA = GetOffsets(vi)
+    local lR, lG, lB, lA = GetLengths(vi)
+
+    return function(px)
+        return
+            ExtractComponent(px, oR, lR),
+            ExtractComponent(px, oG, lG),
+            ExtractComponent(px, oB, lB),
+            ExtractComponent(px, oA, lA)
+    end
+end
+
+local Mapping = class
+{
+    function(fb)
+        local vinfo = fb:getVarInfo()
+        check(fb.type == FB_TYPE.PACKED_PIXELS, "Only packed pixels supported", 3)
+        check(fb.visual == FB_VISUAL.TRUECOLOR, "Only truecolor supported", 3)
+
+        -- TODO: support offset
+        check(vinfo.xoffset == 0 and vinfo.yoffset == 0,
+              "Only offset-less format supported", 2)
+        assert(vinfo.xres == vinfo.xres_virtual and vinfo.yres == vinfo.yres_virtual)
+
+        local pixelPtrType = GetPixelPointerType(vinfo.bits_per_pixel, fb.writable)
+        check(pixelPtrType ~= nil, "Only 16 and 32 bits per pixel supported", 3)
+
+        local fbSize = fb.line_length * vinfo.yres_virtual
+        check(fbSize > 0, "INTERNAL ERROR: framebuffer has size zero", 1)
+        local voidPtr = posix.mmap(
+            nil, fbSize,
+            PROT.READ + (fb.writable and PROT.WRITE or 0),
+            fb.writable and MAP.SHARED or MAP.PRIVATE,
+            fb.fd, 0)
+
+        local pixelSize = vinfo.bits_per_pixel / 8
+
+        return {
+            voidPtr_ = voidPtr,
+            ptr = pixelPtrType(voidPtr),
+            pxSize = pixelSize,
+            unpackPxFunc = GetUnpackPixelFunc(vinfo),
+
+            -- public:
+            xlen = fb.line_length / pixelSize,
+            ylen = vinfo.yres_virtual,
+        }
+    end,
+
+    -- CAUTION!
+    getPixelPointer = function(self)
+        return self.ptr
+    end,
+
+    getPixelSize = function(self)
+        return self.pxSize
+    end,
+
+    getSize = function(self)
+        return self.xlen * self.ylen
+    end,
+
+    getUnpackPixelFunc = function(self)
+        return self.unpackPxFunc
+    end
+}
 
 api.FrameBuffer = class
 {
@@ -76,6 +181,10 @@ api.FrameBuffer = class
             error("Failed getting variable framebuffer info: "..posix.getErrnoString())
         end
         return vinfo
+    end,
+
+    getMapping = function(self)
+        return Mapping(self)
     end,
 
     close = function(self)
