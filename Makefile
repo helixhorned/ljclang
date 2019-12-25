@@ -109,19 +109,19 @@ $(EXTRACTED_ENUMS_LUA): $(LJCLANG_SUPPORT_SO) $(GENERATED_FILES_STAGE_1) ./print
 
 # Linux-specific functionality exposed to us
 
-inotify_h ?= /usr/include/x86_64-linux-gnu/sys/inotify.h
+sys_h := ./dev/sys.h
 
 CHECK_EXTRACTED_INOTIFY_CMD := $(EXTRACT_CMD_ENV) $(luajit) \
     -e "require'inotify_decls'"
 
-$(inotify_decls_lua): $(EXTRACTED_ENUMS_LUA) $(inotify_h)
+$(inotify_decls_lua): $(EXTRACTED_ENUMS_LUA) $(sys_h) Makefile
 	@echo 'local ffi=require"ffi"' > $(inotify_decls_lua_tmp)
 	@echo 'ffi.cdef[[' >> $(inotify_decls_lua_tmp)
-	@$(EXTRACT_CMD_ENV) ./extractdecls.lua -w FunctionDecl -p '^inotify_' $(inotify_h) >> $(inotify_decls_lua_tmp)
+	@$(EXTRACT_CMD_ENV) ./extractdecls.lua -w FunctionDecl -p '^inotify_' $(sys_h) >> $(inotify_decls_lua_tmp)
 	@echo ']]' >> $(inotify_decls_lua_tmp)
 	@echo 'return ffi.new[[struct {' >> $(inotify_decls_lua_tmp)
-	@$(EXTRACT_CMD_ENV) ./extractdecls.lua -C -p '^IN_' -s '^IN_' $(inotify_h) >> $(inotify_decls_lua_tmp)
-	@$(EXTRACT_CMD_ENV) ./extractdecls.lua -w MacroDefinition -C -p '^IN_' -s '^IN_' $(inotify_h) >> $(inotify_decls_lua_tmp)
+	@$(EXTRACT_CMD_ENV) ./extractdecls.lua -C -p '^IN_' -s '^IN_' $(sys_h) >> $(inotify_decls_lua_tmp)
+	@$(EXTRACT_CMD_ENV) ./extractdecls.lua -w MacroDefinition -C -p '^IN_' -s '^IN_' $(sys_h) >> $(inotify_decls_lua_tmp)
 	@echo '}]]' >> $(inotify_decls_lua_tmp)
 	@mv $(inotify_decls_lua_tmp) $@
 	@($(CHECK_EXTRACTED_INOTIFY_CMD) && \
@@ -131,7 +131,6 @@ $(inotify_decls_lua): $(EXTRACTED_ENUMS_LUA) $(inotify_h)
 
 # POSIX functionality exposed to us
 
-poll_h ?= /usr/include/x86_64-linux-gnu/sys/poll.h
 errno_h ?= /usr/include/errno.h
 fcntl_h ?= /usr/include/fcntl.h
 signal_h ?= /usr/include/signal.h
@@ -139,10 +138,10 @@ signal_h ?= /usr/include/signal.h
 CHECK_EXTRACTED_POSIX_CMD := $(EXTRACT_CMD_ENV) $(luajit) \
     -e "require'posix_decls'"
 
-$(posix_decls_lua): $(EXTRACTED_ENUMS_LUA) $(poll_h)
+$(posix_decls_lua): $(EXTRACTED_ENUMS_LUA) $(sys_h) Makefile
 	@echo 'local ffi=require"ffi"' > $(posix_decls_lua_tmp)
 	@echo 'return { POLL = ffi.new[[struct {' >> $(posix_decls_lua_tmp)
-	@$(EXTRACT_CMD_ENV) ./extractdecls.lua -w MacroDefinition -C -p '^POLLIN' -s '^POLL' $(poll_h) >> $(posix_decls_lua_tmp)
+	@$(EXTRACT_CMD_ENV) ./extractdecls.lua -w MacroDefinition -C -p '^POLLIN' -s '^POLL' $(sys_h) >> $(posix_decls_lua_tmp)
 	@echo '}]], ' >> $(posix_decls_lua_tmp)
 	@echo 'E = ffi.new[[struct {' >> $(posix_decls_lua_tmp)
 	@$(EXTRACT_CMD_ENV) ./extractdecls.lua -w MacroDefinition -C -p '^EAGAIN' -s '^E' $(errno_h) >> $(posix_decls_lua_tmp)
