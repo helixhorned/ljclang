@@ -36,6 +36,7 @@ local function usage(hline)
         print(hline)
     end
     print("Usage: "..arg[0].." [our options...] <file.h> [-- [Clang command line args ...]]")
+    print("Exits with a non-zero code if there were errors or no match.")
     print " (Our options may also come after the file name.)"
     print "  -e <enumNameFilterPattern> (enums only)"
     print "  -p <filterPattern>"
@@ -205,6 +206,13 @@ local function getCommonPrefixLengthOfEnums(enumDeclCur)
     end
 end
 
+local matchCount = 0
+
+local function printfMatch(fmt, ...)
+    printf(fmt, ...)
+    matchCount = matchCount + 1
+end
+
 -- The <name> in 'enum <name>' if available, or the empty string:
 local currentEnumName
 
@@ -252,7 +260,7 @@ function(cur, parent)
                                                 currentEnumName,
                                                 currentEnumIntTypeName,
                                                 currentEnumPrefixLength)
-                            print(str)
+                            printfMatch("%s", str)
                         elseif (reverse) then
                             if (enumname[val]) then
                                 printf("Error: enumeration value %d not unique: %s and %s",
@@ -262,34 +270,34 @@ function(cur, parent)
                             enumname[val] = ourname
                             enumseq[#enumseq+1] = val
                         elseif (printConstInt) then
-                            printf("static const int %s = %s;", ourname, val)
+                            printfMatch("static const int %s = %s;", ourname, val)
                         else
-                            printf("%s = %s,", ourname, val)
+                            printfMatch("%s = %s,", ourname, val)
                         end
                     end
                 elseif (what=="FunctionDecl") then
                     -- Function declaration
                     local rettype = cur:resultType()
                     if (not checkexclude(rettype:name())) then
-                        printf("%s %s;", rettype, ourname)
+                        printfMatch("%s %s;", rettype, ourname)
                     end
                 elseif (what=="TypedefDecl") then
                     -- Type definition
                     local utype = cur:typedefType()
                     if (not checkexclude(utype:name())) then
-                        printf("typedef %s %s;", utype, ourname)
+                        printfMatch("typedef %s %s;", utype, ourname)
                     end
 --[[
                 elseif (extractMacro) then
                     local fn, linebeg, lineend = cur:location(true)
                     local defstr = getDefStr(cur)
 
-                    printf("%s @ %s:%d%s :: %s", ourname, fn, linebeg,
+                    printfMatch("%s @ %s:%d%s :: %s", ourname, fn, linebeg,
                            (lineend~=linebeg) and "--"..lineend or "", defstr)
 --]]
                 else
                     -- Anything else
-                    printf("%s", ourname)
+                    printfMatch("%s", ourname)
                 end
             end
         end
@@ -308,7 +316,7 @@ if (reverse) then
     for i=1,#enumseq do
         local val = enumseq[i]
         local name = enumname[val]
-        printf("[%d] = %q;", val, name)
+        printfMatch("[%d] = %q;", val, name)
     end
 end
 
@@ -316,6 +324,6 @@ if (suffixString) then
     print(suffixString)
 end
 
-if (haveErrors) then
+if (haveErrors or matchCount == 0) then
     os.exit(1)
 end
