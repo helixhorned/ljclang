@@ -177,6 +177,7 @@ errno_h ?= /usr/include/errno.h
 fcntl_h ?= /usr/include/fcntl.h
 mman_h ?= /usr/include/asm-generic/mman.h
 signal_h ?= /usr/include/signal.h
+time_h ?= /usr/include/time.h
 
 CHECK_EXTRACTED_POSIX_CMD := $(EXTRACT_CMD_ENV) $(luajit) \
     -e "require'posix_decls'"
@@ -185,6 +186,9 @@ $(posix_decls_lua): $(EXTRACTED_ENUMS_LUA) $(sys_h) Makefile
 	@echo 'local ffi=require"ffi"' > $(posix_decls_lua_tmp)
 	@echo 'return { POLL = ffi.new[[struct {' >> $(posix_decls_lua_tmp)
 	@$(EXTRACT_CMD_ENV) ./extractdecls.lua -w MacroDefinition -C -p '^POLLIN' -s '^POLL' $(sys_h) >> $(posix_decls_lua_tmp)
+	@echo '}]], ' >> $(posix_decls_lua_tmp)
+	@echo 'CLOCK = ffi.new[[struct {' >> $(posix_decls_lua_tmp)
+	@$(EXTRACT_CMD_ENV) ./extractdecls.lua -w MacroDefinition -C -p '^CLOCK_MONOTONIC' -s '^CLOCK_' $(time_h) >> $(posix_decls_lua_tmp)
 	@echo '}]], ' >> $(posix_decls_lua_tmp)
 	@echo 'E = ffi.new[[struct {' >> $(posix_decls_lua_tmp)
 	@$(EXTRACT_CMD_ENV) ./extractdecls.lua -w MacroDefinition -C -p '^EAGAIN' -s '^E' $(errno_h) >> $(posix_decls_lua_tmp)

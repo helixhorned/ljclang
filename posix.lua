@@ -49,6 +49,16 @@ FILE *freopen(const char *pathname, const char *mode, FILE *stream);
 char *realpath(const char *path, char *resolved_path);
 ]]
 
+-- NOTE: members have 'tv_' prefix stripped.
+ffi.cdef[[
+struct timespec {
+    time_t sec;
+    long   nsec;
+};
+
+int clock_gettime(clockid_t clock_id, struct timespec *tp);
+]]
+
 -- NOTE: POSIX integer types declared in ljclang.lua.
 ffi.cdef[[
 struct pollfd {
@@ -243,6 +253,15 @@ api.Fd = class
     end,
 --]]
 }
+
+local single_timespec_t = ffi.typeof("struct timespec [1]")
+
+api.clock_gettime = function()
+    local ts = single_timespec_t()
+    local ret = call("clock_gettime", decls.CLOCK.MONOTONIC, ts)
+    assert(ret == 0)
+    return ts[0]
+end
 
 api.poll = function(tab)
     checktype(tab, 1, "table", 2)
