@@ -1,5 +1,6 @@
 
 local error_util = require("error_util")
+local llvm_libdir_include = require("llvm_libdir_include")
 
 local checktype = error_util.checktype
 local check = error_util.check
@@ -16,7 +17,7 @@ function api.addSystemInclude(compilerArgs, language)
 
     compilerArgs[#compilerArgs + 1] = "-isystem"
     -- Fixes extractdecls.lua on <signal.h>:
-    compilerArgs[#compilerArgs + 1] = "/usr/lib/llvm-9/lib/clang/9.0.1/include"
+    compilerArgs[#compilerArgs + 1] = llvm_libdir_include
 end
 
 -- Done!

@@ -14,6 +14,7 @@ local tostring = tostring
 local unpack = unpack
 
 local cl = require("ljclang")
+local llvm_libdir_include = require("llvm_libdir_include")
 
 local ffi = require("ffi")
 
@@ -496,7 +497,7 @@ end)
 describe("Mangling", function()
     local tu = GetTU("dev/empty.cpp", 0,
                      {"-std=c++11", "-include", "thread",
-                      "-isystem", "/usr/lib/llvm-9/lib/clang/9.0.1/include"},  -- HACK
+                      "-isystem", llvm_libdir_include},
                      {"Incomplete", "SkipFunctionBodies"})
 
     local V = cl.ChildVisitResult

@@ -16,7 +16,6 @@ endif
 
 llvm_version := $(shell $(llvm-config) --version)
 
-
 ########## PATHS ##########
 
 ifneq ($(OS),Linux)
@@ -32,6 +31,7 @@ incdir := $(shell $(llvm-config) --includedir)
 libdir := $(shell $(llvm-config) --libdir)
 lib := -L$(libdir) -lclang
 
+llvm_libdir_include := $(libdir)/clang/$(llvm_version)/include
 
 ########## OPTIONS ##########
 
@@ -51,6 +51,7 @@ cxxflags += $(CXXFLAGS)
 ########## RULES ##########
 
 INDEX_H_LUA := ljclang_Index_h.lua
+LIBDIR_INCLUDE_LUA := ./llvm_libdir_include.lua
 EXTRACTED_ENUMS_LUA := ljclang_extracted_enums.lua
 EXTRACTED_ENUMS_LUA_TMP := $(EXTRACTED_ENUMS_LUA).tmp
 inotify_decls_lua := inotify_decls.lua
@@ -60,7 +61,7 @@ posix_decls_lua_tmp := $(posix_decls_lua).tmp
 
 LJCLANG_SUPPORT_SO := libljclang_support.so
 
-GENERATED_FILES_STAGE_1 := $(INDEX_H_LUA)
+GENERATED_FILES_STAGE_1 := $(INDEX_H_LUA) $(LIBDIR_INCLUDE_LUA)
 GENERATED_FILES_STAGE_2 := $(GENERATED_FILES_STAGE_1) $(EXTRACTED_ENUMS_LUA)
 
 .PHONY: all app_dependencies clean veryclean bootstrap doc test install
@@ -86,6 +87,9 @@ $(INDEX_H_LUA): ./createheader.lua $(incdir)/clang-c/*
 	@$(luajit) ./createheader.lua $(incdir)/clang-c > $@
 	@printf "* \033[1mGenerated $@ from files in $(incdir)/clang-c \033[0m\n"
 
+$(LIBDIR_INCLUDE_LUA): Makefile config.make
+	@echo "return '$(llvm_libdir_include)'" > $@
+
 EXTRACT_CMD_ENV := LD_LIBRARY_PATH="$(libdir):$(THIS_DIR)" incdir="$(incdir)"
 
 CHECK_EXTRACTED_ENUMS_CMD := $(EXTRACT_CMD_ENV) $(luajit) \
@@ -96,7 +100,8 @@ CHECK_EXTRACTED_ENUMS_CMD := $(EXTRACT_CMD_ENV) $(luajit) \
 
 .SILENT: $(EXTRACTED_ENUMS_LUA)
 
-$(EXTRACTED_ENUMS_LUA): $(LJCLANG_SUPPORT_SO) $(GENERATED_FILES_STAGE_1) ./print_extracted_enums_lua.sh $(incdir)/clang-c/*
+$(EXTRACTED_ENUMS_LUA): ./print_extracted_enums_lua.sh $(incdir)/clang-c/*
+$(EXTRACTED_ENUMS_LUA): $(LJCLANG_SUPPORT_SO) $(GENERATED_FILES_STAGE_1)
 	echo 'return {}' > $(EXTRACTED_ENUMS_LUA)
     # Do the extraction.
 	$(EXTRACT_CMD_ENV) ./print_extracted_enums_lua.sh > $(EXTRACTED_ENUMS_LUA_TMP)
