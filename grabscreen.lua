@@ -59,7 +59,7 @@ continuous = continuous or sampling
 local fb = FrameBuffer(0, false)
 local map = fb:getMapping()
 local unpackPx = map:getUnpackPixelFunc()
-local fbPtr = map:getPixelPointer()
+local fbPtr = map:getBasePointer()
 
 local size = map:getSize()
 local tempBuf = Array(map:getPixelType(), size)

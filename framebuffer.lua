@@ -129,14 +129,17 @@ local Mapping = class
     end,
 
     -- CAUTION!
-    getPixelPointer = function(self)
+    getBasePointer = function(self)
         return self.ptr
     end,
 
     getLinearIndex = function(self, x, y)
-        assert(x >= 0 and x <= self.xres - 1)
-        assert(y >= 0 and y <= self.yres - 1)
+        self:checkCoords(x, y)
         return self.xres_virtual * y + x
+    end,
+
+    getPixelPointer = function(self, x, y)
+        return self.ptr + self:getLinearIndex(x, y)
     end,
 
     getPixelSize = function(self)
@@ -151,9 +154,33 @@ local Mapping = class
         return self.xres * self.yres
     end,
 
+    --== Reading
+
     getUnpackPixelFunc = function(self)
         return self.unpackPxFunc
-    end
+    end,
+
+    --== Writing
+
+    fill = function(self, xb, yb, xlen, ylen, byteValue)
+        self:checkCoords(xb, yb)
+        self:checkCoords(xb + xlen - 1, yb + ylen - 1)
+        checktype(byteValue, 5, "number", 2)
+        check(byteValue >= 0 and byteValue <= 255, "argument #5 must be in [0, 255]", 2)
+
+        local lineByteCount = xlen * self:getPixelSize()
+
+        for y = yb, yb + ylen - 1 do
+            local ptr = self:getPixelPointer(xb, y)
+            ffi.fill(ptr, lineByteCount, byteValue)
+        end
+    end,
+
+-- private:
+    checkCoords = function(self, x, y)
+        assert(x >= 0 and x <= self.xres - 1)
+        assert(y >= 0 and y <= self.yres - 1)
+    end,
 }
 
 api.FrameBuffer = class
