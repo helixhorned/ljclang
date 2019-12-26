@@ -10,9 +10,6 @@ local FrameBuffer = require("framebuffer").FrameBuffer
 local JKissRng = require("jkiss_rng").JKissRng
 local posix = require("posix")
 
-local _ok, _sha2 = pcall(function() return require("sha2") end)
-local sha2 = _ok and _sha2 or nil
-
 local assert = assert
 local print = print
 local tonumber = tonumber
@@ -26,6 +23,8 @@ local stderr = io.stderr
 ffi.cdef[[
 void *malloc(size_t size);
 void free(void *ptr);
+
+int memcmp(const void *s1, const void *s2, size_t n);
 ]]
 
 local function Array(elementType, count)
@@ -57,18 +56,6 @@ end
 
 continuous = continuous or sampling
 
-if (sampling and sha2 == nil) then
-    stderr:write("WARNING: 'sha2' unavailable. Will only sample but not hash.\n")
-    os.execute("/bin/sleep 1")
-
-    sha2 = {
-        sha1 = function(str)
-            assert(str ~= nil)
-            return "<unavailable>"
-        end
-    }
-end
-
 local fb = FrameBuffer(0, false)
 local map = fb:getMapping()
 local unpackPx = map:getUnpackPixelFunc()
@@ -88,12 +75,17 @@ local function copyAndNarrow()
     end
 end
 
----------- Sampling and hashing ----------
+---------- Sampling and comparison ----------
 
 local SideLen = 8
 local SquareSize = SideLen * SideLen  -- in pixels
 assert(map.xres % SideLen == 0)
 assert(map.yres % SideLen == 0)
+
+local SBuf = ffi.typeof[[struct {
+    static const int Current = 0;
+    static const int Other = 1;
+}]]
 
 local Sampler = class
 {
@@ -105,7 +97,11 @@ local Sampler = class
             rng = JKissRng(),
             fbIndexes = {},
             sampleCount = sampleCount,
-            sampleBuf = Array(map:getPixelType(), sampleCount),
+            currentBufIdx = 0,
+            sampleBufs = {
+                [0] = Array(map:getPixelType(), sampleCount),
+                [1] = Array(map:getPixelType(), sampleCount),
+            }
         }
     end,
 
@@ -129,32 +125,46 @@ local Sampler = class
     sample = function(self)
         assert(#self.fbIndexes == self.sampleCount)
 
+        self:switchBuffer()
+        local sampleBuf = self:getBuffer(SBuf.Current)
+
         for i = 1, self.sampleCount do
-            self.sampleBuf[i] = fbPtr[self.fbIndexes[i]]
+            sampleBuf[i] = fbPtr[self.fbIndexes[i]]
         end
     end,
 
-    hash = function(self)
+    compare = function(self)
+        local currentBuf = self:getBuffer(SBuf.Current)
+        local otherBuf = self:getBuffer(SBuf.Other)
         local byteCount = self.sampleCount * map:getPixelSize()
-        return sha2.sha1(ffi.string(self.sampleBuf, byteCount))
-    end
+        return (ffi.C.memcmp(currentBuf, otherBuf, byteCount) ~= 0)
+    end,
+
+-- private:
+    getBuffer = function(self, which)
+        local bufIdx = (which == SBuf.Current)
+            and self.currentBufIdx
+            or 1 - self.currentBufIdx
+        return self.sampleBufs[bufIdx]
+    end,
+
+    switchBuffer = function(self)
+        self.currentBufIdx = 1 - self.currentBufIdx
+    end,
 }
 
 -- "Forward-declare"
-local sampleAndHash
+local sampleAndCompare
 
 if (sampling) then
     local sampler = Sampler()
-    local currentHash = "<unavailable>"
 
     sampler:generate()
 
-    function sampleAndHash()
+    function sampleAndCompare()
         sampler:sample()
-        local hash = sampler:hash()
 
-        if (hash ~= currentHash) then
-            currentHash = hash
+        if (sampler:compare()) then
             stderr:write("changed\n")
             -- Perturb the positions of the pixesl to be sampled.
             sampler:generate()
@@ -164,7 +174,7 @@ end
 
 ----------
 
-local testFunc = sampling and sampleAndHash or copyAndNarrow
+local testFunc = sampling and sampleAndCompare or copyAndNarrow
 
 repeat
     local startMs = currentTimeMs()
