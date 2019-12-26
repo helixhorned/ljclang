@@ -57,6 +57,9 @@ struct timespec {
 };
 
 int clock_gettime(clockid_t clock_id, struct timespec *tp);
+int clock_nanosleep(clockid_t clock_id, int flags,
+                    const struct timespec *request,
+                    struct timespec *remain);
 ]]
 
 -- NOTE: POSIX integer types declared in ljclang.lua.
@@ -254,13 +257,24 @@ api.Fd = class
 --]]
 }
 
-local single_timespec_t = ffi.typeof("struct timespec [1]")
+local timespec_t = ffi.typeof("struct timespec")
+local single_timespec_t = ffi.typeof("$ [1]", timespec_t)
+
+-- TODO: for the clock_* functions:
+--  - expose more or all arguments
+--  - more proper argument and/or return value checking
 
 api.clock_gettime = function()
     local ts = single_timespec_t()
     local ret = call("clock_gettime", decls.CLOCK.MONOTONIC, ts)
     assert(ret == 0)
     return ts[0]
+end
+
+api.clock_nanosleep = function(nsec)
+    local request = timespec_t(nsec / 1e9, nsec % 1e9)
+    local ret = call("clock_nanosleep", decls.CLOCK.MONOTONIC, 0, request, nil)
+    assert(ret == 0)
 end
 
 api.poll = function(tab)
