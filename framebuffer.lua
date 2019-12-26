@@ -51,7 +51,7 @@ end
 local api = {}
 
 local function GetPixelType(bitsPerPixel, writable)
-    local prefix = writable and "const " or "";
+    local prefix = (not writable) and "const " or "";
     return ffi.typeof(prefix.."uint"..bitsPerPixel.."_t")
 end
 
