@@ -240,10 +240,12 @@ sed_common_commands := s|@LJCLANG_DEV_DIR@|$(THIS_DIR)|g; s|@LLVM_BINDIR@|$(bind
 app_dependencies: $(inotify_decls_lua) $(posix_decls_lua)
 
 install: $(LJCLANG_SUPPORT_SO) $(GENERATED_FILES_STAGE_2) app_dependencies
+	sed "$(sed_common_commands) s|@APPLICATION@|extractdecls|g" ./app.sh.in > $(BINDIR)/extractdecls
+	chmod +x $(BINDIR)/extractdecls
 	sed "$(sed_common_commands) s|@APPLICATION@|watch_compile_commands|g" ./app.sh.in > $(BINDIR)/watch_compile_commands
+	chmod +x $(BINDIR)/watch_compile_commands
 	install $(THIS_DIR)/wcc-server.sh $(BINDIR)/wcc-server
 	install $(THIS_DIR)/wcc-client.sh $(BINDIR)/wcc-client
-	chmod +x $(BINDIR)/watch_compile_commands
 
 # This target is merely there to create compile_commands.json entries for the test
 # source files in case we are invoked with 'bear'.
