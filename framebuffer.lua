@@ -120,15 +120,23 @@ local Mapping = class
             pxSize = pixelSize,
             unpackPxFunc = GetUnpackPixelFunc(vinfo),
 
+            xres_virtual = vinfo.xres_virtual,
+
             -- public:
-            xlen = fb.line_length / pixelSize,
-            ylen = vinfo.yres_virtual,
+            xres = vinfo.xres,
+            yres = vinfo.yres,
         }
     end,
 
     -- CAUTION!
     getPixelPointer = function(self)
         return self.ptr
+    end,
+
+    getLinearIndex = function(self, x, y)
+        assert(x >= 0 and x <= self.xres - 1)
+        assert(y >= 0 and y <= self.yres - 1)
+        return self.xres_virtual * y + x
     end,
 
     getPixelSize = function(self)
@@ -140,7 +148,7 @@ local Mapping = class
     end,
 
     getSize = function(self)
-        return self.xlen * self.ylen
+        return self.xres * self.yres
     end,
 
     getUnpackPixelFunc = function(self)

@@ -92,12 +92,8 @@ end
 
 local SideLen = 8
 local SquareSize = SideLen * SideLen  -- in pixels
-assert(map.xlen % SideLen == 0)
-assert(map.ylen % SideLen == 0)
-
-local function GetLinearIndex(x, y)
-    return map.xlen * y + x
-end
+assert(map.xres % SideLen == 0)
+assert(map.yres % SideLen == 0)
 
 local Sampler = class
 {
@@ -116,14 +112,12 @@ local Sampler = class
     generate = function(self)
         local idxs = {}
 
-        for y = 0, map.ylen - 1, SideLen do
-            for x = 0, map.xlen - 1, SideLen do
+        for y = 0, map.yres - 1, SideLen do
+            for x = 0, map.xres - 1, SideLen do
                 local xoff = self.rng:getu32() % SideLen
                 local yoff = self.rng:getu32() % SideLen
 
-                local linearIdx = GetLinearIndex(x + xoff, y + yoff)
-                assert(linearIdx < size)
-                idxs[#idxs + 1] = linearIdx
+                idxs[#idxs + 1] = map:getLinearIndex(x + xoff, y + yoff)
             end
         end
 
