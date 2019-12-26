@@ -96,7 +96,7 @@ local Mapping = class
         -- TODO: support offset
         check(vinfo.xoffset == 0 and vinfo.yoffset == 0,
               "Only offset-less format supported", 2)
-        assert(vinfo.xres == vinfo.xres_virtual and vinfo.yres == vinfo.yres_virtual)
+        assert(vinfo.xres <= vinfo.xres_virtual and vinfo.yres <= vinfo.yres_virtual)
 
         -- NOTE: this will error if there is no uint<BPP>_t type.
         local pixelType = GetPixelType(vinfo.bits_per_pixel, fb.writable)
@@ -111,6 +111,7 @@ local Mapping = class
             fb.fd, 0)
 
         local pixelSize = vinfo.bits_per_pixel / 8
+        assert(fb.line_length == pixelSize * vinfo.xres_virtual)
 
         return {
             voidPtr_ = voidPtr,
