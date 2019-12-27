@@ -237,7 +237,7 @@ test: $(SHARED_LIBRARIES) $(GENERATED_FILES_STAGE_2)
 
 sed_common_commands := s|@LJCLANG_DEV_DIR@|$(THIS_DIR)|g; s|@LLVM_BINDIR@|$(bindir)|g; s|@LLVM_LIBDIR@|$(libdir)|g;
 
-app_dependencies: $(inotify_decls_lua) $(posix_decls_lua)
+app_dependencies: $(inotify_decls_lua) $(linux_decls_lua) $(posix_decls_lua)
 
 install: $(SHARED_LIBRARIES) $(GENERATED_FILES_STAGE_2) app_dependencies
 	sed "$(sed_common_commands) s|@APPLICATION@|extractdecls|g" ./app.sh.in > $(BINDIR)/extractdecls
