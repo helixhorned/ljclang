@@ -48,7 +48,9 @@ end
 
 ----------
 
-local api = {}
+local api = {
+    ioctl = ioctl,
+}
 
 local function GetPixelType(bitsPerPixel, writable)
     local prefix = (not writable) and "const " or "";
