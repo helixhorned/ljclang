@@ -109,7 +109,7 @@ CHECK_EXTRACTED_ENUMS_CMD := $(EXTRACT_CMD_ENV) $(luajit) \
 .SILENT: $(EXTRACTED_ENUMS_LUA)
 
 $(EXTRACTED_ENUMS_LUA): ./print_extracted_enums_lua.sh $(incdir)/clang-c/*
-$(EXTRACTED_ENUMS_LUA): $(LJCLANG_SUPPORT_SO) $(GENERATED_FILES_STAGE_1)
+$(EXTRACTED_ENUMS_LUA): $(SHARED_LIBRARIES) $(GENERATED_FILES_STAGE_1)
 	echo 'return {}' > $(EXTRACTED_ENUMS_LUA)
     # Do the extraction.
 	$(EXTRACT_CMD_ENV) ./print_extracted_enums_lua.sh > $(EXTRACTED_ENUMS_LUA_TMP)
@@ -232,14 +232,14 @@ else
 	echo "* Did not generate README.html: '$(MARKDOWN)' not installed"
 endif
 
-test: $(LJCLANG_SUPPORT_SO) $(GENERATED_FILES_STAGE_2)
+test: $(SHARED_LIBRARIES) $(GENERATED_FILES_STAGE_2)
 	LLVM_LIBDIR="$(libdir)" $(SHELL) ./run_tests.sh
 
 sed_common_commands := s|@LJCLANG_DEV_DIR@|$(THIS_DIR)|g; s|@LLVM_BINDIR@|$(bindir)|g; s|@LLVM_LIBDIR@|$(libdir)|g;
 
 app_dependencies: $(inotify_decls_lua) $(posix_decls_lua)
 
-install: $(LJCLANG_SUPPORT_SO) $(GENERATED_FILES_STAGE_2) app_dependencies
+install: $(SHARED_LIBRARIES) $(GENERATED_FILES_STAGE_2) app_dependencies
 	sed "$(sed_common_commands) s|@APPLICATION@|extractdecls|g" ./app.sh.in > $(BINDIR)/extractdecls
 	chmod +x $(BINDIR)/extractdecls
 	sed "$(sed_common_commands) s|@APPLICATION@|watch_compile_commands|g" ./app.sh.in > $(BINDIR)/watch_compile_commands
