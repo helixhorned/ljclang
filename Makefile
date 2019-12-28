@@ -148,7 +148,7 @@ CHECK_EXTRACTED_LINUX_CMD := $(EXTRACT_CMD_ENV) $(luajit) \
 linux_fb_h ?= /usr/include/linux/fb.h
 sed_replace_ints_cmds := s/__u16 /uint16_t /g; s/__u32 /uint32_t /g
 
-$(linux_decls_lua): $(EXTRACT_ENUMS_LUA) $(linux_fb_h) Makefile
+$(linux_decls_lua): $(EXTRACTED_ENUMS_LUA) $(linux_fb_h) Makefile
 	@echo 'local ffi=require"ffi"' > $(linux_decls_lua_tmp)
 	@echo 'ffi.cdef[[' >> $(linux_decls_lua_tmp)
 	@./extractrange.lua $(linux_fb_h) '^struct fb_fix_screeninfo {' '^};' | sed "$(sed_replace_ints_cmds)" >> $(linux_decls_lua_tmp)
