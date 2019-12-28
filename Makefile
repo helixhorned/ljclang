@@ -56,8 +56,6 @@ EXTRACTED_ENUMS_LUA := ljclang_extracted_enums.lua
 EXTRACTED_ENUMS_LUA_TMP := $(EXTRACTED_ENUMS_LUA).tmp
 inotify_decls_lua := inotify_decls.lua
 inotify_decls_lua_tmp := $(inotify_decls_lua).tmp
-linux_decls_lua := linux_decls.lua
-linux_decls_lua_tmp := $(linux_decls_lua).tmp
 posix_decls_lua := posix_decls.lua
 posix_decls_lua_tmp := $(posix_decls_lua).tmp
 
@@ -78,7 +76,6 @@ clean:
 veryclean: clean
 	rm -f $(GENERATED_FILES_STAGE_2) $(EXTRACTED_ENUMS_LUA_TMP) $(EXTRACTED_ENUMS_LUA).reject \
 		$(inotify_decls_lua) $(inotify_decls_lua_tmp) \
-		$(linux_decls_lua) $(linux_decls_lua_tmp) \
 		$(posix_decls_lua) $(posix_decls_lua_tmp)
 
 bootstrap: $(EXTRACTED_ENUMS_LUA)
@@ -138,35 +135,6 @@ $(inotify_decls_lua): $(EXTRACTED_ENUMS_LUA) $(sys_h) Makefile
 	@echo '}]]' >> $(inotify_decls_lua_tmp)
 	@mv $(inotify_decls_lua_tmp) $@
 	@($(CHECK_EXTRACTED_INOTIFY_CMD) && \
-	    printf "* \033[1mGenerated $@\033[0m\n") \
-	|| (printf "* \033[1;31mError\033[0m generating $@\n" && \
-	    mv $@ $@.reject && false)
-
-CHECK_EXTRACTED_LINUX_CMD := $(EXTRACT_CMD_ENV) $(luajit) \
-    -e "require'linux_decls'"
-
-linux_fb_h ?= /usr/include/linux/fb.h
-sed_replace_ints_cmds := s/__u16 /uint16_t /g; s/__u32 /uint32_t /g
-
-$(linux_decls_lua): $(EXTRACTED_ENUMS_LUA) $(linux_fb_h) Makefile
-	@echo 'local ffi=require"ffi"' > $(linux_decls_lua_tmp)
-	@echo 'ffi.cdef[[' >> $(linux_decls_lua_tmp)
-	@./extractrange.lua $(linux_fb_h) '^struct fb_fix_screeninfo {' '^};' | sed "$(sed_replace_ints_cmds)" >> $(linux_decls_lua_tmp)
-	@./extractrange.lua $(linux_fb_h) '^struct fb_bitfield {' '^};' | sed "$(sed_replace_ints_cmds)" >> $(linux_decls_lua_tmp)
-	@./extractrange.lua $(linux_fb_h) '^struct fb_var_screeninfo {' '^};' | sed "$(sed_replace_ints_cmds)" >> $(linux_decls_lua_tmp)
-	@echo ']]' >> $(linux_decls_lua_tmp)
-	@echo 'return { FBIO = ffi.new[[struct {' >> $(linux_decls_lua_tmp)
-	@$(EXTRACT_CMD_ENV) ./extractdecls.lua -w MacroDefinition -C -p '^FBIO.*SCREENINFO' -s '^FBIO' $(linux_fb_h) >> $(linux_decls_lua_tmp)
-	@echo '}]],' >> $(linux_decls_lua_tmp)
-	@echo 'FB_TYPE = ffi.new[[struct {' >> $(linux_decls_lua_tmp)
-	@$(EXTRACT_CMD_ENV) ./extractdecls.lua -w MacroDefinition -C -p '^FB_TYPE_' -s '^FB_TYPE_' $(linux_fb_h) >> $(linux_decls_lua_tmp)
-	@echo '}]],' >> $(linux_decls_lua_tmp)
-	@echo 'FB_VISUAL = ffi.new[[struct {' >> $(linux_decls_lua_tmp)
-	@$(EXTRACT_CMD_ENV) ./extractdecls.lua -w MacroDefinition -C -p '^FB_VISUAL_' -s '^FB_VISUAL_' $(linux_fb_h) >> $(linux_decls_lua_tmp)
-	@echo '}]],' >> $(linux_decls_lua_tmp)
-	@echo '}' >> $(linux_decls_lua_tmp)
-	@mv $(linux_decls_lua_tmp) $@
-	@($(CHECK_EXTRACTED_LINUX_CMD) && \
 	    printf "* \033[1mGenerated $@\033[0m\n") \
 	|| (printf "* \033[1;31mError\033[0m generating $@\n" && \
 	    mv $@ $@.reject && false)
@@ -237,7 +205,7 @@ test: $(SHARED_LIBRARIES) $(GENERATED_FILES_STAGE_2)
 
 sed_common_commands := s|@LJCLANG_DEV_DIR@|$(THIS_DIR)|g; s|@LLVM_BINDIR@|$(bindir)|g; s|@LLVM_LIBDIR@|$(libdir)|g;
 
-app_dependencies: $(inotify_decls_lua) $(linux_decls_lua) $(posix_decls_lua)
+app_dependencies: $(inotify_decls_lua) $(posix_decls_lua)
 
 install: $(SHARED_LIBRARIES) $(GENERATED_FILES_STAGE_2) app_dependencies
 	sed "$(sed_common_commands) s|@APPLICATION@|extractdecls|g" ./app.sh.in > $(BINDIR)/extractdecls
