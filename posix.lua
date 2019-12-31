@@ -73,6 +73,7 @@ struct pollfd {
 int poll(struct pollfd fds[], nfds_t nfds, int timeout);
 
 int sigaddset(sigset_t *, int);
+int sigemptyset(sigset_t *);
 int sigprocmask(int, const sigset_t *restrict, sigset_t *restrict);
 
 void ljclang_setSigintHandlingToDefault();
@@ -159,6 +160,7 @@ do
     --
     -- TODO: think about whether to keep here of move elsewhere.
     local sigset = ffi.new("sigset_t [1]")
+    call("sigemptyset", sigset)
     call("sigaddset", sigset, SIG.PIPE)
     call("sigprocmask", SIG.BLOCK, sigset, nil)
 end
