@@ -21,16 +21,27 @@ namespace
     template <> struct TypeString<int64_t> { static constexpr const char *value = "int64_t"; };
     template <> struct TypeString<uint32_t> { static constexpr const char *value = "uint32_t"; };
     template <> struct TypeString<uint64_t> { static constexpr const char *value = "uint64_t"; };
+    template <> struct TypeString<unsigned long> { static constexpr const char *value = "unsigned long"; };
 
     // NOTE: do not use 'is_same_v', it is absent in Raspbian's libstdc++.
     constexpr bool LongIntIsInt64 = std::is_same<int64_t, long int>::value;
     struct DummyType {};
     using LongInt = std::conditional_t<LongIntIsInt64, DummyType, long int>;
     template <> struct TypeString<LongInt> { static constexpr const char *value = "long int"; };
+
+    template <> struct TypeString<sigset_t> {
+        static const std::string structDef;
+        static const char *value;
+    };
+
+    const std::string TypeString<sigset_t>::structDef =
+        "struct { uint8_t bytes_[" + std::to_string(sizeof(sigset_t)) + "]; } " +
+        "__attribute__((aligned(" + std::to_string(alignof(sigset_t)) + ")))";
+    const char *TypeString<sigset_t>::value = structDef.c_str();
 }
 
 #define TypeDef(typeName) \
-    std::string{"typedef "} + TypeString<time_t>::value + " " + #typeName + ";"
+    std::string{"typedef "} + TypeString<typeName>::value + " " + #typeName + ";"
 
 extern "C"
 const char *ljclang_getTypeDefs()
@@ -53,7 +64,6 @@ const char *ljclang_getTypeDefs()
         + TypeDef(pid_t)
         + TypeDef(ssize_t)
         + TypeDef(suseconds_t)
-        + TypeDef(timer_t)
         + TypeDef(uid_t)
         // poll.h
         + TypeDef(nfds_t)
