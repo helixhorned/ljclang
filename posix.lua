@@ -49,6 +49,16 @@ FILE *freopen(const char *pathname, const char *mode, FILE *stream);
 char *realpath(const char *path, char *resolved_path);
 ]]
 
+-- NOTE: leave type 'struct sockaddr' incomplete.
+ffi.cdef[[
+struct sockaddr;
+int socket(int domain, int type, int protocol);
+int bind(int socket, const struct sockaddr *address, socklen_t address_len);
+int connect(int socket, const struct sockaddr *address, socklen_t address_len);
+int listen(int socket, int backlog);
+int accept(int sockfd, struct sockaddr *addr, socklen_t *addrlen);
+]]
+
 -- NOTE: members have 'tv_' prefix stripped.
 ffi.cdef[[
 struct timespec {
@@ -91,11 +101,13 @@ local external_SIG = {
 }
 
 local api = {
+    AF = decls.AF,
     O = decls.O,
     MAP = decls.MAP,
     POLL = decls.POLL,
     PROT = decls.PROT,
     SIG = external_SIG,
+    SOCK = decls.SOCK,
 }
 
 local function getErrnoString()

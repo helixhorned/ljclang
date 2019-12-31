@@ -155,6 +155,9 @@ $(posix_decls_lua): $(EXTRACTED_ENUMS_LUA) $(sys_h) Makefile
 	@echo 'return { POLL = ffi.new[[struct {' >> $(posix_decls_lua_tmp)
 	@$(EXTRACT_CMD_ENV) ./extractdecls.lua -w MacroDefinition -C -p '^POLLIN' -s '^POLL' $(sys_h) >> $(posix_decls_lua_tmp)
 	@echo '}]], ' >> $(posix_decls_lua_tmp)
+	@echo 'AF = ffi.new[[struct {' >> $(posix_decls_lua_tmp)  # NOTE: PF -> AF
+	$(EXTRACT_CMD_ENV) ./extractdecls.lua -w MacroDefinition -C -p '^PF_INET' -s '^PF_' $(sys_h) >> $(posix_decls_lua_tmp)
+	@echo '}]], ' >> $(posix_decls_lua_tmp)
 	@echo 'CLOCK = ffi.new[[struct {' >> $(posix_decls_lua_tmp)
 	@$(EXTRACT_CMD_ENV) ./extractdecls.lua -w MacroDefinition -C -p '^CLOCK_MONOTONIC' -s '^CLOCK_' $(time_h) >> $(posix_decls_lua_tmp)
 	@echo '}]], ' >> $(posix_decls_lua_tmp)
@@ -179,6 +182,9 @@ $(posix_decls_lua): $(EXTRACTED_ENUMS_LUA) $(sys_h) Makefile
 	@$(EXTRACT_CMD_ENV) ./extractdecls.lua -w MacroDefinition -C -p '^SIGINT' -s '^SIG' $(signal_h) >> $(posix_decls_lua_tmp)
 	@$(EXTRACT_CMD_ENV) ./extractdecls.lua -w MacroDefinition -C -p '^SIGPIPE' -s '^SIG' $(signal_h) >> $(posix_decls_lua_tmp)
 	@$(EXTRACT_CMD_ENV) ./extractdecls.lua -w MacroDefinition -C -p '^SIG_BLOCK' -s '^SIG_' $(signal_h) >> $(posix_decls_lua_tmp)
+	@echo '}]], ' >> $(posix_decls_lua_tmp)
+	@echo 'SOCK = ffi.new[[struct {' >> $(posix_decls_lua_tmp)
+	@$(EXTRACT_CMD_ENV) ./extractdecls.lua -w EnumConstantDecl -C -p '^SOCK_STREAM' -s '^SOCK_' $(sys_h) >> $(posix_decls_lua_tmp)
 	@echo '}]] }' >> $(posix_decls_lua_tmp)
 	@mv $(posix_decls_lua_tmp) $@
 	@($(CHECK_EXTRACTED_POSIX_CMD) && \

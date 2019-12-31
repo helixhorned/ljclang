@@ -9,6 +9,7 @@
 #include <cstddef>
 #include <cstdint>
 
+#include <sys/socket.h>
 #include <sys/types.h>
 #include <poll.h>
 #include <signal.h>
@@ -21,6 +22,7 @@ namespace
     template <> struct TypeString<int64_t> { static constexpr const char *value = "int64_t"; };
     template <> struct TypeString<uint32_t> { static constexpr const char *value = "uint32_t"; };
     template <> struct TypeString<uint64_t> { static constexpr const char *value = "uint64_t"; };
+    template <> struct TypeString<unsigned short> { static constexpr const char *value = "unsigned short"; };
     template <> struct TypeString<unsigned long> { static constexpr const char *value = "unsigned long"; };
 
     // NOTE: do not use 'is_same_v', it is absent in Raspbian's libstdc++.
@@ -69,6 +71,9 @@ const char *ljclang_getTypeDefs()
         + TypeDef(nfds_t)
         // signal.h
         + TypeDef(sigset_t)
+        // sys/socket.h
+        + TypeDef(sa_family_t)
+        + TypeDef(socklen_t)
         ;
 
     return s.c_str();
