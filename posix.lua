@@ -177,6 +177,7 @@ do
     call("sigprocmask", SIG.BLOCK, sigset, nil)
 end
 
+local uint8_ptr_t = ffi.typeof("uint8_t *")
 local uint8_array_t = ffi.typeof("uint8_t [?]")
 local Allow_EAGAIN = { [decls.E.AGAIN] = true }
 local Allow_EPIPE = { [decls.E.PIPE] = true }
@@ -221,9 +222,16 @@ api.Fd = class
         check(length ~= nil, "argument #1 must have ffi.sizeof() ~= nil", 2)
         check(length >= 1, "argument #1 must have ffi.sizeof() >= 1", 2)
 
-        local bytesRead = call("read", self.fd, obj, length)
-        assert(bytesRead >= 0 and bytesRead <= length)
-        check(allowPartial or bytesRead == length, "partial read occurred", 2)
+        local bytePtr = ffi.cast(uint8_ptr_t, obj)
+        local bytesRead = 0
+
+        repeat
+            local remainByteCount = length - bytesRead
+            local ret = call("read", self.fd, bytePtr, remainByteCount)
+            assert(ret >= 0 and ret <= remainByteCount)
+            bytePtr = bytePtr + ret
+            bytesRead = bytesRead + ret
+        until (allowPartial or bytesRead == length)
 
         return obj, bytesRead
     end,
@@ -235,7 +243,32 @@ api.Fd = class
         check(length > 0, "argument must have non-zero length", 2)
         local bytesWritten = call("write", self.fd, obj, length)
         assert(bytesWritten <= length)
+        -- TODO: check non-discarding at all usage sites.
         return bytesWritten
+    end,
+
+    writeFull = function(self, obj, length)
+        check(type(obj) == "cdata",
+              "argument #1 must be a cdata", 2)
+        check(length == nil or type(length) == "number",
+              "argument #2 must be nil or a number", 2)
+
+        local objLength = ffi.sizeof(obj)
+        local writeLength = (length ~= nil) and length or objLength
+
+        check(writeLength > 0, "must request to write at least one byte", 2)
+        check(writeLength <= objLength, "requested write length greater than object size", 2)
+
+        local bytePtr = ffi.cast(uint8_ptr_t, obj)
+        local bytesWritten = 0
+
+        repeat
+            local remainByteCount = writeLength - bytesWritten
+            local ret = call("write", self.fd, bytePtr, remainByteCount)
+            assert(ret >= 0 and ret <= remainByteCount)
+            bytePtr = bytePtr + ret
+            bytesWritten = bytesWritten + ret
+        until (bytesWritten == writeLength)
     end,
 
     -- Write to a file descriptor, catching EPIPE instead of propagating it as Lua error.
