@@ -79,9 +79,27 @@ const char *ljclang_getTypeDefs()
     return s.c_str();
 }
 
-// Check that the 'struct pollfd' on our system (which we want to expose) includes *only*
-// the three members specified by POSIX.
-static_assert(sizeof(pollfd) == sizeof(int) + 2 * sizeof(short));
+namespace {
+namespace Check {
+
+struct timespec {
+    time_t sec;
+    long   nsec;
+};
+
+struct pollfd {
+    int   fd;
+    short events;
+    short revents;
+};
+
+}
+}
+
+// Check that on our system, the structs we want to expose include *only* the members
+// specified by POSIX.
+static_assert(sizeof(Check::timespec) == sizeof(struct timespec));
+static_assert(sizeof(Check::pollfd) == sizeof(struct pollfd));
 
 extern "C"
 void ljclang_setSigintHandlingToDefault()

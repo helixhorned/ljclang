@@ -72,7 +72,6 @@ int clock_nanosleep(clockid_t clock_id, int flags,
                     struct timespec *remain);
 ]]
 
--- NOTE: POSIX integer types declared in ljclang.lua.
 ffi.cdef[[
 struct pollfd {
     int   fd;
