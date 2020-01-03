@@ -10,6 +10,7 @@ local class = require("class").class
 
 local assert = assert
 local error = error
+local ipairs = ipairs
 local type = type
 local unpack = unpack
 
@@ -145,6 +146,19 @@ function api.BimapAdd(self, first, second)
     self[second] = first
 
     self[BimapTags.COUNT] = self[BimapTags.COUNT] + 1
+end
+
+function api.MakeBimap(tab)
+    checktype(tab, 1, "table", 2)
+
+    local firstItem = tab[1]
+    local bimap = api.Bimap(type(firstItem[1]), type(firstItem[2]))
+
+    for _, item in ipairs(tab) do
+        api.BimapAdd(bimap, item[1], item[2])
+    end
+
+    return bimap
 end
 
 function api.BimapGetCount(self)
