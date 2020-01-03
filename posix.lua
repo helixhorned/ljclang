@@ -61,6 +61,11 @@ int accept(int sockfd, struct sockaddr *addr, socklen_t *addrlen);
 
 -- NOTE: members have 'tv_' prefix stripped.
 ffi.cdef[[
+struct timeval {
+    time_t sec;
+    suseconds_t usec;
+};
+
 struct timespec {
     time_t sec;
     long   nsec;

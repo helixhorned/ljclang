@@ -82,6 +82,11 @@ const char *ljclang_getTypeDefs()
 namespace {
 namespace Check {
 
+struct timeval {
+    time_t sec;
+    suseconds_t usec;
+};
+
 struct timespec {
     time_t sec;
     long   nsec;
@@ -98,6 +103,7 @@ struct pollfd {
 
 // Check that on our system, the structs we want to expose include *only* the members
 // specified by POSIX.
+static_assert(sizeof(Check::timeval) == sizeof(struct timeval));
 static_assert(sizeof(Check::timespec) == sizeof(struct timespec));
 static_assert(sizeof(Check::pollfd) == sizeof(struct pollfd));
 
