@@ -96,6 +96,43 @@ void ljclang_setSigintHandlingToDefault();
 local pollfd_t = ffi.typeof("struct pollfd")
 local pollfd_array_t = ffi.typeof("$ [?]", pollfd_t)
 
+ffi.cdef[[
+void ljclang_FD_CLR(int fd, fd_set *set);
+int  ljclang_FD_ISSET(int fd, fd_set *set);
+void ljclang_FD_SET(int fd, fd_set *set);
+
+int select(int nfds, fd_set *readfds, fd_set *writefds,
+           fd_set *exceptfds, struct timeval *timeout);
+]]
+
+local fd_set_t = ffi.typeof("fd_set")
+local FD_SETSIZE = 8 * ffi.sizeof(fd_set_t)
+
+local function checkSetFd(fd)
+    checktype(fd, 1, "number", 3)
+    check(fd >= 0 and fd < FD_SETSIZE, "file descriptor value is too large", 3)
+end
+
+fd_set_t = class
+{
+    fd_set_t,
+
+    set = function(self, fd)
+        checkSetFd(fd)
+        ljposix.ljclang_FD_SET(fd, self)
+    end,
+
+    clear = function(self, fd)
+        checkSetFd(fd)
+        ljposix.ljclang_FD_CLR(fd, self)
+    end,
+
+    isSet = function(self, fd)
+        checkSetFd(fd)
+        return (ljposix.ljclang_FD_ISSET(fd, self) ~= 0)
+    end,
+}
+
 local SIG = decls.SIG
 local SIG_DFL = pollfd_t()  -- just a marker with a unique address
 
@@ -112,6 +149,8 @@ local api = {
     PROT = decls.PROT,
     SIG = external_SIG,
     SOCK = decls.SOCK,
+
+    fd_set_t = fd_set_t,
 }
 
 local function getErrnoString()
