@@ -156,7 +156,7 @@ $(posix_decls_lua): $(EXTRACTED_ENUMS_LUA) $(sys_h) Makefile
 	@$(EXTRACT_CMD_ENV) ./extractdecls.lua -w MacroDefinition -C -p '^POLLIN' -s '^POLL' $(sys_h) >> $(posix_decls_lua_tmp)
 	@echo '}]], ' >> $(posix_decls_lua_tmp)
 	@echo 'AF = ffi.new[[struct {' >> $(posix_decls_lua_tmp)  # NOTE: PF -> AF
-	$(EXTRACT_CMD_ENV) ./extractdecls.lua -w MacroDefinition -C -p '^PF_INET' -s '^PF_' $(sys_h) >> $(posix_decls_lua_tmp)
+	@$(EXTRACT_CMD_ENV) ./extractdecls.lua -w MacroDefinition -C -p '^PF_INET' -s '^PF_' $(sys_h) >> $(posix_decls_lua_tmp)
 	@echo '}]], ' >> $(posix_decls_lua_tmp)
 	@echo 'CLOCK = ffi.new[[struct {' >> $(posix_decls_lua_tmp)
 	@$(EXTRACT_CMD_ENV) ./extractdecls.lua -w MacroDefinition -C -p '^CLOCK_MONOTONIC' -s '^CLOCK_' $(time_h) >> $(posix_decls_lua_tmp)
