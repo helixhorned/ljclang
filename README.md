@@ -79,6 +79,7 @@ various forms usable as FFI C declarations or descriptive tables with LuaJIT.
 
 ~~~~~~~~~~
 Usage: ./extractdecls.lua [our options...] <file.h> [-- [Clang command line args ...]]
+Exits with a non-zero code if there were errors or no match.
  (Our options may also come after the file name.)
   -e <enumNameFilterPattern> (enums only)
   -p <filterPattern>
@@ -206,7 +207,7 @@ parse `TranslationUnit`s. Both input arguments are optional and default to
 [`enum CXChildVisitResult`]:
  http://clang.llvm.org/doxygen/group__CINDEX__CURSOR__TRAVERSAL.html#ga99a9058656e696b622fbefaf5207d715
 
-An object containing a mapping of names to values permissible as values returned
+An object mapping names to values to be returned
 from cursor visitor callbacks. The names are identical with those in [`enum
 CXChildVisitResult`] with the "`CXChildVisit_`" prefix removed: `Break`,
 `Continue`, `Recurse`.
@@ -233,8 +234,8 @@ Creates a permanent cursor from one received by the visitor callback.
 [`enum CXErrorCode`]:
  http://clang.llvm.org/doxygen/CXErrorCode_8h.html#adba17f287f8184fc266f2db4e669bf0f
 
-An object containing a mapping of names to value representing success or various
-error conditions. The names are identical with those in [`enum CXErrorCode`] with
+An object mapping names to values representing success or various
+error conditions. The names are identical to those in [`enum CXErrorCode`] with
 the "`CXError_`" prefix removed.
 
 ### Index
