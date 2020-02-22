@@ -1,5 +1,10 @@
 #!/usr/bin/env luajit
 
+-- NOTE: on Raspbian, we need to require ljclang before busted, otherwise we get
+--  error "wrong number of type parameters" for ffi.cdef 'typedef enum CXChildVisitResult'.
+local cl = require("ljclang")
+local llvm_libdir_include = require("llvm_libdir_include")
+
 require 'busted.runner'()
 
 local assert = assert
@@ -12,9 +17,6 @@ local rawequal = rawequal
 local type = type
 local tostring = tostring
 local unpack = unpack
-
-local cl = require("ljclang")
-local llvm_libdir_include = require("llvm_libdir_include")
 
 local ffi = require("ffi")
 
