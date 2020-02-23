@@ -321,18 +321,21 @@ describe2("Loading a file with includes", function(createTU)
         assertParseWasSuccess(tu, errorCode)
     end)
 
+    local expectedError = (createTU == CreateTUFuncs[1]) and
+        cl.ErrorCode.ASTReadError or cl.ErrorCode.Failure
+
     it("tests passing multiple source file names (1)", function()
         local clangOpts = concatTables(clangOpts, {fileName1, fileName2})
         local tu, errorCode = createTU(cl.createIndex(), "", clangOpts)
         assert.is_nil(tu)
-        assert.are.equal(errorCode, cl.ErrorCode.ASTReadError)
+        assert.are.equal(errorCode, expectedError)
     end)
 
     it("tests passing multiple source file names (2)", function()
         local clangOpts = concatTables(clangOpts, {fileName2})
         local tu, errorCode = createTU(cl.createIndex(), fileName1, clangOpts)
         assert.is_nil(tu)
-        assert.are.equal(errorCode, cl.ErrorCode.ASTReadError)
+        assert.are.equal(errorCode, expectedError)
     end)
 end)
 
