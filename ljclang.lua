@@ -117,6 +117,46 @@ do
 end
 
 -------------------------------------------------------------------------
+
+local function PrepareParse(srcfile, args, opts)
+    check(type(srcfile)=="string", "<srcfile> must be a string", 3)
+    check(type(args)=="string" or type(args)=="table", "<args> must be a string or table", 3)
+    util.check_iftab_iscellstr(args, "<args>", 3)
+
+    if (srcfile == "") then
+        srcfile = nil
+    end
+
+    local opts = util.checkOptionsArgAndGetDefault(opts, C.CXTranslationUnit_None)
+
+    -- Input argument handling.
+
+    if (type(args)=="string") then
+        args = api.splitAtWhitespace(args)
+    end
+
+    opts = util.handleTableOfOptionStrings(clang, "CXTranslationUnit_", opts)
+
+    local argsptrs = ffi.new("const char * [?]", #args, args)  -- ARGS_FROM_TAB
+
+    -- Create the CXTranslationUnit.
+    local tuAr = ffi.new("CXTranslationUnit [1]")
+
+    return srcfile, args, opts, argsptrs, tuAr
+end
+
+local function FinishParse(tuAr, errorCode, parent)
+    assert((tuAr[0] ~= nil) == (errorCode == 'CXError_Success'))
+
+    if (tuAr[0] == nil) then
+        return nil, errorCode
+    end
+
+    -- Wrap it in a TranslationUnit_t.
+    return TranslationUnit_t(tuAr[0], parent, true), errorCode
+end
+
+-------------------------------------------------------------------------
 --------------------------------- Index ---------------------------------
 -------------------------------------------------------------------------
 
@@ -164,39 +204,12 @@ local Index = class
     -- On failure, `translationUnit` is `nil` and `errorCode` (comparable against
     -- values in `clang.ErrorCode`) can be examined.
     parse = function(self, srcfile, args, opts)
-        check(type(srcfile)=="string", "<srcfile> must be a string", 2)
-        check(type(args)=="string" or type(args)=="table", "<args> must be a string or table", 2)
-        util.check_iftab_iscellstr(args, "<args>", 2)
+        local srcfile, args, opts, argsptrs, tuAr = PrepareParse(srcfile, args, opts)
 
-        if (srcfile == "") then
-            srcfile = nil
-        end
-
-        local opts = util.checkOptionsArgAndGetDefault(opts, C.CXTranslationUnit_None)
-
-        -- Input argument handling.
-
-        if (type(args)=="string") then
-            args = api.splitAtWhitespace(args)
-        end
-
-        opts = util.handleTableOfOptionStrings(clang, "CXTranslationUnit_", opts)
-
-        local argsptrs = ffi.new("const char * [?]", #args, args)  -- ARGS_FROM_TAB
-
-        -- Create the CXTranslationUnit.
-        local tuAr = ffi.new("CXTranslationUnit [1]")
         local errorCode = clang.clang_parseTranslationUnit2(
             self._idx, srcfile, argsptrs, #args, nil, 0, opts, tuAr)
 
-        assert((tuAr[0] ~= nil) == (errorCode == 'CXError_Success'))
-
-        if (tuAr[0] == nil) then
-            return nil, errorCode
-        end
-
-        -- Wrap it in a TranslationUnit_t.
-        return TranslationUnit_t(tuAr[0], self, true), errorCode
+        return FinishParse(tuAr, errorCode, self)
     end,
 }
 
