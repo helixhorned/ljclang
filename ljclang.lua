@@ -157,6 +157,46 @@ local function FinishParse(tuAr, errorCode, parent)
 end
 
 -------------------------------------------------------------------------
+------------------------------ IndexSession -----------------------------
+-------------------------------------------------------------------------
+
+local IndexSession = class
+{
+    function(cxidxact, parent)
+        assert(ffi.istype("CXIndexAction", cxidxact))
+        assert(cxidxact ~= nil)
+        assert(ffi.istype("CXIndex", parent._idx))
+
+        return {
+            _idxact = ffi.gc(cxidxact, clang.clang_IndexAction_dispose),
+            _parent = parent,
+        }
+    end,
+
+    indexSourceFile = function(self, callbacks, indexOpts,
+                               srcfile, args, opts)
+        local srcfile, args, opts, argsptrs, tuAr = PrepareParse(srcfile, args, opts)
+
+        local indexOpts = util.checkOptionsArgAndGetDefault(opts, C.CXIndexOpt_None)
+        indexOpts = util.handleTableOfOptionStrings(clang, "CXIndexOpt_", indexOpts)
+
+        local errorCode = clang.clang_indexSourceFile(
+            self._idxact,
+            nil, -- CXClientData client_data,
+            -- TODO:
+            nil, -- IndexerCallbacks *index_callbacks,
+            0, -- unsigned index_callbacks_size,
+            indexOpts,
+            srcfile,
+            argsptrs, #args,
+            nil, 0,
+            tuAr, opts)
+
+        return FinishParse(tuAr, errorCode, self)
+    end,
+}
+
+-------------------------------------------------------------------------
 --------------------------------- Index ---------------------------------
 -------------------------------------------------------------------------
 
@@ -166,6 +206,10 @@ local Index = class
         assert(ffi.istype("CXIndex", cxidx))
         assert(cxidx ~= nil)
         return { _idx = ffi.gc(cxidx, clang.clang_disposeIndex) }
+    end,
+
+    createSession = function(self)
+        return IndexSession(clang.clang_IndexAction_create(self._idx), self)
     end,
 
     loadTranslationUnit = function(self, filename)
