@@ -33,11 +33,31 @@ assert(io.open(nonExistentFileName) == nil)
 
 ----------
 
+local CreateTUFuncs = {
+    function(index, ...)
+        return index:parse(...)
+    end,
+
+    function(index, ...)
+        return index:createSession():indexSourceFile(
+            cl.IndexerCallbacks{}, nil, ...)
+    end,
+}
+
+local function describe2(title, func)
+    for i, createTU in ipairs(CreateTUFuncs) do
+        local tag = (i == 1) and "direct" or "session"
+        describe(title.." ["..tag.."]", function()
+            func(createTU)
+        end)
+    end
+end
+
 local clangOpts = { "-std=c++14", "-Wall", "-pedantic" }
 
-describe("Attempting to parse a nonexistent file", function()
+describe2("Attempting to parse a nonexistent file", function(createTU)
     local index = cl.createIndex()
-    local tu, errorCode = index:parse(nonExistentFileName, { "-std=c99" })
+    local tu, errorCode = createTU(index, nonExistentFileName, { "-std=c99" })
     assert.is_nil(tu)
     assert.are.not_equal(errorCode, cl.ErrorCode.Success)
 end)
@@ -47,11 +67,11 @@ local function assertParseWasSuccess(tu, errorCode)
     assert.are.equal(errorCode, cl.ErrorCode.Success)
 end
 
-describe("Loading a cpp file without includes", function()
+describe2("Loading a cpp file without includes", function(createTU)
     local fileName = "test_data/simple.hpp"
     local astFileName = "/tmp/ljclang_test_simple.hpp.ast"
 
-    local tu, errorCode = cl.createIndex():parse(fileName, clangOpts)
+    local tu, errorCode = createTU(cl.createIndex(), fileName, clangOpts)
 
     -- Test that we don't need to keep the index (from createIndex()) around:
     collectgarbage()
@@ -286,7 +306,7 @@ local function concatTables(...)
     return tab
 end
 
-describe("Loading a file with includes", function()
+describe2("Loading a file with includes", function(createTU)
     local fileName1 = "/tmp/ljclang_test_includes_simple.cpp"
     local fileName2 = "/tmp/ljclang_test_includes_enums.cpp"
 
@@ -297,36 +317,36 @@ describe("Loading a file with includes", function()
     local clangOpts = concatTables(clangOpts, additionalOpts)
 
     it("tests passing a single source file name", function()
-        local tu, errorCode = cl.createIndex():parse(fileName1, clangOpts)
+        local tu, errorCode = createTU(cl.createIndex(), fileName1, clangOpts)
         assertParseWasSuccess(tu, errorCode)
     end)
 
     it("tests passing multiple source file names (1)", function()
         local clangOpts = concatTables(clangOpts, {fileName1, fileName2})
-        local tu, errorCode = cl.createIndex():parse("", clangOpts)
+        local tu, errorCode = createTU(cl.createIndex(), "", clangOpts)
         assert.is_nil(tu)
         assert.are.equal(errorCode, cl.ErrorCode.ASTReadError)
     end)
 
     it("tests passing multiple source file names (2)", function()
         local clangOpts = concatTables(clangOpts, {fileName2})
-        local tu, errorCode = cl.createIndex():parse(fileName1, clangOpts)
+        local tu, errorCode = createTU(cl.createIndex(), fileName1, clangOpts)
         assert.is_nil(tu)
         assert.are.equal(errorCode, cl.ErrorCode.ASTReadError)
     end)
 end)
 
-local function GetTU(fileName, expectedDiagCount, opts)
-    local tu = cl.createIndex():parse(
-        fileName, (opts ~= nil) and opts or clangOpts)
+local function GetTU(createTU, fileName, expectedDiagCount, opts)
+    local tu = createTU(cl.createIndex(),
+                        fileName, (opts ~= nil) and opts or clangOpts)
     assert.is_not_nil(tu)
     local diags = tu:diagnosticSet()
     assert.are.equal(#diags, expectedDiagCount or 0)
     return tu
 end
 
-describe("Enumerations", function()
-    local tu = GetTU("test_data/enums.hpp")
+describe2("Enumerations", function(createTU)
+    local tu = GetTU(createTU, "test_data/enums.hpp")
     local tuCursor = tu:cursor()
 
     it("tests various queries on enumerations", function()
@@ -386,8 +406,8 @@ describe("Enumerations", function()
     end)
 end)
 
-describe("Virtual functions", function()
-    local tu = GetTU("test_data/virtual.hpp")
+describe2("Virtual functions", function(createTU)
+    local tu = GetTU(createTU, "test_data/virtual.hpp")
     local tuCursor = tu:cursor()
 
     local classDefs = tuCursor:children()
@@ -465,10 +485,10 @@ describe("Virtual functions", function()
     end)
 end)
 
-describe("Cross-referencing", function()
-    local tuDef = GetTU("test_data/enums.hpp")  -- contains definition of enum BigNumbers
-    local tuDecl = GetTU("test_data/simple.hpp", 1)  -- a declaration
-    local tuMisDecl = GetTU("test_data/virtual.hpp")  -- a mis-declaration (wrong underlying type)
+describe2("Cross-referencing", function(createTU)
+    local tuDef = GetTU(createTU, "test_data/enums.hpp")  -- contains definition of enum BigNumbers
+    local tuDecl = GetTU(createTU, "test_data/simple.hpp", 1)  -- a declaration
+    local tuMisDecl = GetTU(createTU, "test_data/virtual.hpp")  -- a mis-declaration (wrong underlying type)
 
     local USRs = {}
     local declCursors, defCursors = {}, {}
@@ -496,8 +516,8 @@ describe("Cross-referencing", function()
     end)
 end)
 
-describe("Mangling", function()
-    local tu = GetTU("dev/empty.cpp", 0,
+describe2("Mangling", function(createTU)
+    local tu = GetTU(createTU, "dev/empty.cpp", 0,
                      {"-std=c++11", "-include", "thread",
                       "-isystem", llvm_libdir_include},
                      {"Incomplete", "SkipFunctionBodies"})
