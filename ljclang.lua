@@ -6,6 +6,7 @@
 
 local assert = assert
 local error = error
+local pairs = pairs
 local require = require
 local select = select
 local setmetatable = setmetatable
@@ -146,7 +147,9 @@ local function PrepareParse(srcfile, args, opts)
 end
 
 local function FinishParse(tuAr, errorCode, parent)
-    assert((tuAr[0] ~= nil) == (errorCode == 'CXError_Success'))
+    -- NOTE: 0 is 'CXError_Success', but we cannot write that because 'errorCode' may be a
+    --  CXErrorCode or an int.
+    assert((tuAr[0] ~= nil) == (tonumber(errorCode) == 0))
 
     if (tuAr[0] == nil) then
         return nil, errorCode
@@ -159,6 +162,28 @@ end
 -------------------------------------------------------------------------
 ------------------------------ IndexSession -----------------------------
 -------------------------------------------------------------------------
+
+function api.IndexerCallbacks(tab)
+    check(type(tab) == "table", "argument must be a table", 2)
+
+    local callbacks = ffi.new("IndexerCallbacks")
+    local isEmpty = true
+
+    for funcName, func in pairs(tab) do
+        check(type(funcName) == "string", "argument table must contain string keys", 2)
+        check(type(func) == "function", "argument table must contain function values", 2)
+
+        -- NOTE: permanently anchors FFI callback.
+        callbacks[funcName] = func
+        isEmpty = false
+    end
+
+    return isEmpty and callbacks or ffi.gc(callbacks, function(_)
+        -- Force lifetime to the end of the program to prevent discarding of a temporary.
+        -- (After freeing of the cdata, the anchored FFI callbacks would get leaked).
+        error("Indexer callbacks are not supposed to be garbage-collected")
+    end)
+end
 
 local IndexSession = class
 {
@@ -180,12 +205,13 @@ local IndexSession = class
         local indexOpts = util.checkOptionsArgAndGetDefault(opts, C.CXIndexOpt_None)
         indexOpts = util.handleTableOfOptionStrings(clang, "CXIndexOpt_", indexOpts)
 
+        check(ffi.istype("IndexerCallbacks", callbacks),
+              "<callback> must be a an object obtained with IndexerCallbacks()", 2)
+
         local errorCode = clang.clang_indexSourceFile(
             self._idxact,
             nil, -- CXClientData client_data,
-            -- TODO:
-            nil, -- IndexerCallbacks *index_callbacks,
-            0, -- unsigned index_callbacks_size,
+            callbacks, ffi.sizeof(callbacks),
             indexOpts,
             srcfile,
             argsptrs, #args,
