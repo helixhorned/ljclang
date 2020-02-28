@@ -457,9 +457,10 @@ describe2("Virtual functions", function(createTU)
         for _, defCursor in ipairs(classDefs) do
             assert.is_true(defCursor:isDefinition())
         end
-        for _, declCursor in ipairs({Ir, Br, Dr, Fr}) do
+        for _, declCursor in ipairs({Ir, Br, Dr}) do
             assert.is_false(declCursor:isDefinition())
         end
+        assert.is_true(Fr:isDefinition())
     end)
 
     -- NOTE: this thematically belongs to test case "Cross-referencing",
@@ -631,8 +632,8 @@ describe("Indexer callbacks", function()
 
                 local cur = declInfo.cursor
                 assert.is_false(declInfo.isRedeclaration)
-                assert.is_equal(cur:haskind("ClassDecl"), declInfo.isDefinition)
-                assert.is_equal(cur:haskind("ClassDecl"), declInfo.isContainer)
+                assert.is_true(not cur:haskind("ClassDecl") or declInfo.isDefinition)
+                assert.is_true(not cur:haskind("ClassDecl") or declInfo.isContainer)
                 assert.is_false(declInfo.isImplicit)
 
                 local cCur = declInfo.lexicalContainer.cursor
@@ -642,6 +643,10 @@ describe("Indexer callbacks", function()
                 local entInfo = declInfo.entityInfo
                 assert.is_equal(entInfo.cursor, cur)
                 assert.is_equal(entInfo.templateKind, 'CXIdxEntity_NonTemplate')
+                assert.is_equal(cCur:name() == "Final", entInfo.attributes:has('CXXFinalAttr'))
+
+                assert.is_equal(#declInfo.attributes, declInfo.numAttributes)
+                assert.is_equal(#entInfo.attributes, declInfo.numAttributes)
 
                 local isCXXEntity = (entInfo.name ~= "BigNumbers")
                 assert.is_equal(entInfo.lang,

@@ -159,7 +159,7 @@ local function FinishParse(tuAr, errorCode, parent)
     return TranslationUnit_t(tuAr[0], parent, true), errorCode
 end
 
-local function WrappedArrayType(elementCType, elementWrapFunc)
+local function WrappedArrayType(elementCType, elementWrapFunc, methods)
     return class{
         ffi.typeof("struct { const $ *_ptr; double _length; }", elementCType),
 
@@ -168,6 +168,10 @@ local function WrappedArrayType(elementCType, elementWrapFunc)
         end,
 
         __index = function(self, i)
+            if (methods ~= nil and type(i) == "string") then
+                return methods[i]
+            end
+
             check(type(i) == "number", "<i> must be a number", 2)
             check(i >= 1 and i <= self._length, "<i> must be in [1, #self]", 2)
 
@@ -187,7 +191,30 @@ local CXTypes = {
     IdxLoc = { ffi.typeof("CXIdxLoc"), function() error("CXIdxLoc not yet supported") end },
 }
 
-local CXIdxAttrInfoPtrPtr = ffi.typeof("const CXIdxAttrInfo *const *")
+local CXIdxObjectWrapper  -- class "forward-reference"
+
+local CXIdxAttrInfoPtr = ffi.typeof("const CXIdxAttrInfo *")
+local CXIdxAttrInfoPtrPtr = ffi.typeof("$ const *", CXIdxAttrInfoPtr)
+
+local WrappedAttrInfoArray = WrappedArrayType(CXIdxAttrInfoPtr, function(cxIdxAttrInfoPtr)
+    return CXIdxObjectWrapper(cxIdxAttrInfoPtr)
+end, {
+    has = function(self, attrKind)
+        check(type(attrKind) == "string", "attribute #2 must be a string", 2)
+
+        local attr = C['CXCursor_'..attrKind]
+
+        for i = 1, #self do
+            local kindNum = self[i].cursor:kindnum()
+            assert(kindNum >= 'CXCursor_FirstAttr' and kindNum <= 'CXCursor_LastAttr')
+            if (kindNum == attr) then
+                return true
+            end
+        end
+
+        return false
+    end,
+})
 
 local CXIdxPtrTypes = {
     ContainerInfo = ffi.typeof("const CXIdxContainerInfo *"),
@@ -202,8 +229,6 @@ local function checkCXIdxObject(expectedCType, cxIdxObjPtr)
     assert(ffi.istype(expectedCType, cxIdxObjPtr))
     assert(cxIdxObjPtr ~= nil)
 end
-
-local CXIdxObjectWrapper
 
 CXIdxObjectWrapper = class
 {
@@ -250,8 +275,8 @@ CXIdxObjectWrapper = class
         if (ffi.istype(const_char_ptr_t, value)) then
             return (value ~= nil) and ffi.string(value) or nil
         elseif (ffi.istype(CXIdxAttrInfoPtrPtr, value)) then
-            -- TODO:
-            error("CXIdxAttrInfo not yet supported", 2)
+            assert(key == "attributes")
+            return WrappedAttrInfoArray(value, self._obj.numAttributes)
         end
 
         -- TODO: functions like clang_index_getCXXClassDeclInfo().
@@ -1194,7 +1219,7 @@ class
     end,
 
     -- Returns an enumeration constant, which in LuaJIT can be compared
-    -- against a *string*, too.
+    -- against a *string*, too. Even using arithmetic relational operators.
     kindnum = function(self)
         return clang.clang_getCursorKind(self._cur)
     end,
