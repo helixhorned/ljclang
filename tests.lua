@@ -55,6 +55,15 @@ end
 
 local clangOpts = { "-std=c++14", "-Wall", "-pedantic" }
 
+local function GetTU(createTU, fileName, expectedDiagCount, opts)
+    local tu = createTU(cl.createIndex(),
+                        fileName, (opts ~= nil) and opts or clangOpts)
+    assert.is_not_nil(tu)
+    local diags = tu:diagnosticSet()
+    assert.are.equal(#diags, expectedDiagCount or 0)
+    return tu
+end
+
 describe2("Attempting to parse a nonexistent file", function(createTU)
     local index = cl.createIndex()
     local tu, errorCode = createTU(index, nonExistentFileName, { "-std=c99" })
@@ -338,15 +347,6 @@ describe2("Loading a file with includes", function(createTU)
         assert.are.equal(errorCode, expectedError)
     end)
 end)
-
-local function GetTU(createTU, fileName, expectedDiagCount, opts)
-    local tu = createTU(cl.createIndex(),
-                        fileName, (opts ~= nil) and opts or clangOpts)
-    assert.is_not_nil(tu)
-    local diags = tu:diagnosticSet()
-    assert.are.equal(#diags, expectedDiagCount or 0)
-    return tu
-end
 
 describe2("Enumerations", function(createTU)
     local tu = GetTU(createTU, "test_data/enums.hpp")
