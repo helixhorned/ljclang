@@ -159,6 +159,23 @@ local function FinishParse(tuAr, errorCode, parent)
     return TranslationUnit_t(tuAr[0], parent, true), errorCode
 end
 
+local function WrappedArrayType(elementCType, elementWrapFunc)
+    return class{
+        ffi.typeof("struct { const $ *_ptr; double _length; }", elementCType),
+
+        __len = function(self)
+            return self._length
+        end,
+
+        __index = function(self, i)
+            check(type(i) == "number", "<i> must be a number", 2)
+            check(i >= 1 and i <= self._length, "<i> must be in [1, #self]", 2)
+
+            return elementWrapFunc(self._ptr[i - 1])
+        end,
+    }
+end
+
 -------------------------------------------------------------------------
 ------------------------------ IndexSession -----------------------------
 -------------------------------------------------------------------------
@@ -418,6 +435,7 @@ local Index = class
 
 local CXFile = ffi.typeof("CXFile")
 local SingleCXFileArray = ffi.typeof("CXFile [1]")
+local CXSourceLocation = ffi.typeof("CXSourceLocation")
 
 local LineCol = ffi.metatype([[
 union {
@@ -466,7 +484,7 @@ local SL = {
 local SourceLocation = class
 {
     function(cxloc, parent)
-        assert(ffi.istype("CXSourceLocation", cxloc))
+        assert(ffi.istype(CXSourceLocation, cxloc))
 
         -- type(parent) can be: TODO?, TranslationUnit_t
         assert(type(parent) == "table")
@@ -727,24 +745,11 @@ local function getFile(tu, filename)
     return clang.clang_getFile(tu, filename)
 end
 
--- TODO: generalize with pointed-to type and pointer wrapping map function?
-local WrappedSourceLocArray = class
-{
-    "CXSourceLocation *_ptr; double _length;",
-
-    __len = function(self)
-        return self._length
-    end,
-
-    __index = function(self, i)
-        check(type(i) == "number", "<i> must be a number", 2)
-        check(i >= 1 and i <= self._length, "<i> must be in [1, #self]", 2)
-
-        -- NOTE/XXX: passing dummy parent as anchor. This is sort of OK in the specific
-        -- usage context.
-        return SourceLocation(self._ptr[i - 1], {})
-    end,
-}
+local WrappedSourceLocArray = WrappedArrayType(CXSourceLocation, function(cxsrcloc)
+    -- NOTE/XXX: passing dummy parent as anchor. This is sort of OK in the specific
+    -- usage context.
+    return SourceLocation(cxsrcloc, {})
+end)
 
 TranslationUnit_t = class
 {
