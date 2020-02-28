@@ -549,3 +549,100 @@ describe2("Mangling", function(createTU)
 
     assert.is_true(type(func) == "cdata")
 end)
+
+local function makeIndexerCallbacks(tab)
+    tab._noGcCheck = true
+    local callbacks = cl.IndexerCallbacks(tab)
+    -- Exercise behavior mentioned in LUA_FUNC_INTO_CDATA_FPTR.
+    -- (Seen if _noGcCheck above were not present.)
+    collectgarbage()
+    return callbacks
+end
+
+describe("Indexer callbacks", function()
+    -- TODO: test indexing multiple source files with the within one session.
+
+    local FileName = "test_data/virtual.hpp"
+
+    local runIndexing = function(callbacks)
+        local createTU = function(index, ...)
+            return index:createSession():indexSourceFile(callbacks, nil, ...)
+        end
+
+        GetTU(createTU, FileName)
+    end
+
+    for runIdx = 1, 2 do
+        local infixStr = (runIdx == 1 and "out" or "")
+
+        it("tests indexing with"..infixStr.." aborting", function()
+            local ExpectedCallCount = 21
+            local CallCountToAbortAt = 7
+
+            local callCount = 0
+
+            runIndexing(makeIndexerCallbacks{
+                abortQuery = function()
+                    callCount = callCount + 1
+                    -- NOTE: an abort request may not be honored immediately,
+                    --  hence '>='.
+                    return runIdx == 2 and (callCount >= CallCountToAbortAt)
+                end
+            })
+
+            local _ = (runIdx == 1) and
+                assert.is_equal(callCount, ExpectedCallCount) or
+                assert.is_true(callCount < ExpectedCallCount)
+        end)
+    end
+
+    it("tests indexing with declaration and entity reference callbacks", function()
+        local callCounts = {
+            decl = 0,
+            ref = 0,
+        }
+
+        runIndexing(makeIndexerCallbacks{
+            indexDeclaration = function(declInfo)
+                callCounts.decl = callCounts.decl + 1
+
+                assert.is_number(declInfo.numAttributes)
+
+                assert.is_boolean(declInfo.isRedeclaration)
+                assert.is_boolean(declInfo.isDefinition)
+                assert.is_boolean(declInfo.isContainer)
+                assert.is_boolean(declInfo.isImplicit)
+
+                local cur = declInfo.cursor
+                assert.is_false(declInfo.isRedeclaration)
+                assert.is_equal(cur:haskind("ClassDecl"), declInfo.isDefinition)
+                assert.is_equal(cur:haskind("ClassDecl"), declInfo.isContainer)
+                assert.is_false(declInfo.isImplicit)
+
+                local cCur = declInfo.lexicalContainer.cursor
+                assert.is_true(cCur:kind() == "TranslationUnit" or
+                               cCur:kind() == "ClassDecl")
+
+                local entInfo = declInfo.entityInfo
+                assert.is_equal(entInfo.cursor, cur)
+                assert.is_equal(entInfo.templateKind, 'CXIdxEntity_NonTemplate')
+
+                local isCXXEntity = (entInfo.name ~= "BigNumbers")
+                assert.is_equal(entInfo.lang,
+                                isCXXEntity and 'CXIdxEntityLang_CXX' or 'CXIdxEntityLang_C')
+            end,
+
+            indexEntityReference = function(entRefInfo)
+                callCounts.ref = callCounts.ref + 1
+
+                assert.is_equal(entRefInfo.role, 'CXSymbolRole_Reference')
+
+                local entInfo = entRefInfo.referencedEntity
+                assert.is_equal(entInfo.kind, 'CXIdxEntity_CXXClass')
+            end,
+        })
+
+        assert.is_equal(callCounts.decl, 13)
+        assert.is_equal(callCounts.ref, 3)
+    end)
+end)

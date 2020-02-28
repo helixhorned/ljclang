@@ -163,22 +163,151 @@ end
 ------------------------------ IndexSession -----------------------------
 -------------------------------------------------------------------------
 
+local CXTypes = {
+    Cursor = { ffi.typeof("CXCursor"), Cursor_t },
+
+    -- TODO:
+    IdxLoc = { ffi.typeof("CXIdxLoc"), function() error("CXIdxLoc not yet supported") end },
+}
+
+local CXIdxAttrInfoPtrPtr = ffi.typeof("const CXIdxAttrInfo *const *")
+
+local CXIdxPtrTypes = {
+    ContainerInfo = ffi.typeof("const CXIdxContainerInfo *"),
+    DeclInfo = ffi.typeof("const CXIdxDeclInfo *"),
+    EntityInfo = ffi.typeof("const CXIdxEntityInfo *"),
+    EntityRefInfo = ffi.typeof("const CXIdxEntityRefInfo *"),
+}
+
+local const_char_ptr_t = ffi.typeof("const char *")
+
+local function checkCXIdxObject(expectedCType, cxIdxObjPtr)
+    assert(ffi.istype(expectedCType, cxIdxObjPtr))
+    assert(cxIdxObjPtr ~= nil)
+end
+
+local CXIdxObjectWrapper
+
+CXIdxObjectWrapper = class
+{
+    function(cxIdxObjPtr)
+        assert(cxIdxObjPtr ~= nil)
+
+        return {
+            _obj = cxIdxObjPtr[0],
+        }
+    end,
+
+    __index = function(self, key)
+        check(type(key) == "string", "key must be a string", 2)
+
+        local value = self._obj[key]
+
+        -- CAUTION: make sure that this wrapping covers all cases of the types in the
+        --  'CX*Types' tables above as well as types reachable from them.
+
+        if (key:sub(1,2) == "is") then
+            -- 'int' on the C side -> boolean
+            return (value ~= 0)
+        elseif (type(value) == "number") then
+            return value
+        end
+
+        -- Try members of struct type.
+        for _, typeDescTab in pairs(CXTypes) do
+            if (ffi.istype(typeDescTab[1], value)) then
+                local ourType = typeDescTab[2]
+                return ourType(value)
+            end
+        end
+
+        -- Try members of type "pointer to const CXIdx<Thing>".
+        for _, ctype in pairs(CXIdxPtrTypes) do
+            if (ffi.istype(ctype, value)) then
+                -- NOTE: potentially recurse!
+                return (value ~= nil) and CXIdxObjectWrapper(value) or nil
+            end
+        end
+
+        -- Try types with special handling.
+        if (ffi.istype(const_char_ptr_t, value)) then
+            return (value ~= nil) and ffi.string(value) or nil
+        elseif (ffi.istype(CXIdxAttrInfoPtrPtr, value)) then
+            -- TODO:
+            error("CXIdxAttrInfo not yet supported", 2)
+        end
+
+        -- TODO: functions like clang_index_getCXXClassDeclInfo().
+
+        -- Expect an enum value.
+        assert(type(value) == "cdata")
+        assert(tostring(value):sub(1, 11) == "cdata<enum ")
+        return value
+    end
+}
+
+local function WrapIndexerCallback(funcName, userCallback)
+    assert(type(funcName) == "string")
+    assert(type(userCallback) == "function")
+
+    local wrappers = {
+        abortQuery = function(_, _)
+            local shouldAbort = userCallback()
+            check(type(shouldAbort) == "boolean", "return value must be boolean", 2)
+            return (shouldAbort and 1 or 0)
+        end,
+
+        -- NOTE: callback 'diagnostic' not exposed.
+        -- TODO: callbacks returning 'CXIdxClient<Thing>'
+
+        indexDeclaration = function(_, cxIdxDeclInfo)
+            checkCXIdxObject(CXIdxPtrTypes.DeclInfo, cxIdxDeclInfo)
+            userCallback(CXIdxObjectWrapper(cxIdxDeclInfo))
+            return nil
+        end,
+
+        indexEntityReference = function(_, cxIdxEntityRefInfo)
+            checkCXIdxObject(CXIdxPtrTypes.EntityRefInfo, cxIdxEntityRefInfo)
+            userCallback(CXIdxObjectWrapper(cxIdxEntityRefInfo))
+            return nil
+        end,
+    }
+
+    local wrapper = wrappers[funcName]
+    check(wrapper ~= nil,
+          "unknown or unsupported indexer callback '"..funcName.."'", 3)
+    return wrapper
+end
+
+local allIndexerCallbackFuncs = {}
+
 function api.IndexerCallbacks(tab)
     check(type(tab) == "table", "argument must be a table", 2)
 
     local callbacks = ffi.new("IndexerCallbacks")
+    local noGcCheck = false
     local isEmpty = true
 
     for funcName, func in pairs(tab) do
         check(type(funcName) == "string", "argument table must contain string keys", 2)
-        check(type(func) == "function", "argument table must contain function values", 2)
 
-        -- NOTE: permanently anchors FFI callback.
-        callbacks[funcName] = func
-        isEmpty = false
+        if (funcName == "diagnostic") then
+            -- do nothing
+        elseif (funcName == "_noGcCheck") then
+            noGcCheck = true
+        else
+            check(type(func) == "function", "argument table must contain function values", 2)
+            -- TODO [LUA_FUNC_INTO_CDATA_FPTR]: without anchoring the Lua function here, the
+            --  returned 'IndexerCallbacks' cdata value *does* get GC-collected! Why?
+            allIndexerCallbackFuncs[#allIndexerCallbackFuncs + 1] = func
+            -- NOTE: permanently anchors FFI callback.
+            --  However, uncertain about exact intended LuaJIT behavior, see TODO above.
+            callbacks[funcName] = WrapIndexerCallback(funcName, func)
+            isEmpty = false
+        end
     end
 
-    return isEmpty and callbacks or ffi.gc(callbacks, function(_)
+    return (isEmpty or noGcCheck) and callbacks or ffi.gc(callbacks, function(_)
         -- Force lifetime to the end of the program to prevent discarding of a temporary.
         -- (After freeing of the cdata, the anchored FFI callbacks would get leaked).
         error("Indexer callbacks are not supposed to be garbage-collected")
