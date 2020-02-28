@@ -328,6 +328,22 @@ describe2("Loading a file with includes", function(createTU)
     it("tests passing a single source file name", function()
         local tu, errorCode = createTU(cl.createIndex(), fileName1, clangOpts)
         assertParseWasSuccess(tu, errorCode)
+
+        local callCount = 0
+
+        local incs = tu:inclusions(function(includedFile, stack)
+            callCount = callCount + 1
+
+            assert.is_false(includedFile:isSystemHeader())
+            assert.is_equal(#stack, callCount - 1)
+
+            if (#stack > 0) then
+                assert.is_false(stack[1]:isInSystemHeader())
+                assert.is_true(stack[1]:isFromMainFile())
+            end
+        end)
+
+        assert.is_equal(callCount, 2)
     end)
 
     local expectedError = (createTU == CreateTUFuncs[1]) and
