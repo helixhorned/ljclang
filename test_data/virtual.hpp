@@ -1,6 +1,7 @@
 
 class Interface
 {
+public:
     virtual int getIt() = 0;
     virtual void setIt(int) = 0;
 };
@@ -25,3 +26,9 @@ class Final : public Derived
 
 // Mis-declaration of the enum from enums.hpp to test USRs. (Wrong underlying type.)
 enum BigNumbers : int;
+
+namespace LJClangTest {
+inline int GetIt(Interface &interface) {
+    return interface.getIt();
+}
+}

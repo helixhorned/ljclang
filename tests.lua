@@ -19,6 +19,7 @@ local tostring = tostring
 local unpack = unpack
 
 local ffi = require("ffi")
+local C = ffi.C
 
 local io = require("io")
 local math = require("math")
@@ -430,18 +431,19 @@ describe2("Virtual functions", function(createTU)
     local tuCursor = tu:cursor()
 
     local classDefs = tuCursor:children()
-    assert.is.equal(#classDefs, 5)
+    assert.is.equal(#classDefs, 6)
     classDefs[5] = nil  -- EnumDecl for another test case
+    classDefs[6] = nil  -- namespace
 
     local I, B, D, F = unpack(classDefs)
     local Ic, Bc, Dc, Fc = I:children(), B:children(), D:children(), F:children()
 
     it("tests the number of children of each class definition", function()
-        assert.are.same({#Ic, #Bc, #Dc, #Fc}, {2, 3, 3, 3})
+        assert.are.same({#Ic, #Bc, #Dc, #Fc}, {3, 3, 3, 3})
     end)
 
     -- Obtain the cursors for our reference function "getIt()".
-    local Ir, Br, Dr, Fr = Ic[1], Bc[#Bc], Dc[#Dc], Fc[2]
+    local Ir, Br, Dr, Fr = Ic[2], Bc[#Bc], Dc[#Dc], Fc[2]
 
     it("tests that the cursors refer to functions with identical signature", function()
         assert.are.same({Ir:kind(), Br:kind(), Dr:kind(), Fr:kind()},
@@ -593,7 +595,7 @@ describe("Indexer callbacks", function()
         local infixStr = (runIdx == 1 and "out" or "")
 
         it("tests indexing with"..infixStr.." aborting", function()
-            local ExpectedCallCount = 21
+            local ExpectedCallCount = 26
             local CallCountToAbortAt = 7
 
             local callCount = 0
@@ -617,6 +619,7 @@ describe("Indexer callbacks", function()
         local callCounts = {
             decl = 0,
             ref = 0,
+            methodRef = 0,
         }
 
         runIndexing(makeIndexerCallbacks{
@@ -637,8 +640,10 @@ describe("Indexer callbacks", function()
                 assert.is_false(declInfo.isImplicit)
 
                 local cCur = declInfo.lexicalContainer.cursor
-                assert.is_true(cCur:kind() == "TranslationUnit" or
-                               cCur:kind() == "ClassDecl")
+                assert.is_true(
+                    cCur:kind() == "Namespace" or
+                    cCur:kind() == "TranslationUnit" or
+                    cCur:kind() == "ClassDecl")
 
                 local entInfo = declInfo.entityInfo
                 assert.is_equal(entInfo.cursor, cur)
@@ -648,7 +653,8 @@ describe("Indexer callbacks", function()
                 assert.is_equal(#declInfo.attributes, declInfo.numAttributes)
                 assert.is_equal(#entInfo.attributes, declInfo.numAttributes)
 
-                local isCXXEntity = (entInfo.name ~= "BigNumbers")
+                local isCXXEntity = (entInfo.name ~= "BigNumbers" and
+                                     entInfo.name ~= "GetIt")  -- TODO: why?
                 assert.is_equal(entInfo.lang,
                                 isCXXEntity and 'CXIdxEntityLang_CXX' or 'CXIdxEntityLang_C')
             end,
@@ -656,14 +662,27 @@ describe("Indexer callbacks", function()
             indexEntityReference = function(entRefInfo)
                 callCounts.ref = callCounts.ref + 1
 
-                assert.is_equal(entRefInfo.role, 'CXSymbolRole_Reference')
-
                 local entInfo = entRefInfo.referencedEntity
-                assert.is_equal(entInfo.kind, 'CXIdxEntity_CXXClass')
+                local isMethod = entInfo.cursor:haskind("CXXMethod")
+
+                if (not isMethod) then
+                    assert.is_equal(entRefInfo.role, 'CXSymbolRole_Reference')
+                    assert.is_equal(entInfo.kind, 'CXIdxEntity_CXXClass')
+                else
+                    callCounts.methodRef = callCounts.methodRef + 1
+
+                    assert.is_equal(entRefInfo.role,
+                                    -- TODO: better API
+                                    C['CXSymbolRole_Reference'] +
+                                    C['CXSymbolRole_Call'] +
+                                    C['CXSymbolRole_Dynamic'])
+                    assert.is_equal(entInfo.kind, 'CXIdxEntity_CXXInstanceMethod')
+                end
             end,
         })
 
-        assert.is_equal(callCounts.decl, 13)
-        assert.is_equal(callCounts.ref, 3)
+        assert.is_equal(callCounts.decl, 15)
+        assert.is_equal(callCounts.ref, 5)
+        assert.is_equal(callCounts.methodRef, 1)
     end)
 end)
