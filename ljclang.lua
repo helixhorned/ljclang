@@ -192,7 +192,7 @@ local SourceLocation  -- class "forward-reference"
 local File
 
 local CXTypes = {
-    Cursor = {
+    {
         ffi.typeof("CXCursor"),
         function (cxcur, parent)
             -- CAUTION: 'parent' lost.
@@ -200,7 +200,7 @@ local CXTypes = {
         end
     },
 
-    VoidPtr = {
+    {
         -- TODO?
         ffi.typeof("void *"),  -- CXFile, CXModule
         function (voidPtr, _)
@@ -208,7 +208,7 @@ local CXTypes = {
         end
     },
 
-    IdxLoc = {
+    {
         ffi.typeof("CXIdxLoc"),
         function(cxidxloc, parent)
             local cxsrcloc = clang.clang_indexLoc_getCXSourceLocation(cxidxloc)
@@ -284,7 +284,8 @@ CXIdxObjectWrapper = class
         end
 
         -- Try members of struct type.
-        for _, typeDescTab in pairs(CXTypes) do
+        for i = 1, #CXTypes do
+            local typeDescTab = CXTypes[i]
             if (ffi.istype(typeDescTab[1], value)) then
                 local ourType = typeDescTab[2]
                 return ourType(value, self)
