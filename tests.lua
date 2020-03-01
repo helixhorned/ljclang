@@ -615,6 +615,7 @@ describe("Indexer callbacks", function()
 
     it("tests indexing with inclusion-related callbacks", function()
         local callCounts = {
+            tuStart = 0,
             fileInclude = 0,
         }
 
@@ -624,6 +625,12 @@ describe("Indexer callbacks", function()
 #include "enums.hpp"
 ]])
         local callbacks = makeIndexerCallbacks{
+            startedTranslationUnit = function()
+                callCounts.tuStart = callCounts.tuStart + 1
+
+                assert.is_equal(callCounts.fileInclude, 0)
+            end,
+
             ppIncludedFile = function(incFileInfo)
                 callCounts.fileInclude = callCounts.fileInclude + 1
 
@@ -639,6 +646,7 @@ describe("Indexer callbacks", function()
         local additionalOpts = {"-Itest_data/"}
         runIndexing(FileName, callbacks, 1, concatTables(clangOpts, additionalOpts))
 
+        assert.is_equal(callCounts.tuStart, 2)  -- TODO: why? Expectation is 1.
         assert.is_equal(callCounts.fileInclude, 2)
     end)
 

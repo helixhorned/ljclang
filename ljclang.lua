@@ -335,6 +335,11 @@ local function WrapIndexerCallback(funcName, userCallback)
             return nil
         end,
 
+        startedTranslationUnit = function(_, _)
+            userCallback()
+            return nil
+        end,
+
         indexDeclaration = function(_, cxIdxDeclInfo)
             checkCXIdxObject(CXIdxPtrTypes.DeclInfo, cxIdxDeclInfo)
             userCallback(CXIdxObjectWrapper(cxIdxDeclInfo))
