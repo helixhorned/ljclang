@@ -581,14 +581,12 @@ end
 describe("Indexer callbacks", function()
     -- TODO: test indexing multiple source files with the within one session.
 
-    local FileName = "test_data/virtual.hpp"
-
-    local runIndexing = function(callbacks)
+    local runIndexing = function(fileName, callbacks, ...)
         local createTU = function(index, ...)
             return index:createSession():indexSourceFile(callbacks, nil, ...)
         end
 
-        GetTU(createTU, FileName)
+        GetTU(createTU, fileName, ...)
     end
 
     for runIdx = 1, 2 do
@@ -600,7 +598,7 @@ describe("Indexer callbacks", function()
 
             local callCount = 0
 
-            runIndexing(makeIndexerCallbacks{
+            runIndexing("test_data/virtual.hpp", makeIndexerCallbacks{
                 abortQuery = function()
                     callCount = callCount + 1
                     -- NOTE: an abort request may not be honored immediately,
@@ -615,6 +613,35 @@ describe("Indexer callbacks", function()
         end)
     end
 
+    it("tests indexing with inclusion-related callbacks", function()
+        local callCounts = {
+            fileInclude = 0,
+        }
+
+        local FileName = "/tmp/ljclang_test_includes.cpp"
+        writeToFile(FileName, [[
+#include "virtual.hpp"
+#include "enums.hpp"
+]])
+        local callbacks = makeIndexerCallbacks{
+            ppIncludedFile = function(incFileInfo)
+                callCounts.fileInclude = callCounts.fileInclude + 1
+
+                assert.is_false(incFileInfo.isImport)
+                local _, hashLco = incFileInfo.hashLoc:fileSite()
+                assert.is_equal(hashLco.line, callCounts.fileInclude)
+                assert.is_equal(incFileInfo.filename:sub(-4), ".hpp")
+            end,
+
+            -- TODO: importedASTFile
+        }
+
+        local additionalOpts = {"-Itest_data/"}
+        runIndexing(FileName, callbacks, 1, concatTables(clangOpts, additionalOpts))
+
+        assert.is_equal(callCounts.fileInclude, 2)
+    end)
+
     it("tests indexing with declaration and entity reference callbacks", function()
         local callCounts = {
             decl = 0,
@@ -623,7 +650,9 @@ describe("Indexer callbacks", function()
             mainFileEnter = 0,
         }
 
-        runIndexing(makeIndexerCallbacks{
+        local FileName = "test_data/virtual.hpp"
+
+        runIndexing(FileName, makeIndexerCallbacks{
             enteredMainFile = function(mainFile)
                 assert.is_equal(mainFile:name(), FileName)
                 callCounts.mainFileEnter = callCounts.mainFileEnter + 1

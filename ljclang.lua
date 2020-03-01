@@ -239,6 +239,7 @@ local CXIdxPtrTypes = {
     DeclInfo = ffi.typeof("const CXIdxDeclInfo *"),
     EntityInfo = ffi.typeof("const CXIdxEntityInfo *"),
     EntityRefInfo = ffi.typeof("const CXIdxEntityRefInfo *"),
+    IncludedFileInfo = ffi.typeof("const CXIdxIncludedFileInfo *"),
 }
 
 local const_char_ptr_t = ffi.typeof("const char *")
@@ -325,6 +326,12 @@ local function WrapIndexerCallback(funcName, userCallback)
             assert(ffi.istype(CXFile, mainFile))
             -- NOTE: dummy parent.
             userCallback(File(mainFile, {}))
+            return nil
+        end,
+
+        ppIncludedFile = function(_, cxIdxIncFileInfo)
+            checkCXIdxObject(CXIdxPtrTypes.IncludedFileInfo, cxIdxIncFileInfo)
+            userCallback(CXIdxObjectWrapper(cxIdxIncFileInfo))
             return nil
         end,
 
