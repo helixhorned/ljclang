@@ -618,6 +618,7 @@ describe("Indexer callbacks", function()
         local callCounts = {
             astFileImport = 0,
             tuStart = 0,
+            mainFileEnter = 0,
             fileInclude = 0,
         }
 
@@ -641,6 +642,15 @@ describe("Indexer callbacks", function()
                 assert.is_equal(callCounts.fileInclude, 0)
             end,
 
+            enteredMainFile = function(mainFile)
+                callCounts.mainFileEnter = callCounts.mainFileEnter + 1
+
+                assert.is_equal(callCounts.astFileImport, 1)
+                assert.is_equal(callCounts.fileInclude, 0)
+
+                assert.is_equal(mainFile:name(), FileName)
+            end,
+
             ppIncludedFile = function(incFileInfo)
                 callCounts.fileInclude = callCounts.fileInclude + 1
 
@@ -659,6 +669,7 @@ describe("Indexer callbacks", function()
 
         assert.is_equal(callCounts.astFileImport, 1)
         assert.is_equal(callCounts.tuStart, 2)  -- TODO: why? Expectation is 1.
+        assert.is_equal(callCounts.mainFileEnter, 1)
         assert.is_equal(callCounts.fileInclude, 2)
     end)
 
@@ -667,17 +678,11 @@ describe("Indexer callbacks", function()
             decl = 0,
             ref = 0,
             methodRef = 0,
-            mainFileEnter = 0,
         }
 
         local FileName = "test_data/virtual.hpp"
 
         runIndexing(FileName, makeIndexerCallbacks{
-            enteredMainFile = function(mainFile)
-                assert.is_equal(mainFile:name(), FileName)
-                callCounts.mainFileEnter = callCounts.mainFileEnter + 1
-            end,
-
             indexDeclaration = function(declInfo)
                 callCounts.decl = callCounts.decl + 1
 
@@ -745,6 +750,5 @@ describe("Indexer callbacks", function()
         assert.is_equal(callCounts.decl, 15)
         assert.is_equal(callCounts.ref, 5)
         assert.is_equal(callCounts.methodRef, 1)
-        assert.is_equal(callCounts.mainFileEnter, 1)
     end)
 end)
