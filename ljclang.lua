@@ -184,11 +184,24 @@ end
 ------------------------------ IndexSession -----------------------------
 -------------------------------------------------------------------------
 
-local CXTypes = {
-    Cursor = { ffi.typeof("CXCursor"), Cursor_t },
+local SourceLocation  -- class "forward-reference"
 
-    -- TODO:
-    IdxLoc = { ffi.typeof("CXIdxLoc"), function() error("CXIdxLoc not yet supported") end },
+local CXTypes = {
+    Cursor = {
+        ffi.typeof("CXCursor"),
+        function (cxcur, parent)
+            -- CAUTION: 'parent' lost.
+            return Cursor_t(cxcur)
+        end
+    },
+
+    IdxLoc = {
+        ffi.typeof("CXIdxLoc"),
+        function(cxidxloc, parent)
+            local cxsrcloc = clang.clang_indexLoc_getCXSourceLocation(cxidxloc)
+            return SourceLocation(cxsrcloc, parent)
+        end
+    },
 }
 
 local CXIdxObjectWrapper  -- class "forward-reference"
@@ -259,7 +272,7 @@ CXIdxObjectWrapper = class
         for _, typeDescTab in pairs(CXTypes) do
             if (ffi.istype(typeDescTab[1], value)) then
                 local ourType = typeDescTab[2]
-                return ourType(value)
+                return ourType(value, self)
             end
         end
 
@@ -506,7 +519,7 @@ local SL = {
     end
 }
 
-local SourceLocation = class
+SourceLocation = class
 {
     function(cxloc, parent)
         assert(ffi.istype(CXSourceLocation, cxloc))
