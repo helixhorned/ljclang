@@ -200,6 +200,14 @@ local CXTypes = {
         end
     },
 
+    VoidPtr = {
+        -- TODO?
+        ffi.typeof("void *"),  -- CXFile, CXModule
+        function (voidPtr, _)
+            return (voidPtr ~= nil) and true or nil
+        end
+    },
+
     IdxLoc = {
         ffi.typeof("CXIdxLoc"),
         function(cxidxloc, parent)
@@ -239,6 +247,7 @@ local CXIdxPtrTypes = {
     DeclInfo = ffi.typeof("const CXIdxDeclInfo *"),
     EntityInfo = ffi.typeof("const CXIdxEntityInfo *"),
     EntityRefInfo = ffi.typeof("const CXIdxEntityRefInfo *"),
+    ImportedAstFileInfo = ffi.typeof("const CXIdxImportedASTFileInfo *"),
     IncludedFileInfo = ffi.typeof("const CXIdxIncludedFileInfo *"),
 }
 
@@ -332,6 +341,12 @@ local function WrapIndexerCallback(funcName, userCallback)
         ppIncludedFile = function(_, cxIdxIncFileInfo)
             checkCXIdxObject(CXIdxPtrTypes.IncludedFileInfo, cxIdxIncFileInfo)
             userCallback(CXIdxObjectWrapper(cxIdxIncFileInfo))
+            return nil
+        end,
+
+        importedASTFile = function(_, cxIdxImpASTFileInfo)
+            checkCXIdxObject(CXIdxPtrTypes.ImportedAstFileInfo, cxIdxImpASTFileInfo)
+            userCallback(CXIdxObjectWrapper(cxIdxImpASTFileInfo))
             return nil
         end,
 

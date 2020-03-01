@@ -77,9 +77,10 @@ local function assertParseWasSuccess(tu, errorCode)
     assert.are.equal(errorCode, cl.ErrorCode.Success)
 end
 
+local ASTFileName = "/tmp/ljclang_test_simple.hpp.ast"
+
 describe2("Loading a cpp file without includes", function(createTU)
     local fileName = "test_data/simple.hpp"
-    local astFileName = "/tmp/ljclang_test_simple.hpp.ast"
 
     local tu, errorCode = createTU(cl.createIndex(), fileName, clangOpts)
 
@@ -176,11 +177,11 @@ describe2("Loading a cpp file without includes", function(createTU)
         end)
 
         it("tests saving and loading it", function()
-            local saveError = tu:save(astFileName)
+            local saveError = tu:save(ASTFileName)
             assert.are.equal(saveError, cl.SaveError.None)
 
             local newIndex = cl.createIndex(true)
-            local loadedTU, status = newIndex:loadTranslationUnit(astFileName)
+            local loadedTU, status = newIndex:loadTranslationUnit(ASTFileName)
             assert.is_not_nil(loadedTU)
             assert.are.equal(status, cl.ErrorCode.Success)
         end)
@@ -615,6 +616,7 @@ describe("Indexer callbacks", function()
 
     it("tests indexing with inclusion-related callbacks", function()
         local callCounts = {
+            astFileImport = 0,
             tuStart = 0,
             fileInclude = 0,
         }
@@ -625,27 +627,37 @@ describe("Indexer callbacks", function()
 #include "enums.hpp"
 ]])
         local callbacks = makeIndexerCallbacks{
+            importedASTFile = function(impASTFileInfo)
+                callCounts.astFileImport = callCounts.astFileImport + 1
+
+                assert.is_not_nil(impASTFileInfo.file)
+                assert.is_nil(impASTFileInfo.module)
+            end,
+
             startedTranslationUnit = function()
                 callCounts.tuStart = callCounts.tuStart + 1
 
+                assert.is_equal(callCounts.astFileImport, 1)
                 assert.is_equal(callCounts.fileInclude, 0)
             end,
 
             ppIncludedFile = function(incFileInfo)
                 callCounts.fileInclude = callCounts.fileInclude + 1
 
+                assert.is_equal(callCounts.astFileImport, 1)
+
+                assert.is_not_nil(incFileInfo.file)
                 assert.is_false(incFileInfo.isImport)
                 local _, hashLco = incFileInfo.hashLoc:fileSite()
                 assert.is_equal(hashLco.line, callCounts.fileInclude)
                 assert.is_equal(incFileInfo.filename:sub(-4), ".hpp")
             end,
-
-            -- TODO: importedASTFile
         }
 
-        local additionalOpts = {"-Itest_data/"}
-        runIndexing(FileName, callbacks, 1, concatTables(clangOpts, additionalOpts))
+        local additionalOpts = {"-Itest_data/", "-include-pch", ASTFileName}
+        runIndexing(FileName, callbacks, 2, concatTables(clangOpts, additionalOpts))
 
+        assert.is_equal(callCounts.astFileImport, 1)
         assert.is_equal(callCounts.tuStart, 2)  -- TODO: why? Expectation is 1.
         assert.is_equal(callCounts.fileInclude, 2)
     end)
