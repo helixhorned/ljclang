@@ -184,7 +184,12 @@ end
 ------------------------------ IndexSession -----------------------------
 -------------------------------------------------------------------------
 
+local CXFile = ffi.typeof("CXFile")
+local SingleCXFileArray = ffi.typeof("CXFile [1]")
 local SourceLocation  -- class "forward-reference"
+
+-- File and SourceLocation are circularly referential. "Forward-declare" the former.
+local File
 
 local CXTypes = {
     Cursor = {
@@ -313,7 +318,15 @@ local function WrapIndexerCallback(funcName, userCallback)
         end,
 
         -- NOTE: callback 'diagnostic' not exposed.
-        -- TODO: callbacks returning 'CXIdxClient<Thing>'
+        -- TODO: in callbacks returning 'CXIdxClient<Thing>', allow returning client value
+        --  and attach it to Lua objects somehow?
+
+        enteredMainFile = function(_, mainFile, _)
+            assert(ffi.istype(CXFile, mainFile))
+            -- NOTE: dummy parent.
+            userCallback(File(mainFile, {}))
+            return nil
+        end,
 
         indexDeclaration = function(_, cxIdxDeclInfo)
             checkCXIdxObject(CXIdxPtrTypes.DeclInfo, cxIdxDeclInfo)
@@ -471,8 +484,6 @@ local Index = class
 ---------------------------- SourceLocation -----------------------------
 -------------------------------------------------------------------------
 
-local CXFile = ffi.typeof("CXFile")
-local SingleCXFileArray = ffi.typeof("CXFile [1]")
 local CXSourceLocation = ffi.typeof("CXSourceLocation")
 
 local LineCol = ffi.metatype([[
@@ -498,9 +509,6 @@ union {
         return isEqual
     end
 })
-
--- File and SourceLocation are circularly referential. "Forward-declare" the former.
-local File
 
 -- Private SourceLocation functions
 local SL = {

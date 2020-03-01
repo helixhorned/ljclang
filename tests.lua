@@ -620,9 +620,15 @@ describe("Indexer callbacks", function()
             decl = 0,
             ref = 0,
             methodRef = 0,
+            mainFileEnter = 0,
         }
 
         runIndexing(makeIndexerCallbacks{
+            enteredMainFile = function(mainFile)
+                assert.is_equal(mainFile:name(), FileName)
+                callCounts.mainFileEnter = callCounts.mainFileEnter + 1
+            end,
+
             indexDeclaration = function(declInfo)
                 callCounts.decl = callCounts.decl + 1
 
@@ -690,5 +696,6 @@ describe("Indexer callbacks", function()
         assert.is_equal(callCounts.decl, 15)
         assert.is_equal(callCounts.ref, 5)
         assert.is_equal(callCounts.methodRef, 1)
+        assert.is_equal(callCounts.mainFileEnter, 1)
     end)
 end)
