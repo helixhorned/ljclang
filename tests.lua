@@ -615,12 +615,12 @@ describe("Indexer callbacks", function()
     end
 
     it("tests indexing with inclusion-related callbacks", function()
-        local callCounts = {
-            astFileImport = 0,
-            tuStart = 0,
-            mainFileEnter = 0,
-            fileInclude = 0,
-        }
+        local seqNum = 0
+
+        local checkSeqNum = function(expectedSeqNum)
+            assert.is_equal(seqNum, expectedSeqNum)
+            seqNum = seqNum + 1
+        end
 
         local FileName = "/tmp/ljclang_test_includes.cpp"
         writeToFile(FileName, [[
@@ -629,48 +629,38 @@ describe("Indexer callbacks", function()
 ]])
         local callbacks = makeIndexerCallbacks{
             importedASTFile = function(impASTFileInfo)
-                callCounts.astFileImport = callCounts.astFileImport + 1
+                checkSeqNum(0)
+
+                assert.is_equal(seqNum, 1)
 
                 assert.is_not_nil(impASTFileInfo.file)
                 assert.is_nil(impASTFileInfo.module)
             end,
 
             startedTranslationUnit = function()
-                callCounts.tuStart = callCounts.tuStart + 1
-
-                assert.is_equal(callCounts.astFileImport, 1)
-                assert.is_equal(callCounts.fileInclude, 0)
+                -- TODO: why is this callback invoked twice?
+                checkSeqNum((seqNum == 1) and 1 or 2)
             end,
 
             enteredMainFile = function(mainFile)
-                callCounts.mainFileEnter = callCounts.mainFileEnter + 1
-
-                assert.is_equal(callCounts.astFileImport, 1)
-                assert.is_equal(callCounts.fileInclude, 0)
+                checkSeqNum(3)
 
                 assert.is_equal(mainFile:name(), FileName)
             end,
 
             ppIncludedFile = function(incFileInfo)
-                callCounts.fileInclude = callCounts.fileInclude + 1
-
-                assert.is_equal(callCounts.astFileImport, 1)
+                checkSeqNum((seqNum == 4) and 4 or 5)
 
                 assert.is_not_nil(incFileInfo.file)
                 assert.is_false(incFileInfo.isImport)
                 local _, hashLco = incFileInfo.hashLoc:fileSite()
-                assert.is_equal(hashLco.line, callCounts.fileInclude)
+                assert.is_equal(hashLco.line, seqNum - 4)
                 assert.is_equal(incFileInfo.filename:sub(-4), ".hpp")
             end,
         }
 
         local additionalOpts = {"-Itest_data/", "-include-pch", ASTFileName}
         runIndexing(FileName, callbacks, 2, concatTables(clangOpts, additionalOpts))
-
-        assert.is_equal(callCounts.astFileImport, 1)
-        assert.is_equal(callCounts.tuStart, 2)  -- TODO: why? Expectation is 1.
-        assert.is_equal(callCounts.mainFileEnter, 1)
-        assert.is_equal(callCounts.fileInclude, 2)
     end)
 
     it("tests indexing with declaration and entity reference callbacks", function()
