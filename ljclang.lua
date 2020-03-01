@@ -477,24 +477,24 @@ local CXSourceLocation = ffi.typeof("CXSourceLocation")
 
 local LineCol = ffi.metatype([[
 union {
-    struct { unsigned line, col; };
+    struct { unsigned line, column; };
     unsigned ar[2];
 }
 ]], {
     __eq = function(self, other)
-        return self.line == other.line and self.col == other.col
+        return self.line == other.line and self.column == other.column
     end
 })
 
 local LineColOfs = ffi.metatype([[
 union {
-    struct { unsigned line, col, offset; };
+    struct { unsigned line, column, offset; };
     unsigned ar[3];
 }
 ]], {
     __eq = function(self, other)
         local isEqual = (self.offset == other.offset)
-        assert((self.line == other.line and self.col == other.col) == isEqual)
+        assert((self.line == other.line and self.column == other.column) == isEqual)
         return isEqual
     end
 })
@@ -1078,10 +1078,10 @@ class
         elseif (linesfirst) then
             -- LJClang order -- IMO you're usually more interested in the
             -- line number
-            return filename, Beg.line, End.line, Beg.col, End.col, Beg.offset, End.offset
+            return filename, Beg.line, End.line, Beg.column, End.column, Beg.offset, End.offset
         else
             -- luaclang-parser order (offset: undocumented)
-            return filename, Beg.line, Beg.col, End.line, End.col, Beg.offset, End.offset
+            return filename, Beg.line, Beg.column, End.line, End.column, Beg.offset, End.offset
         end
     end,
 

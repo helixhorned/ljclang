@@ -682,7 +682,7 @@ describe("Indexer callbacks", function()
                 local file, lco = entRefInfo.loc:fileSite()
                 assert.is_equal(file:name(), FileName)
                 assert.is_true(lco.line > 0)
-                assert.is_true(lco.col > 0)
+                assert.is_true(lco.column > 0)
                 assert.is_true(lco.offset > 0)
             end,
         })
