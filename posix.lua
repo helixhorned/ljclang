@@ -10,6 +10,7 @@ local error_util = require("error_util")
 local ljposix = ffi.load("ljposix")
 require("posix_types")
 local decls = require("posix_decls")
+local linux_decls = require("ljclang_linux_decls")
 
 local assert = assert
 local check = error_util.check
@@ -410,11 +411,16 @@ api.mmap = function(addr, length, prot, flags, fd, offset)
     checktype(prot, 3, "number", 2)
     checktype(flags, 4, "number", 2)
 
-    local MAP, PROT = decls.MAP, decls.PROT
-    check(bit.band(prot, bit.bnot(PROT.READ + PROT.WRITE)) == 0,
-          "Only PROT.READ and/or PROT.WRITE allowed", 2)
-    check(bit.band(prot, bit.bnot(MAP.SHARED + MAP.PRIVATE)) == 0,
-          "Only MAP.SHARED or MAP.PRIVATE allowed", 2)
+    do
+        local MAP, PROT = decls.MAP, decls.PROT
+        check(bit.band(prot, bit.bnot(PROT.READ + PROT.WRITE)) == 0,
+              "Only PROT.READ and/or PROT.WRITE allowed", 2)
+        local allowedFlags = bit.bnot(MAP.SHARED + MAP.PRIVATE + linux_decls.MAP.ANONYMOUS)
+        check(bit.band(flags, allowedFlags) == 0,
+              "Only MAP.{SHARED,PRIVATE,ANONYMOUS} allowed", 2)
+        check(bit.band(flags, linux_decls.MAP.ANONYMOUS) == 0 or fd == -1,
+              "argument #5 must be -1 when argument #4 has MAP.ANONYMOUS set", 2)
+    end
 
     checktype(fd, 5, "number", 2)
     checktype(offset, 6, "number", 2)

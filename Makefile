@@ -119,6 +119,7 @@ $(EXTRACTED_ENUMS_LUA): $(SHARED_LIBRARIES) $(GENERATED_FILES_STAGE_1)
 
 # Linux-specific functionality exposed to us
 
+mman_h ?= /usr/include/asm-generic/mman.h
 sys_h := ./dev/sys.h
 
 CHECK_EXTRACTED_INOTIFY_CMD := $(EXTRACT_CMD_ENV) $(luajit) \
@@ -132,7 +133,11 @@ $(linux_decls_lua): $(EXTRACTED_ENUMS_LUA) $(sys_h) Makefile
 	@echo 'return { IN = ffi.new[[struct {' >> $(linux_decls_lua_tmp)
 	@$(EXTRACT_CMD_ENV) ./extractdecls.lua -C -p '^IN_' -s '^IN_' $(sys_h) >> $(linux_decls_lua_tmp)
 	@$(EXTRACT_CMD_ENV) ./extractdecls.lua -w MacroDefinition -C -p '^IN_' -s '^IN_' $(sys_h) >> $(linux_decls_lua_tmp)
-	@echo '}]] }' >> $(linux_decls_lua_tmp)
+	@echo '}]], ' >> $(linux_decls_lua_tmp)
+	@echo 'MAP = ffi.new[[struct {' >> $(linux_decls_lua_tmp)
+	@$(EXTRACT_CMD_ENV) ./extractdecls.lua -w MacroDefinition -C -p '^MAP_ANONYMOUS$$' -s '^MAP_' $(mman_h) >> $(linux_decls_lua_tmp)
+	@echo '}]], ' >> $(linux_decls_lua_tmp)
+	@echo '}' >> $(linux_decls_lua_tmp)
 	@mv $(linux_decls_lua_tmp) $@
 	@($(CHECK_EXTRACTED_INOTIFY_CMD) && \
 	    printf "* \033[1mGenerated $@\033[0m\n") \
@@ -143,7 +148,6 @@ $(linux_decls_lua): $(EXTRACTED_ENUMS_LUA) $(sys_h) Makefile
 
 errno_h ?= /usr/include/errno.h
 fcntl_h ?= /usr/include/fcntl.h
-mman_h ?= /usr/include/asm-generic/mman.h
 signal_h ?= /usr/include/signal.h
 time_h ?= /usr/include/time.h
 
