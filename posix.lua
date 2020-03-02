@@ -36,6 +36,7 @@ void *mmap(void *addr, size_t length, int prot, int flags,
 int munmap(void *addr, size_t length);
 
 char *strerror(int);
+long sysconf(int name);
 
 pid_t fork(void);
 pid_t getpid(void);
@@ -148,6 +149,7 @@ local api = {
     MAP = decls.MAP,
     POLL = decls.POLL,
     PROT = decls.PROT,
+    _SC = decls._SC,
     SIG = external_SIG,
     SOCK = decls.SOCK,
 
@@ -366,6 +368,13 @@ api.clock_nanosleep = function(nsec)
     local request = timespec_t(nsec / 1e9, nsec % 1e9)
     local ret = call("clock_nanosleep", decls.CLOCK.MONOTONIC, 0, request, nil)
     assert(ret == 0)
+end
+
+api.sysconf = function(name)
+    checktype(name, 2, "number", 2)
+    local ret = call("sysconf", name)
+    assert(ret ~= -1)
+    return ret
 end
 
 api.poll = function(tab)

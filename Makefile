@@ -150,6 +150,7 @@ errno_h ?= /usr/include/errno.h
 fcntl_h ?= /usr/include/fcntl.h
 signal_h ?= /usr/include/signal.h
 time_h ?= /usr/include/time.h
+unistd_h ?= /usr/include/unistd.h
 
 CHECK_EXTRACTED_POSIX_CMD := $(EXTRACT_CMD_ENV) $(luajit) \
     -e "require'posix_decls'"
@@ -180,6 +181,9 @@ $(posix_decls_lua): $(EXTRACTED_ENUMS_LUA) $(sys_h) Makefile
 	@echo '}]], ' >> $(posix_decls_lua_tmp)
 	@echo 'PROT = ffi.new[[struct {' >> $(posix_decls_lua_tmp)
 	@$(EXTRACT_CMD_ENV) ./extractdecls.lua -w MacroDefinition -C -p '^PROT_[RWN]' -s '^PROT_' $(mman_h) >> $(posix_decls_lua_tmp)
+	@echo '}]], ' >> $(posix_decls_lua_tmp)
+	@echo '_SC = ffi.new[[struct {' >> $(posix_decls_lua_tmp)
+	@$(EXTRACT_CMD_ENV) ./extractdecls.lua -w EnumConstantDecl -C -p '^_SC_PAGESIZE$$' -s '^_SC_' $(unistd_h) >> $(posix_decls_lua_tmp)
 	@echo '}]], ' >> $(posix_decls_lua_tmp)
 	@echo 'SIG = ffi.new[[struct {' >> $(posix_decls_lua_tmp)
 	@$(EXTRACT_CMD_ENV) ./extractdecls.lua -w MacroDefinition -C -p '^SIGINT$$' -s '^SIG' $(signal_h) >> $(posix_decls_lua_tmp)
