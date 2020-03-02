@@ -1,7 +1,7 @@
 local ffi = require("ffi")
 local C = ffi.C
 
-local IN = require("inotify_decls")
+local IN = require("ljclang_linux_decls").IN
 
 local class = require("class").class
 local check = require("error_util").check

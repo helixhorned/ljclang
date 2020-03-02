@@ -54,8 +54,8 @@ INDEX_H_LUA := ljclang_Index_h.lua
 LIBDIR_INCLUDE_LUA := ./llvm_libdir_include.lua
 EXTRACTED_ENUMS_LUA := ljclang_extracted_enums.lua
 EXTRACTED_ENUMS_LUA_TMP := $(EXTRACTED_ENUMS_LUA).tmp
-inotify_decls_lua := inotify_decls.lua
-inotify_decls_lua_tmp := $(inotify_decls_lua).tmp
+linux_decls_lua := ljclang_linux_decls.lua
+linux_decls_lua_tmp := $(linux_decls_lua).tmp
 posix_decls_lua := posix_decls.lua
 posix_decls_lua_tmp := $(posix_decls_lua).tmp
 
@@ -75,7 +75,7 @@ clean:
 
 veryclean: clean
 	rm -f $(GENERATED_FILES_STAGE_2) $(EXTRACTED_ENUMS_LUA_TMP) $(EXTRACTED_ENUMS_LUA).reject \
-		$(inotify_decls_lua) $(inotify_decls_lua_tmp) \
+		$(linux_decls_lua) $(linux_decls_lua_tmp) \
 		$(posix_decls_lua) $(posix_decls_lua_tmp)
 
 bootstrap: $(EXTRACTED_ENUMS_LUA)
@@ -122,18 +122,18 @@ $(EXTRACTED_ENUMS_LUA): $(SHARED_LIBRARIES) $(GENERATED_FILES_STAGE_1)
 sys_h := ./dev/sys.h
 
 CHECK_EXTRACTED_INOTIFY_CMD := $(EXTRACT_CMD_ENV) $(luajit) \
-    -e "require'inotify_decls'"
+    -e "require'ljclang_linux_decls'"
 
-$(inotify_decls_lua): $(EXTRACTED_ENUMS_LUA) $(sys_h) Makefile
-	@echo 'local ffi=require"ffi"' > $(inotify_decls_lua_tmp)
-	@echo 'ffi.cdef[[' >> $(inotify_decls_lua_tmp)
-	@$(EXTRACT_CMD_ENV) ./extractdecls.lua -w FunctionDecl -p '^inotify_' $(sys_h) >> $(inotify_decls_lua_tmp)
-	@echo ']]' >> $(inotify_decls_lua_tmp)
-	@echo 'return ffi.new[[struct {' >> $(inotify_decls_lua_tmp)
-	@$(EXTRACT_CMD_ENV) ./extractdecls.lua -C -p '^IN_' -s '^IN_' $(sys_h) >> $(inotify_decls_lua_tmp)
-	@$(EXTRACT_CMD_ENV) ./extractdecls.lua -w MacroDefinition -C -p '^IN_' -s '^IN_' $(sys_h) >> $(inotify_decls_lua_tmp)
-	@echo '}]]' >> $(inotify_decls_lua_tmp)
-	@mv $(inotify_decls_lua_tmp) $@
+$(linux_decls_lua): $(EXTRACTED_ENUMS_LUA) $(sys_h) Makefile
+	@echo 'local ffi=require"ffi"' > $(linux_decls_lua_tmp)
+	@echo 'ffi.cdef[[' >> $(linux_decls_lua_tmp)
+	@$(EXTRACT_CMD_ENV) ./extractdecls.lua -w FunctionDecl -p '^inotify_' $(sys_h) >> $(linux_decls_lua_tmp)
+	@echo ']]' >> $(linux_decls_lua_tmp)
+	@echo 'return { IN = ffi.new[[struct {' >> $(linux_decls_lua_tmp)
+	@$(EXTRACT_CMD_ENV) ./extractdecls.lua -C -p '^IN_' -s '^IN_' $(sys_h) >> $(linux_decls_lua_tmp)
+	@$(EXTRACT_CMD_ENV) ./extractdecls.lua -w MacroDefinition -C -p '^IN_' -s '^IN_' $(sys_h) >> $(linux_decls_lua_tmp)
+	@echo '}]] }' >> $(linux_decls_lua_tmp)
+	@mv $(linux_decls_lua_tmp) $@
 	@($(CHECK_EXTRACTED_INOTIFY_CMD) && \
 	    printf "* \033[1mGenerated $@\033[0m\n") \
 	|| (printf "* \033[1;31mError\033[0m generating $@\n" && \
@@ -210,7 +210,7 @@ test: $(SHARED_LIBRARIES) $(GENERATED_FILES_STAGE_2)
 
 sed_common_commands := s|@LJCLANG_DEV_DIR@|$(THIS_DIR)|g; s|@LLVM_BINDIR@|$(bindir)|g; s|@LLVM_LIBDIR@|$(libdir)|g;
 
-app_dependencies: $(inotify_decls_lua) $(posix_decls_lua)
+app_dependencies: $(linux_decls_lua) $(posix_decls_lua)
 
 install: $(SHARED_LIBRARIES) $(GENERATED_FILES_STAGE_2) app_dependencies
 	sed "$(sed_common_commands) s|@APPLICATION@|extractdecls|g" ./app.sh.in > $(BINDIR)/extractdecls
