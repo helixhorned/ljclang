@@ -27,6 +27,8 @@ local function loadandstrip(filename)
               :gsub("#[^\n]-\n", "")  -- single-line preprocessor directives
               :gsub("CINDEX_LINKAGE","")
               :gsub("CINDEX_DEPRECATED","")
+              :gsub("LLVM_CLANG_C_EXTERN_C_BEGIN","")
+              :gsub("LLVM_CLANG_C_EXTERN_C_END","")
               :gsub(" *\n+", "\n")
 end
 

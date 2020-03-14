@@ -384,7 +384,9 @@ enum CXTranslationUnit_Flags {
 
   CXTranslationUnit_VisitImplicitAttributes = 0x2000,
 
-  CXTranslationUnit_IgnoreNonErrorsFromIncludedFiles = 0x4000
+  CXTranslationUnit_IgnoreNonErrorsFromIncludedFiles = 0x4000,
+
+  CXTranslationUnit_RetainExcludedConditionalBlocks = 0x8000
 };
  unsigned clang_defaultEditingTranslationUnitOptions(void);
  CXTranslationUnit
@@ -875,7 +877,17 @@ enum CXCursorKind {
   CXCursor_OMPTargetTeamsDistributeSimdDirective = 279,
 
   CXCursor_BuiltinBitCastExpr = 280,
-  CXCursor_LastStmt = CXCursor_BuiltinBitCastExpr,
+
+  CXCursor_OMPMasterTaskLoopDirective = 281,
+
+  CXCursor_OMPParallelMasterTaskLoopDirective = 282,
+
+  CXCursor_OMPMasterTaskLoopSimdDirective      = 283,
+
+  CXCursor_OMPParallelMasterTaskLoopSimdDirective      = 284,
+
+  CXCursor_OMPParallelMasterDirective      = 285,
+  CXCursor_LastStmt = CXCursor_OMPParallelMasterDirective,
 
   CXCursor_TranslationUnit               = 300,
   /* Attributes */
