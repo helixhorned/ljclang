@@ -38,7 +38,7 @@ const char *ljclang_getLLVMVersion();
 unsigned ljclang_getHardwareConcurrency();
 ]]
 
-local supportLLVMVersion = ffi.string(support.ljclang_getLLVMVersion())
+local supportLLVMVersion = ffi.string(support.ljclang_getLLVMVersion()):gsub("git$","")
 
 require("posix_types")
 require("ljclang_Index_h")

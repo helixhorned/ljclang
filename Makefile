@@ -14,7 +14,8 @@ ifeq ($(llvm-config),)
     $(error "$(LLVM_CONFIG) not found, use LLVM_CONFIG=<path/to/llvm-config> make")
 endif
 
-llvm_version := $(shell $(llvm-config) --version)
+full_llvm_version := $(shell $(llvm-config) --version)
+llvm_version := $(full_llvm_version:git=)
 
 ########## PATHS ##########
 
