@@ -10,3 +10,5 @@ const char *ljclang_getTypeDefs();
 ]]
 
 ffi.cdef(ffi.string(ljposix.ljclang_getTypeDefs()))
+
+return {}

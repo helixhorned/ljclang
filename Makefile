@@ -67,12 +67,14 @@ SHARED_LIBRARIES := $(LJCLANG_SUPPORT_SO) $(LJPOSIX_SO)
 GENERATED_FILES_STAGE_1 := $(INDEX_H_LUA) $(LIBDIR_INCLUDE_LUA)
 GENERATED_FILES_STAGE_2 := $(GENERATED_FILES_STAGE_1) $(EXTRACTED_ENUMS_LUA)
 
-.PHONY: all app_dependencies clean veryclean bootstrap doc test install
+.PHONY: all app_dependencies apps clean veryclean bootstrap doc test install
 
 all: $(SHARED_LIBRARIES) $(GENERATED_FILES_STAGE_2)
 
+apps: extractdecls.app.lua watch_compile_commands.app.lua
+
 clean:
-	rm -f $(SHARED_LIBRARIES)
+	rm -f $(SHARED_LIBRARIES) $(apps)
 
 veryclean: clean
 	rm -f $(GENERATED_FILES_STAGE_2) $(EXTRACTED_ENUMS_LUA_TMP) $(EXTRACTED_ENUMS_LUA).reject \
@@ -94,7 +96,7 @@ $(INDEX_H_LUA): ./createheader.lua $(incdir)/clang-c/*
 	@printf "* \033[1mGenerated $@ from files in $(incdir)/clang-c \033[0m\n"
 
 $(LIBDIR_INCLUDE_LUA): Makefile config.make
-	@echo "return '$(llvm_libdir_include)'" > $@
+	@echo "return { '$(llvm_libdir_include)' }" > $@
 
 EXTRACT_CMD_ENV := LD_LIBRARY_PATH="$(libdir):$(THIS_DIR)" incdir="$(incdir)"
 
@@ -220,6 +222,16 @@ test: $(SHARED_LIBRARIES) $(GENERATED_FILES_STAGE_2)
 sed_common_commands := s|@LJCLANG_DEV_DIR@|$(THIS_DIR)|g; s|@LLVM_BINDIR@|$(bindir)|g; s|@LLVM_LIBDIR@|$(libdir)|g;
 
 app_dependencies: $(linux_decls_lua) $(posix_decls_lua)
+
+extractdecls.app.lua: extractdecls.lua mkapp.lua $(GENERATED_FILES_STAGE_1) app_dependencies
+	@$(EXTRACT_CMD_ENV) $(luajit) -l mkapp $< -Q > /dev/null
+	@chmod +x $@
+	@printf "* \033[1mCreated $@\033[0m\n"
+
+watch_compile_commands.app.lua: watch_compile_commands.lua mkapp.lua $(GENERATED_FILES_STAGE_2) app_dependencies
+	@$(EXTRACT_CMD_ENV) $(luajit) -l mkapp $< -x > /dev/null
+	@chmod +x $@
+	@printf "* \033[1mCreated $@\033[0m\n"
 
 install: $(SHARED_LIBRARIES) $(GENERATED_FILES_STAGE_2) app_dependencies
 	sed "$(sed_common_commands) s|@APPLICATION@|extractdecls|g" ./app.sh.in > $(BINDIR)/extractdecls

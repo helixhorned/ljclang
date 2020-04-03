@@ -1,6 +1,6 @@
 
 local error_util = require("error_util")
-local llvm_libdir_include = require("llvm_libdir_include")
+local llvm_libdir_include = require("llvm_libdir_include")[1]
 
 local checktype = error_util.checktype
 local check = error_util.check

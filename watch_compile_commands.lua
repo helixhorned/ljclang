@@ -83,6 +83,10 @@ local CacheDirectory = HomeDir.."/.cache/ljclang"
 local TempDirectory = "/tmp/ljclang"
 local GlobalInclusionGraphRelation = "isIncludedBy"
 
+-- Are we using mkapp.lua?
+-- KEEPINSYNC with 'exitImmediately' short option letter.
+local IsMakingApp = (arg[1] == "-x" and arg[2] == nil)
+
 local function usage(hline)
     if (hline) then
         errprint("ERROR: "..hline.."\n")
@@ -141,7 +145,11 @@ Options:
     - '@<number>..': range starting with the specified index, or
     - '@<number>..<number>': inclusive range.]],
 progname, CacheDirectory, GlobalInclusionGraphRelation)
-    os.exit(ErrorCode.CommandLine)
+    if (not IsMakingApp) then
+        os.exit(ErrorCode.CommandLine)
+    end
+
+    -- Continue to allow mkapp.lua collect the remaining 'require's.
 end
 
 local parsecmdline = require("parsecmdline_pk")
@@ -363,6 +371,11 @@ local POLL = posix.POLL
 local linux_decls = require("ljclang_linux_decls")
 local inotify = require("inotify")
 local IN = inotify.IN
+
+if (IsMakingApp) then
+    -- KEEPINSYNC: make sure that there are no require() calls below us!
+    os.exit(0)
+end
 
 ----------
 

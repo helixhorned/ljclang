@@ -3,7 +3,7 @@
 -- NOTE: on Raspbian, we need to require ljclang before busted, otherwise we get
 --  error "wrong number of type parameters" for ffi.cdef 'typedef enum CXChildVisitResult'.
 local cl = require("ljclang")
-local llvm_libdir_include = require("llvm_libdir_include")
+local llvm_libdir_include = require("llvm_libdir_include")[1]
 
 require 'busted.runner'()
 

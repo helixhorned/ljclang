@@ -31,6 +31,10 @@ local function errprintf(fmt, ...)
     io.stderr:write(format(fmt, ...).."\n")
 end
 
+-- Are we using mkapp.lua?
+-- KEEPINSYNC with 'quiet' short option letter.
+local IsMakingApp = (arg[1] == "-Q" and arg[2] == nil)
+
 local function usage(hline)
     if (hline) then
         print(hline)
@@ -65,7 +69,12 @@ local function usage(hline)
     print "  -Q: be quiet"
     print "  -w: extract what? Can be"
     print "       EnumConstantDecl (default), TypedefDecl, FunctionDecl, MacroDefinition"
-    os.exit(1)
+
+    if (not IsMakingApp) then
+        os.exit(1)
+    end
+
+    -- Continue to allow mkapp.lua collect the remaining 'require's.
 end
 
 local parsecmdline = require("parsecmdline_pk")
@@ -99,6 +108,11 @@ end
 
 -- Late load to allow printing the help text with a plain invocation.
 local cl = require("ljclang")
+
+if (IsMakingApp) then
+    -- KEEPINSYNC: make sure that there are no require() calls below us!
+    os.exit(0)
+end
 
 if (not extractEnum and enumNameFilterPattern ~= nil) then
     usage("Option -e only available for enum extraction")
