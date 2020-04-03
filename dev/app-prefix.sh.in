@@ -1,0 +1,8 @@
+#!/bin/bash
+
+d=@LJCLANG_DEV_DIR@  # FIXME: remove!
+export LD_LIBRARY_PATH="@LLVM_LIBDIR@:$d"
+export LLVM_BINDIR="@LLVM_BINDIR@"
+
+# CAUTION: the quotes here are crucial!
+luajit - "$@" <<"EOF________________________________________________________________________________"

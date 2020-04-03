@@ -39,7 +39,7 @@ local function usage(hline)
     if (hline) then
         print(hline)
     end
-    print("Usage: "..arg[0].." [our options...] <file.h> [-- [Clang command line args ...]]")
+    print("Usage: extractdecls.lua [our options...] <file.h> [-- [Clang command line args ...]]")
     print("Exits with a non-zero code if there were errors or no match.")
     print " (Our options may also come after the file name.)"
     print "  -e <enumNameFilterPattern> (enums only)"

@@ -92,11 +92,9 @@ local function usage(hline)
         errprint("ERROR: "..hline.."\n")
     end
 
-    local progname = arg[0]:match("([^/]+)$")
-
     printf([[
 Usage:
-   %s [options...] <compile_commands-file>
+   watch_compile_commands.lua [options...] <compile_commands-file>
 
 In this help text, single quotes ("'") are for exposition purposes only.
 They are never to be spelled in actual option arguments.
@@ -144,7 +142,7 @@ Options:
     - '@<number>': single compile command, or
     - '@<number>..': range starting with the specified index, or
     - '@<number>..<number>': inclusive range.]],
-progname, CacheDirectory, GlobalInclusionGraphRelation)
+CacheDirectory, GlobalInclusionGraphRelation)
     if (not IsMakingApp) then
         os.exit(ErrorCode.CommandLine)
     end

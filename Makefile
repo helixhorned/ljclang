@@ -67,7 +67,7 @@ SHARED_LIBRARIES := $(LJCLANG_SUPPORT_SO) $(LJPOSIX_SO)
 GENERATED_FILES_STAGE_1 := $(INDEX_H_LUA) $(LIBDIR_INCLUDE_LUA)
 GENERATED_FILES_STAGE_2 := $(GENERATED_FILES_STAGE_1) $(EXTRACTED_ENUMS_LUA)
 
-.PHONY: all app_dependencies apps clean veryclean bootstrap doc test install
+.PHONY: all app_dependencies apps clean veryclean bootstrap doc test install install-dev _install_common
 
 all: $(SHARED_LIBRARIES) $(GENERATED_FILES_STAGE_2)
 
@@ -225,21 +225,38 @@ app_dependencies: $(linux_decls_lua) $(posix_decls_lua)
 
 extractdecls.app.lua: extractdecls.lua mkapp.lua $(GENERATED_FILES_STAGE_1) app_dependencies
 	@$(EXTRACT_CMD_ENV) $(luajit) -l mkapp $< -Q > /dev/null
-	@chmod +x $@
 	@printf "* \033[1mCreated $@\033[0m\n"
 
 watch_compile_commands.app.lua: watch_compile_commands.lua mkapp.lua $(GENERATED_FILES_STAGE_2) app_dependencies
 	@$(EXTRACT_CMD_ENV) $(luajit) -l mkapp $< -x > /dev/null
-	@chmod +x $@
 	@printf "* \033[1mCreated $@\033[0m\n"
 
-install: $(SHARED_LIBRARIES) $(GENERATED_FILES_STAGE_2) app_dependencies
+pre := dev/app-prefix.sh.in
+post := dev/app-suffix.sh.in
+
+_install_common:
+	install $(THIS_DIR)/wcc-server.sh $(BINDIR)/wcc-server
+	install $(THIS_DIR)/wcc-client.sh $(BINDIR)/wcc-client
+
+# Notes:
+#  - the check using grep for 'EOF' is stricter than necessary -- we append 80 '_' chars.
+#  - the overhead of the generated Bash script (reading the here document line-by-line?) is
+#    noticable on a Raspberry Pi (approx. 100ms on a Pi 4).
+install: $(SHARED_LIBRARIES) $(GENERATED_FILES_STAGE_2) apps _install_common
+	@if grep -c EOF extractdecls.app.lua > /dev/null; then echo "ERROR: 'EOF' in Lua source!"; false; else true; fi
+	sed "$(sed_common_commands)" $(pre) | cat - extractdecls.app.lua $(post) > $(BINDIR)/extractdecls
+	@rm -f extractdecls.app.lua
+	chmod +x $(BINDIR)/extractdecls
+	@if grep -c EOF watch_compile_commands.app.lua > /dev/null; then echo "ERROR: 'EOF' in Lua source!"; false; else true; fi
+	sed "$(sed_common_commands)" $(pre) | cat - watch_compile_commands.app.lua $(post) > $(BINDIR)/watch_compile_commands
+	@rm -f watch_compile_commands.app.lua
+	chmod +x $(BINDIR)/watch_compile_commands
+
+install-dev: $(SHARED_LIBRARIES) $(GENERATED_FILES_STAGE_2) app_dependencies _install_common
 	sed "$(sed_common_commands) s|@APPLICATION@|extractdecls|g" ./app.sh.in > $(BINDIR)/extractdecls
 	chmod +x $(BINDIR)/extractdecls
 	sed "$(sed_common_commands) s|@APPLICATION@|watch_compile_commands|g" ./app.sh.in > $(BINDIR)/watch_compile_commands
 	chmod +x $(BINDIR)/watch_compile_commands
-	install $(THIS_DIR)/wcc-server.sh $(BINDIR)/wcc-server
-	install $(THIS_DIR)/wcc-client.sh $(BINDIR)/wcc-client
 
 # This target is merely there to create compile_commands.json entries for the test
 # source files in case we are invoked with 'bear'.
