@@ -253,9 +253,9 @@ install: $(SHARED_LIBRARIES) $(GENERATED_FILES_STAGE_2) apps _install_common
 	@chmod +x $(BINDIR)/watch_compile_commands
 
 install-dev: $(SHARED_LIBRARIES) $(GENERATED_FILES_STAGE_2) app_dependencies _install_common
-	sed "$(sed_common_commands) s|@APPLICATION@|extractdecls|g" ./app.sh.in > $(BINDIR)/extractdecls
+	sed "$(sed_common_commands) s|@APPLICATION@|extractdecls|g" ./dev/app.sh.in > $(BINDIR)/extractdecls
 	@chmod +x $(BINDIR)/extractdecls
-	sed "$(sed_common_commands) s|@APPLICATION@|watch_compile_commands|g" ./app.sh.in > $(BINDIR)/watch_compile_commands
+	sed "$(sed_common_commands) s|@APPLICATION@|watch_compile_commands|g" ./dev/app.sh.in > $(BINDIR)/watch_compile_commands
 	@chmod +x $(BINDIR)/watch_compile_commands
 
 # This target is merely there to create compile_commands.json entries for the test

@@ -650,7 +650,7 @@ end
 
 local function GetPchInputFiles()
     local luaPath = getEnv("LUA_PATH", "Lua path")
-    -- KEEPINSYNC with app.sh.in
+    -- KEEPINSYNC with dev/app.sh.in
     local ljclangDir = luaPath:match(";;(.*)/%?%.lua")
     if (ljclangDir == nil) then
         abort("Failed to obtain LJClang directory from Lua path.")
