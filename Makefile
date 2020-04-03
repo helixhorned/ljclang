@@ -246,17 +246,17 @@ install: $(SHARED_LIBRARIES) $(GENERATED_FILES_STAGE_2) apps _install_common
 	@if grep -c EOF extractdecls.app.lua > /dev/null; then echo "ERROR: 'EOF' in Lua source!"; false; else true; fi
 	sed "$(sed_common_commands)" $(pre) | cat - extractdecls.app.lua $(post) > $(BINDIR)/extractdecls
 	@rm -f extractdecls.app.lua
-	chmod +x $(BINDIR)/extractdecls
+	@chmod +x $(BINDIR)/extractdecls
 	@if grep -c EOF watch_compile_commands.app.lua > /dev/null; then echo "ERROR: 'EOF' in Lua source!"; false; else true; fi
 	sed "$(sed_common_commands)" $(pre) | cat - watch_compile_commands.app.lua $(post) > $(BINDIR)/watch_compile_commands
 	@rm -f watch_compile_commands.app.lua
-	chmod +x $(BINDIR)/watch_compile_commands
+	@chmod +x $(BINDIR)/watch_compile_commands
 
 install-dev: $(SHARED_LIBRARIES) $(GENERATED_FILES_STAGE_2) app_dependencies _install_common
 	sed "$(sed_common_commands) s|@APPLICATION@|extractdecls|g" ./app.sh.in > $(BINDIR)/extractdecls
-	chmod +x $(BINDIR)/extractdecls
+	@chmod +x $(BINDIR)/extractdecls
 	sed "$(sed_common_commands) s|@APPLICATION@|watch_compile_commands|g" ./app.sh.in > $(BINDIR)/watch_compile_commands
-	chmod +x $(BINDIR)/watch_compile_commands
+	@chmod +x $(BINDIR)/watch_compile_commands
 
 # This target is merely there to create compile_commands.json entries for the test
 # source files in case we are invoked with 'bear'.
