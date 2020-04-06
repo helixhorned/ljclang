@@ -12,6 +12,7 @@
 #include <sys/select.h>
 #include <sys/socket.h>
 #include <sys/types.h>
+#include <dirent.h>
 #include <poll.h>
 #include <signal.h>
 
@@ -149,6 +150,11 @@ struct pollfd {
 static_assert(sizeof(Check::timeval) == sizeof(struct timeval));
 static_assert(sizeof(Check::timespec) == sizeof(struct timespec));
 static_assert(sizeof(Check::pollfd) == sizeof(struct pollfd));
+
+extern "C"
+const char *ljclang_getDirent64Name(const struct dirent64 &dirent) {
+    return dirent.d_name;
+}
 
 extern "C"
 void ljclang_setSigintHandlingToDefault()

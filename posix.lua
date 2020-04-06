@@ -51,6 +51,18 @@ FILE *freopen(const char *pathname, const char *mode, FILE *stream);
 char *realpath(const char *path, char *resolved_path);
 ]]
 
+-- NOTE: readdir64() is glibc-specific. We use it instead of readdir() because 'struct
+-- dirent' has #ifndef-conditional member definitions while 'struct dirent64' does not.
+ffi.cdef[[
+struct _DIR;
+struct dirent64;
+typedef struct _DIR DIR;
+DIR *opendir(const char *name);
+int closedir(DIR *dirp);
+struct dirent64 *readdir64(DIR *dirp);
+const char *ljclang_getDirent64Name(const struct dirent64 &dirent);
+]]
+
 -- NOTE: leave type 'struct sockaddr' incomplete.
 ffi.cdef[[
 struct sockaddr;
@@ -349,6 +361,35 @@ api.Fd = class
     end,
 --]]
 }
+
+local Directory = class{
+    "DIR *ptr;",
+
+    read = function(self)
+        assert(self.ptr ~= nil)
+
+        ffi.errno(0)
+        local dirEnt = C.readdir64(self.ptr)
+        if (ffi.errno() ~= 0) then
+            error("readdir failed: %s"..getErrnoString())
+        end
+
+        return (dirEnt ~= nil) and ffi.string(ljposix.ljclang_getDirent64Name(dirEnt)) or nil
+    end
+}
+
+api.Dir = function(name)
+    checktype(name, 1, "string", 2)
+
+    local dirPtr = C.opendir(name)
+    if (dirPtr == nil) then
+        error("opendir failed: %s"..getErrnoString())
+    end
+
+    return ffi.gc(Directory(dirPtr), function(d)
+        C.closedir(d.ptr)
+    end)
+end
 
 local timespec_t = ffi.typeof("struct timespec")
 local single_timespec_t = ffi.typeof("$ [1]", timespec_t)
