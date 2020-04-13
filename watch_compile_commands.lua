@@ -1217,7 +1217,7 @@ local SymbolInfo = ffi.typeof[[struct {
 local SymbolInfoPage = (function()
     local pageSize = posix.sysconf(posix._SC.PAGESIZE)
     assert(pageSize % ffi.sizeof(SymbolInfo) == 0)
-    return ffi.typeof("$ [$]", SymbolInfo, pageSize / ffi.sizeof(SymbolInfo))
+    return ffi.typeof("$ [$]", SymbolInfo, tonumber(pageSize / ffi.sizeof(SymbolInfo)))
 end)()
 
 local MaxSymPages = {
