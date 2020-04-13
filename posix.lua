@@ -549,11 +549,7 @@ end
 local pid_t = ffi.typeof("pid_t")
 
 local function isPid(v)
-    if (ffi.sizeof("void *") == 4) then
-        return (type(v) == "number")
-    else
-        return ffi.istype("pid_t", v)
-    end
+    return (type(v) == "number" or ffi.istype("pid_t", v))
 end
 
 api.waitpid = function(pid, options)
