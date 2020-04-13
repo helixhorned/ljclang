@@ -71,6 +71,7 @@ int bind(int socket, const struct sockaddr *address, socklen_t address_len);
 int connect(int socket, const struct sockaddr *address, socklen_t address_len);
 int listen(int socket, int backlog);
 int accept(int sockfd, struct sockaddr *addr, socklen_t *addrlen);
+int shutdown(int sockfd, int how);
 ]]
 
 -- NOTE: members have 'tv_' prefix stripped.
@@ -162,6 +163,7 @@ local api = {
     POLL = decls.POLL,
     PROT = decls.PROT,
     _SC = decls._SC,
+    SHUT = decls.SHUT,
     SIG = external_SIG,
     SOCK = decls.SOCK,
 
@@ -346,6 +348,10 @@ api.Fd = class
         local ret = call("dup2", self.fd, fd)
         assert(ret == fd)
         return ret
+    end,
+
+    shutdown = function(self, how)
+        local ret = call("shutdown", self.fd, how)
     end,
 
     close = function(self)
