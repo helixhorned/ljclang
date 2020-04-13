@@ -20,18 +20,22 @@ namespace
 {
     template <typename T> struct TypeString {};
 
+    // NOTE: do not use 'is_same_v', it is absent in Raspbian's libstdc++.
+    constexpr bool LongIntIsInt64 = std::is_same<int64_t, long int>::value;
+    constexpr bool ULongIsUInt64 = std::is_same<uint64_t, unsigned long>::value;
+    struct DummyType1 {};
+    struct DummyType2 {};
+    using LongInt = std::conditional_t<LongIntIsInt64, DummyType1, long int>;
+    using ULong = std::conditional_t<ULongIsUInt64, DummyType2, unsigned long>;
+
     template <> struct TypeString<int32_t> { static constexpr const char *value = "int32_t"; };
     template <> struct TypeString<int64_t> { static constexpr const char *value = "int64_t"; };
     template <> struct TypeString<uint32_t> { static constexpr const char *value = "uint32_t"; };
     template <> struct TypeString<uint64_t> { static constexpr const char *value = "uint64_t"; };
     template <> struct TypeString<unsigned short> { static constexpr const char *value = "unsigned short"; };
-    template <> struct TypeString<unsigned long> { static constexpr const char *value = "unsigned long"; };
 
-    // NOTE: do not use 'is_same_v', it is absent in Raspbian's libstdc++.
-    constexpr bool LongIntIsInt64 = std::is_same<int64_t, long int>::value;
-    struct DummyType {};
-    using LongInt = std::conditional_t<LongIntIsInt64, DummyType, long int>;
     template <> struct TypeString<LongInt> { static constexpr const char *value = "long int"; };
+    template <> struct TypeString<ULong> { static constexpr const char *value = "unsigned long"; };
 
     template <> struct TypeString<sigset_t> {
         static const std::string structDef;
