@@ -69,6 +69,7 @@ local function usage(hline)
     print "  -Q: be quiet"
     print "  -w: extract what? Can be"
     print "       EnumConstantDecl (default), TypedefDecl, FunctionDecl, MacroDefinition"
+    -- TODO: allow list in '-w'.
 
     if (not IsMakingApp) then
         os.exit(1)

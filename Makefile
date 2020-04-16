@@ -27,6 +27,7 @@ incdir := $(shell $(llvm-config) --includedir)
 libdir := $(shell $(llvm-config) --libdir)
 lib := -L$(libdir) -lclang
 
+# TODO: error or warn if directory does not exist. Ideally, remove.
 llvm_libdir_include := $(libdir)/clang/$(llvm_version)/include
 
 ########## OPTIONS ##########
@@ -129,7 +130,6 @@ $(linux_decls_lua): $(EXTRACTED_ENUMS_LUA) $(sys_h) Makefile
 	@$(EXTRACT_CMD_ENV) ./extractdecls.lua -w FunctionDecl -p '^inotify_' $(sys_h) >> $(linux_decls_lua_tmp)
 	@echo ']]' >> $(linux_decls_lua_tmp)
 	@echo 'return { IN = ffi.new[[struct {' >> $(linux_decls_lua_tmp)
-	@$(EXTRACT_CMD_ENV) ./extractdecls.lua -C -p '^IN_' -s '^IN_' $(sys_h) >> $(linux_decls_lua_tmp)
 	@$(EXTRACT_CMD_ENV) ./extractdecls.lua -w MacroDefinition -C -p '^IN_' -s '^IN_' $(sys_h) >> $(linux_decls_lua_tmp)
 	@echo '}]], ' >> $(linux_decls_lua_tmp)
 	@echo 'MAP = ffi.new[[struct {' >> $(linux_decls_lua_tmp)
@@ -181,10 +181,12 @@ $(posix_decls_lua): $(EXTRACTED_ENUMS_LUA) $(sys_h) Makefile
 	@$(EXTRACT_CMD_ENV) ./extractdecls.lua -w MacroDefinition -C -p '^PROT_[RWN]' -s '^PROT_' $(mman_h) >> $(posix_decls_lua_tmp)
 	@echo '}]], ' >> $(posix_decls_lua_tmp)
 	@echo '_SC = ffi.new[[struct {' >> $(posix_decls_lua_tmp)
-	@$(EXTRACT_CMD_ENV) ./extractdecls.lua -w EnumConstantDecl -C -p '^_SC_PAGESIZE$$' -s '^_SC_' $(unistd_h) >> $(posix_decls_lua_tmp)
+	@$(EXTRACT_CMD_ENV) ./extractdecls.lua -w EnumConstantDecl -C -p '^_SC_PAGESIZE$$' -s '^_SC_' $(unistd_h) >> $(posix_decls_lua_tmp) || \
+		$(EXTRACT_CMD_ENV) ./extractdecls.lua -w MacroDefinition -C -p '^_SC_PAGESIZE$$' -s '^_SC_' $(unistd_h) >> $(posix_decls_lua_tmp)
 	@echo '}]], ' >> $(posix_decls_lua_tmp)
 	@echo 'SHUT = ffi.new[[struct {' >> $(posix_decls_lua_tmp)
-	@$(EXTRACT_CMD_ENV) ./extractdecls.lua -w EnumConstantDecl -C -p '^SHUT_RDWR$$' -s '^SHUT_' $(sys_h) >> $(posix_decls_lua_tmp)
+	@$(EXTRACT_CMD_ENV) ./extractdecls.lua -w EnumConstantDecl -C -p '^SHUT_RDWR$$' -s '^SHUT_' $(sys_h) >> $(posix_decls_lua_tmp) || \
+		$(EXTRACT_CMD_ENV) ./extractdecls.lua -w MacroDefinition -C -p '^SHUT_RDWR$$' -s '^SHUT_' $(sys_h) >> $(posix_decls_lua_tmp)
 	@echo '}]], ' >> $(posix_decls_lua_tmp)
 	@echo 'SIG = ffi.new[[struct {' >> $(posix_decls_lua_tmp)
 	@$(EXTRACT_CMD_ENV) ./extractdecls.lua -w MacroDefinition -C -p '^SIGINT$$' -s '^SIG' $(signal_h) >> $(posix_decls_lua_tmp)
@@ -192,7 +194,8 @@ $(posix_decls_lua): $(EXTRACTED_ENUMS_LUA) $(sys_h) Makefile
 	@$(EXTRACT_CMD_ENV) ./extractdecls.lua -w MacroDefinition -C -p '^SIG_BLOCK$$' -s '^SIG_' $(signal_h) >> $(posix_decls_lua_tmp)
 	@echo '}]], ' >> $(posix_decls_lua_tmp)
 	@echo 'SOCK = ffi.new[[struct {' >> $(posix_decls_lua_tmp)
-	@$(EXTRACT_CMD_ENV) ./extractdecls.lua -w EnumConstantDecl -C -p '^SOCK_STREAM$$' -s '^SOCK_' $(sys_h) >> $(posix_decls_lua_tmp)
+	@$(EXTRACT_CMD_ENV) ./extractdecls.lua -w EnumConstantDecl -C -p '^SOCK_STREAM$$' -s '^SOCK_' $(sys_h) >> $(posix_decls_lua_tmp) || \
+		$(EXTRACT_CMD_ENV) ./extractdecls.lua -w MacroDefinition -C -p '^SOCK_STREAM$$' -s '^SOCK_' $(sys_h) >> $(posix_decls_lua_tmp)
 	@echo '}]] }' >> $(posix_decls_lua_tmp)
 	@mv $(posix_decls_lua_tmp) $@
 	@($(CHECK_EXTRACTED_POSIX_CMD) && \
