@@ -1,6 +1,5 @@
 
 OS := $(shell uname -s)
-MACHINE := $(shell uname -m)
 THIS_DIR := $(abspath $(dir $(lastword $(MAKEFILE_LIST))))
 
 # User configuration
@@ -21,10 +20,6 @@ llvm_version := $(full_llvm_version:git=)
 
 ifneq ($(OS),Linux)
     $(error "Unsupported OS")
-endif
-ifeq ($(MACHINE),armv7l)
-    # On Raspbian, assume that a recent LLVM is used.
-    CXX=clang++
 endif
 
 bindir := $(shell $(llvm-config) --bindir)
