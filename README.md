@@ -16,8 +16,8 @@ LJClang -- A LuaJIT-based interface to libclang
 Introduction
 ------------
 
-[LuaJIT]: http://luajit.org/
-[libclang]: http://clang.llvm.org/doxygen/group__CINDEX.html
+[LuaJIT]: https://luajit.org/
+[libclang]: https://clang.llvm.org/doxygen/group__CINDEX.html
 [luaclang-parser]: https://github.com/mkottman/luaclang-parser
 
 LJClang is an interface to [libclang] for [LuaJIT], modeled after and mostly
@@ -30,7 +30,7 @@ Requirements
 * LuaJIT 2.0 or greater
 
 * LLVM/Clang -- from the Linux distribution or
-  [here](http://apt.llvm.org/). Development is done using the latest stable
+  [here](https://apt.llvm.org/). Development is done using the latest stable
   version, but older versions should work mostly fine (except that interfaces
   exposed by newer version are not available, of course).
 
@@ -71,14 +71,14 @@ Example programs
 ### `extractdecls.lua`
 
 [`enum CXCursorKind`]:
- http://clang.llvm.org/doxygen/group__CINDEX.html#gaaccc432245b4cd9f2d470913f9ef0013
+ https://clang.llvm.org/doxygen/group__CINDEX.html#gaaccc432245b4cd9f2d470913f9ef0013
 
 The `extractdecls.lua` script accompanied by LJClang can be used to extract
 various kinds of C declarations from (usually) headers and print them in
 various forms usable as FFI C declarations or descriptive tables with LuaJIT.
 
 ~~~~~~~~~~
-Usage: ./extractdecls.lua [our options...] <file.h> [-- [Clang command line args ...]]
+Usage: extractdecls.lua [our options...] <file.h> [-- [Clang command line args ...]]
 Exits with a non-zero code if there were errors or no match.
  (Our options may also come after the file name.)
   -e <enumNameFilterPattern> (enums only)
@@ -205,7 +205,7 @@ parse `TranslationUnit`s. Both input arguments are optional and default to
 #### `clang.ChildVisitResult`
 
 [`enum CXChildVisitResult`]:
- http://clang.llvm.org/doxygen/group__CINDEX__CURSOR__TRAVERSAL.html#ga99a9058656e696b622fbefaf5207d715
+ https://clang.llvm.org/doxygen/group__CINDEX__CURSOR__TRAVERSAL.html#ga99a9058656e696b622fbefaf5207d715
 
 An object mapping names to values to be returned
 from cursor visitor callbacks. The names are identical with those in [`enum
@@ -232,7 +232,7 @@ Creates a permanent cursor from one received by the visitor callback.
 #### `clang.ErrorCode`
 
 [`enum CXErrorCode`]:
- http://clang.llvm.org/doxygen/CXErrorCode_8h.html#adba17f287f8184fc266f2db4e669bf0f
+ https://clang.llvm.org/doxygen/CXErrorCode_8h.html#adba17f287f8184fc266f2db4e669bf0f
 
 An object mapping names to values representing success or various
 error conditions. The names are identical to those in [`enum CXErrorCode`] with
