@@ -227,12 +227,12 @@ sed_common_commands := s|@LJCLANG_DEV_DIR@|$(THIS_DIR)|g; s|@LLVM_BINDIR@|$(bind
 app_dependencies: $(linux_decls_lua) $(posix_decls_lua)
 
 extractdecls.app.lua: extractdecls.lua mkapp.lua $(GENERATED_FILES_STAGE_1) app_dependencies
-	@$(EXTRACT_CMD_ENV) $(luajit) -l mkapp $< -Q > /dev/null
-	@printf "* \033[1mCreated $@\033[0m\n"
+	@$(EXTRACT_CMD_ENV) $(luajit) -l mkapp $< -Q > /dev/null && \
+		printf "* \033[1mCreated $@\033[0m\n"
 
 watch_compile_commands.app.lua: watch_compile_commands.lua mkapp.lua $(GENERATED_FILES_STAGE_2) app_dependencies
-	@$(EXTRACT_CMD_ENV) $(luajit) -l mkapp $< -x > /dev/null
-	@printf "* \033[1mCreated $@\033[0m\n"
+	@$(EXTRACT_CMD_ENV) $(luajit) -l mkapp $< -x > /dev/null && \
+		printf "* \033[1mCreated $@\033[0m\n"
 
 pre := dev/app-prefix.sh.in
 post := dev/app-suffix.sh.in
