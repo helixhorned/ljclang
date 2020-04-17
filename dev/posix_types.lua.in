@@ -9,14 +9,14 @@ ffi.cdef[[
  -p ^_*id_t$ -p ^_*gid_t$ -p ^_*pid_t$ -p ^_*uid_t$ \
  -p ^_*mode_t$ -p ^_*nfds_t$ -p ^_*nlink_t$ -p ^_*off_t$ -p ^_*ssize_t$ \
  -p ^__u_quad_t$ -p ^_*dev_t$ -p ^_*sa_family_t$ -p ^_*socklen_t$
+
+typedef
+@@ -m dev.exdecl_surrogate_struct -p ^fd_set$ ./dev/posix.h
+fd_set;
+
+typedef
+@@ -m dev.exdecl_surrogate_struct -p ^sigset_t$ ./dev/posix.h
+sigset_t;
 ]]
-
-local ljposix = ffi.load("ljposix")
-
-ffi.cdef[[
-const char *ljclang_getTypeDefs();
-]]
-
-ffi.cdef(ffi.string(ljposix.ljclang_getTypeDefs()))
 
 return {}
