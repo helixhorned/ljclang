@@ -14,10 +14,14 @@ local hacks = require("hacks")
 local util = require("util")
 
 local assert = assert
+local getfenv = getfenv
 local ipairs = ipairs
-local print = print
-local tonumber = tonumber
 local loadstring = loadstring
+local pcall = pcall
+local print = print
+local setfenv = setfenv
+local tonumber = tonumber
+local type = type
 
 local format = string.format
 
@@ -56,6 +60,10 @@ local function usage(hline)
        static const int membname = 123;  (enums/macros only)
   -R: reverse mapping, only if one-to-one. Print lines like
        [123] = \"membname\";  (enums/macros only)
+  -m <extraction-spec-module>: name of a Lua module to 'require()' which should return a
+     function taking the LJClang cursor as a single argument. In the context of the call to
+     'require()' and the module function, the functions 'check' and 'printf' are available.
+     Incompatible with -1, -2, -C, -R, -f and -w.
   -f <formatFunc>: user-provided body for formatting function (enums/macros only)
        Arguments to that function are named
          * 'k' (enum constant / macro name)
@@ -68,7 +76,7 @@ local function usage(hline)
        Must return a formatted line.
        Example:
          "return f('%s = %s%s,', k, k:find('KEY_') and '65536+' or '', v)"
-       Incompatible with -C or -R.
+       Incompatible with -C, -R or -f.
   -Q: be quiet
   -w: extract what? Can be
        E+M, EnumConstantDecl (default), MacroDefinition, TypedefDecl, FunctionDecl
@@ -98,7 +106,7 @@ local parsecmdline = require("parsecmdline_pk")
 
 -- Meta-information about options, see parsecmdline_pk.
 local opt_meta = { e=true, p=1, A=1, x=1, s=true, C=false, R=false, Q=false,
-                   ['1']=true, ['2']=true, w=true, f=true }
+                   ['1']=true, ['2']=true, w=true, f=true, m=true }
 
 local opts, args = parsecmdline.getopts(opt_meta, arg, usage)
 
@@ -110,10 +118,12 @@ local stripPattern = opts.s
 local printConstInt = opts.C
 local reverse = opts.R
 local quiet = opts.Q
+local haveWhat = (opts.w ~= nil)
 local what = opts.w or "EnumConstantDecl"
 local fmtfuncCode = opts.f
+local moduleName = opts.m
 
-local extractEnum = (what == "EnumConstantDecl" or what == EnumOrMacro)
+local extractEnum = (moduleName == nil and what == "EnumConstantDecl" or what == EnumOrMacro)
 local extractMacro = (what:find("^Macro") or what == EnumOrMacro)
 
 local prefixString = opts['1']
@@ -142,7 +152,18 @@ if (not (extractEnum or extractMacro) and (printConstInt or reverse)) then
 end
 
 local fmtfunc
-if (fmtfuncCode) then
+local moduleFunc
+
+local matchCount = 0
+
+local function printfMatch(fmt, ...)
+    printf(fmt, ...)
+    matchCount = matchCount + 1
+end
+
+if (fmtfuncCode and moduleName) then
+    usage("Options -f and -m are mutually exclusive.")
+elseif (fmtfuncCode) then
     if (not (extractEnum or extractMacro)) then
         usage("Option -f only available for enum or macro extraction.")
     end
@@ -163,6 +184,31 @@ end
     end
 
     fmtfunc = func()
+elseif (moduleName) then
+    -- KEEPINSYNC with usage help: "Incompatible with -1, -2, -C, -R, -f and -w."
+    if (prefixString or suffixString or printConstInt or reverse or fmtfuncCode or haveWhat) then
+        usage("Passed option incompatible with -m.")
+    end
+
+    -- Restrict the environment because we are taking arguments from the command line.
+    --
+    -- Notes:
+    --  - It would be preferable to set the environment on a temporary function, but if
+    --    we attempt to do that, 'printf' is already nil at require() time.
+    --  - This way, we also disallow calling 'printf()' at require() time, but unintendedly:
+    --    it appears that *from within the C function implementing Lua print()*, there is an
+    --    access to the global environment which then is not fulfilled.
+    local env = getfenv(0)
+    setfenv(0, { check=assert, printf=printfMatch, type=type })
+    moduleFunc = require(moduleName)
+    setfenv(0, env)
+
+    if (type(moduleFunc) ~= "function") then
+        io.stderr:write("ERROR: module specified with -m must return a function\n")
+        os.exit(1)
+    end
+
+    setfenv(moduleFunc, {})
 end
 
 local tuOptions = extractMacro and {"DetailedPreprocessingRecord"} or nil
@@ -239,13 +285,6 @@ local function getCommonPrefixLengthOfEnums(enumDeclCur)
     end
 end
 
-local matchCount = 0
-
-local function printfMatch(fmt, ...)
-    printf(fmt, ...)
-    matchCount = matchCount + 1
-end
-
 -- The <name> in 'enum <name>' if available, or the empty string:
 local currentEnumName
 
@@ -291,7 +330,8 @@ function(cur, parent)
         end
     end
 
-    local kind = wantedCursorKind(cur)
+    local isUserDefined = (moduleFunc ~= nil)
+    local kind = isUserDefined and "*anything*" or wantedCursorKind(cur)
 
     if (kind ~= nil) then
         local name = cur:displayName()
@@ -300,7 +340,9 @@ function(cur, parent)
             if (not checkexclude(name)) then
                 local ourname = stripPattern and name:gsub(stripPattern, "") or name
 
-                if (extractEnum or extractMacro) then
+                if (isUserDefined) then
+                    moduleFunc(cur)
+                elseif (extractEnum or extractMacro) then
                     local isEnum = (kind == "EnumConstantDecl")
                     local val = isEnum and cur:enumval() or getDefStr(cur)
 
@@ -351,7 +393,7 @@ function(cur, parent)
         end
     end
 
-    return 'CXChildVisit_Continue'
+    return isUserDefined and 'CXChildVisit_Recurse' or 'CXChildVisit_Continue'
 end)
 
 if (prefixString) then
