@@ -37,39 +37,45 @@ local IsMakingApp = (arg[1] == "-Q" and arg[2] == nil)
 
 local function usage(hline)
     if (hline) then
-        print(hline)
+        errprintf("ERROR: %s", hline)
     end
     print("Usage: extractdecls.lua [our options...] <file.h> [-- [Clang command line args ...]]")
-    print("Exits with a non-zero code if there were errors or no match.")
-    print " (Our options may also come after the file name.)"
-    print "  -e <enumNameFilterPattern> (enums only)"
-    print "  -p <filterPattern>"
-    print "  -x <excludePattern1> [-x <excludePattern2>] ..."
-    print "  -s <stripPattern>"
-    print "  -1 <string to print before everything>"
-    print "  -2 <string to print after everything>"
-    print "  -A <single Clang command line arg> (same as if specified as positional arg)"
-    print "  -C: print lines like"
-    print "       static const int membname = 123;  (enums/macros only)"
-    print "  -R: reverse mapping, only if one-to-one. Print lines like"
-    print "       [123] = \"membname\";  (enums/macros only)"
-    print "  -f <formatFunc>: user-provided body for formatting function (enums/macros only)"
-    print "       Arguments to that function are named"
-    print "         * 'k' (enum constant / macro name)"
-    print "         * 'v' (its numeric value)"
-    print "         * 'enumName' (the name in 'enum <name>', or the empty string)"
-    print "         * 'enumIntTypeName' (the name of the underlying integer type of an enum)"
-    print "         * 'enumPrefixLength' (the length of the common prefix of all names; enums only)"
-    print "       Also, the following is provided:"
-    print "         * 'f' as a shorthand for 'string.format'"
-    print "       Must return a formatted line."
-    print "       Example:"
-    print[[         "return f('%s = %s%s,', k, k:find('KEY_') and '65536+' or '', v)"]]
-    print "       Incompatible with -C or -R."
-    print "  -Q: be quiet"
-    print "  -w: extract what? Can be"
-    print "       EnumConstantDecl (default), TypedefDecl, FunctionDecl, MacroDefinition"
-    -- TODO: allow list in '-w'.
+
+    if (not hline) then
+        print("Exits with a non-zero code if there were errors or no match.")
+        print[[
+ (Our options may also come after the file name.)
+  -e <enumNameFilterPattern> (enums only)
+  -p <filterPattern>
+  -x <excludePattern1> [-x <excludePattern2>] ...
+  -s <stripPattern>
+  -1 <string to print before everything>
+  -2 <string to print after everything>
+  -A <single Clang command line arg> (same as if specified as positional arg)
+  -C: print lines like
+       static const int membname = 123;  (enums/macros only)
+  -R: reverse mapping, only if one-to-one. Print lines like
+       [123] = \"membname\";  (enums/macros only)
+  -f <formatFunc>: user-provided body for formatting function (enums/macros only)
+       Arguments to that function are named
+         * 'k' (enum constant / macro name)
+         * 'v' (its numeric value)
+         * 'enumName' (the name in 'enum <name>', or the empty string)
+         * 'enumIntTypeName' (the name of the underlying integer type of an enum)
+         * 'enumPrefixLength' (the length of the common prefix of all names; enums only)
+       Also, the following is provided:
+         * 'f' as a shorthand for 'string.format'
+       Must return a formatted line.
+       Example:
+         "return f('%s = %s%s,', k, k:find('KEY_') and '65536+' or '', v)"
+       Incompatible with -C or -R.
+  -Q: be quiet
+  -w: extract what? Can be
+       EnumConstantDecl (default), TypedefDecl, FunctionDecl, MacroDefinition
+]]
+        -- ^ KEEPINSYNC with IsValidWhat:
+        -- TODO: allow more general list in '-w'?
+    end
 
     if (not IsMakingApp) then
         os.exit(1)
@@ -116,21 +122,21 @@ if (IsMakingApp) then
 end
 
 if (not extractEnum and enumNameFilterPattern ~= nil) then
-    usage("Option -e only available for enum extraction")
+    usage("Option -e only available for enum extraction.")
 end
 
 if (not (extractEnum or extractMacro) and (printConstInt or reverse)) then
-    usage("Options -C and -R only available for enum or macro extraction")
+    usage("Options -C and -R only available for enum or macro extraction.")
 end
 
 local fmtfunc
 if (fmtfuncCode) then
     if (not (extractEnum or extractMacro)) then
-        usage("Option -f only available for enum or macro extraction")
+        usage("Option -f only available for enum or macro extraction.")
     end
 
     if (printConstInt or reverse) then
-        usage("Option -f is incompatible with -C or -R")
+        usage("Option -f is incompatible with -C or -R.")
     end
 
     local func, errmsg = loadstring([[
