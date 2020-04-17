@@ -30,3 +30,5 @@ inline int badFunc(const char *, ...)
 
 // Declaration of the enum from enums.hpp to test USRs.
 enum BigNumbers : unsigned long long;
+
+class Incomplete;

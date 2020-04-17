@@ -106,7 +106,7 @@ describe2("Loading a cpp file without includes", function(createTU)
             assert.is_true(obtainedFileName == fileName)
             assert.is_true(absoluteFileName:sub(1,1) == "/")
             assert.is_not_nil(absoluteFileName:match("/.+/"..fileName.."$"))
-            assert.is_true(ffi.C.time(nil) > modTime)
+            assert.is_true(C.time(nil) > modTime)
         end)
 
         -- TODO: location in a system header, location outside a system header but not in
@@ -191,7 +191,7 @@ describe2("Loading a cpp file without includes", function(createTU)
     describe("Collection of children", function()
         local tuCursor = tu:cursor()
         local expectedKinds = {
-            "StructDecl", "FunctionDecl", "EnumDecl", "FunctionDecl", "EnumDecl"
+            "StructDecl", "FunctionDecl", "EnumDecl", "FunctionDecl", "EnumDecl", "ClassDecl"
         }
 
         it("tests the luaclang-parser convention", function()
@@ -203,7 +203,7 @@ describe2("Loading a cpp file without includes", function(createTU)
             end
 
             assert.are.same(kinds, expectedKinds)
-            assert.are.same(isVariadic, { false, false, false, true, false })
+            assert.are.same(isVariadic, { false, false, false, true, false, false })
         end)
 
         local V = cl.ChildVisitResult
@@ -268,7 +268,10 @@ describe2("Loading a cpp file without includes", function(createTU)
         end)
 
         it("tests the ljclang convention: Recurse", function()
-            local expectedMembers = {{ "int", "a" }, { "long", "b" }}
+            local expectedMembers = {
+                { "int", "a", ffi.sizeof("int"), ffi.alignof("int") },
+                { "long", "b", ffi.sizeof("long"), ffi.alignof("long") }
+            }
             local expectedRefQuals = { "none", "lvalue", "rvalue" }
 
             local members, refQuals = {}, {}
@@ -277,11 +280,24 @@ describe2("Loading a cpp file without includes", function(createTU)
             function(cur)
                 if (cur:haskind("StructDecl")) then
                     assert.is_equal(cur:name(), "First")
+                    local ty = cur:type()
+                    assert.is_equal(type(ty:size()), "number")
+                    assert.is_equal(type(ty:alignment()), "number")
+                    assert.is_equal(ty:byteOffsetOf("a"), 0)
+                    assert.is_equal(ty:byteOffsetOf("b"), ffi.alignof("long"))
+                    assert.is_equal(ty:bitOffsetOf("b"), 8*ffi.alignof("long"))
+                    assert.is_equal(ty:bitOffsetOf(""), C.CXTypeLayoutError_InvalidFieldName)
                     return V.Recurse
+                elseif (cur:haskind("ClassDecl")) then
+                    assert.is_equal(cur:name(), "Incomplete")
+                    assert.is_equal(cur:type():size(), C.CXTypeLayoutError_Incomplete)
                 end
 
                 if (cur:haskind("FieldDecl")) then
-                    members[#members + 1] = { cur:type():name(), cur:name() }
+                    local ty = cur:type()
+                    members[#members + 1] = {
+                        ty:name(), cur:name(), ty:size(), ty:alignment()
+                    }
                 elseif (cur:haskind("CXXMethod")) then
                     refQuals[#refQuals + 1] = cur:type():refQualifier()
                 end

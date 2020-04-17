@@ -1333,6 +1333,11 @@ class
 ---------------------------------- Type ---------------------------------
 -------------------------------------------------------------------------
 
+local CXTypeLayoutError = ffi.typeof("enum CXTypeLayoutError")
+local function TypeLayoutResult(llnum)
+    return llnum >= 0 and tonumber(llnum) or CXTypeLayoutError(llnum)
+end
+
 class
 {
     Type_t,
@@ -1408,6 +1413,25 @@ class
         else
             return self:kindnum() == kind
         end
+    end,
+
+    size = function(self)
+        return TypeLayoutResult(clang.clang_Type_getSizeOf(self._typ))
+    end,
+
+    alignment = function(self)
+        return TypeLayoutResult(clang.clang_Type_getAlignOf(self._typ))
+    end,
+
+    bitOffsetOf = function(self, member)
+        check(type(member) == "string", "argument must be a string", 2)
+        return TypeLayoutResult(clang.clang_Type_getOffsetOf(self._typ, member))
+    end,
+
+    byteOffsetOf = function(self, member)
+        local bitOffset = self:bitOffsetOf(member)
+        -- NOTE: this may return a fractional value.
+        return bitOffset < 0 and bitOffset or bitOffset / 8
     end,
 
     refQualifier = function(self)
