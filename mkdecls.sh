@@ -23,9 +23,16 @@ if [ -z "$inFile" ]; then
     usageAndExit
 fi
 
+if grep '\\.' "$inFile"; then
+    # We allow line continuations, but disallow any other use of the backslash because
+    # 'read' without '-r' would not retain them.
+    echo "ERROR: in $inFile, found backslash not at the end of a line." >&2
+    exit 2
+fi
+
 exec {resultFd}< "$inFile"
 
-while IFS='' read -r -u $resultFd line; do
+while IFS='' read -u $resultFd line; do
     if [ x"${line:0:2}" == x'@@' ]; then
         args="${line:2}"
         "$extractdecls" $args
