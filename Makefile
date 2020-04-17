@@ -32,7 +32,7 @@ llvm_libdir_include := $(libdir)/clang/$(llvm_version)/include
 
 ########## OPTIONS ##########
 
-cxxflags := -std=c++17 -I$(incdir) -fPIC
+cxxflags := -std=c++17 -I$(incdir) -fPIC -O2
 cxxflags += -DLJCLANG_LLVM_VERSION='"$(llvm_version)"'
 cxxflags += -Werror -Wall -Wextra -Wold-style-cast -pedantic
 ifneq ($(findstring clang,$(CXX)),)
