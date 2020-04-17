@@ -126,8 +126,8 @@ sys_h := ./dev/sys.h
 CHECK_EXTRACTED_INOTIFY_CMD := $(EXTRACT_CMD_ENV) $(luajit) \
     -e "require'ljclang_linux_decls'"
 
-$(linux_decls_lua): $(EXTRACTED_ENUMS_LUA) $(sys_h) Makefile
-	@$(EXTRACT_CMD_ENV) ./mkdecls.sh ./dev/ljclang_linux_decls.lua.in > $(linux_decls_lua_tmp)
+$(linux_decls_lua): ./dev/ljclang_linux_decls.lua.in $(EXTRACTED_ENUMS_LUA) $(sys_h) Makefile
+	@$(EXTRACT_CMD_ENV) ./mkdecls.sh $< > $(linux_decls_lua_tmp)
 	@mv $(linux_decls_lua_tmp) $@
 	@($(CHECK_EXTRACTED_INOTIFY_CMD) && \
 	    printf "* \033[1mGenerated $@\033[0m\n") \
@@ -136,16 +136,16 @@ $(linux_decls_lua): $(EXTRACTED_ENUMS_LUA) $(sys_h) Makefile
 
 # POSIX functionality exposed to us
 
-$(posix_types_lua): $(EXTRACTED_ENUMS_LUA) $(sys_h) Makefile
-	@$(EXTRACT_CMD_ENV) ./mkdecls.sh ./dev/posix_types.lua.in > $(posix_types_lua_tmp)
+$(posix_types_lua): ./dev/posix_types.lua.in $(EXTRACTED_ENUMS_LUA) $(sys_h) Makefile
+	@$(EXTRACT_CMD_ENV) ./mkdecls.sh $< > $(posix_types_lua_tmp)
 	@mv $(posix_types_lua_tmp) $@
 	@($(EXTRACT_CMD_ENV) $(luajit) -e "require'posix_types'" && \
 	    printf "* \033[1mGenerated $@\033[0m\n") \
 	|| (printf "* \033[1;31mError\033[0m generating $@\n" && \
 	    mv $@ $@.reject && false)
 
-$(posix_decls_lua): $(EXTRACTED_ENUMS_LUA) $(sys_h) Makefile $(posix_types_lua)
-	@$(EXTRACT_CMD_ENV) ./mkdecls.sh ./dev/posix_decls.lua.in > $(posix_decls_lua_tmp)
+$(posix_decls_lua): ./dev/posix_decls.lua.in $(EXTRACTED_ENUMS_LUA) $(sys_h) Makefile $(posix_types_lua)
+	@$(EXTRACT_CMD_ENV) ./mkdecls.sh $< > $(posix_decls_lua_tmp)
 	@mv $(posix_decls_lua_tmp) $@
 	@($(EXTRACT_CMD_ENV) $(luajit) -e "require'posix_decls'" && \
 	    printf "* \033[1mGenerated $@\033[0m\n") \
