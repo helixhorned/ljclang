@@ -3,8 +3,8 @@
 set -e
 
 # NOTE: this program expects an environment suitable for running:
-EXTRACTDECLS=./extractdecls.lua
-extractdecls="$(realpath -e $EXTRACTDECLS)"
+extractdecls=./extractdecls.lua
+test -x "$extractdecls"
 
 inFile="$1"
 
