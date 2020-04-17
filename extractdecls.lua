@@ -302,14 +302,6 @@ function(cur, parent)
                     if (not checkexclude(utype:name())) then
                         printfMatch("typedef %s %s;", utype, ourname)
                     end
---[[
-                elseif (extractMacro) then
-                    local fn, linebeg, lineend = cur:location(true)
-                    local defstr = getDefStr(cur)
-
-                    printfMatch("%s @ %s:%d%s :: %s", ourname, fn, linebeg,
-                           (lineend~=linebeg) and "--"..lineend or "", defstr)
---]]
                 else
                     -- Anything else
                     printfMatch("%s", ourname)
