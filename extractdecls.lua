@@ -46,8 +46,8 @@ local function usage(hline)
         print[[
  (Our options may also come after the file name.)
   -e <enumNameFilterPattern> (enums only)
-  -p <filterPattern>
-  -x <excludePattern1> [-x <excludePattern2>] ...
+  -p <filterPattern1> [-p <filterPattern2>] ... (logically OR'd)
+  -x <excludePattern1> [-x <excludePattern2>] ...  (logically OR'd)
   -s <stripPattern>
   -1 <string to print before everything>
   -2 <string to print after everything>
@@ -97,14 +97,14 @@ local IsValidWhat = {
 local parsecmdline = require("parsecmdline_pk")
 
 -- Meta-information about options, see parsecmdline_pk.
-local opt_meta = { e=true, p=true, A=1, x=1, s=true, C=false, R=false, Q=false,
+local opt_meta = { e=true, p=1, A=1, x=1, s=true, C=false, R=false, Q=false,
                    ['1']=true, ['2']=true, w=true, f=true }
 
 local opts, args = parsecmdline.getopts(opt_meta, arg, usage)
 
 local additionalArgs = opts.A
 local enumNameFilterPattern = opts.e
-local filterPattern = opts.p
+local filterPatterns = opts.p
 local excludePatterns = opts.x
 local stripPattern = opts.s
 local printConstInt = opts.C
@@ -266,6 +266,16 @@ local function wantedCursorKind(cur)
     return (cur:haskind(what)) and what or nil
 end
 
+local function matchesFilterPattern(name)
+    for _, filterPattern in ipairs(filterPatterns) do
+        if (name:find(filterPattern)) then
+            return true
+        end
+    end
+
+    return false
+end
+
 local visitor = cl.regCursorVisitor(
 function(cur, parent)
     if (extractEnum) then
@@ -286,7 +296,7 @@ function(cur, parent)
     if (kind ~= nil) then
         local name = cur:displayName()
 
-        if (filterPattern == nil or name:find(filterPattern)) then
+        if (#filterPatterns == 0 or matchesFilterPattern(name)) then
             if (not checkexclude(name)) then
                 local ourname = stripPattern and name:gsub(stripPattern, "") or name
 
