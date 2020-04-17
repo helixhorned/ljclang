@@ -1,0 +1,12 @@
+local ffi=require"ffi"
+ffi.cdef[[
+@@ -w FunctionDecl -p ^inotify_ ./dev/sys.h
+]]
+return {
+IN = ffi.new[[struct {
+@@ -w MacroDefinition -C -p ^IN_ -s ^IN_ ./dev/sys.h
+}]],
+MAP = ffi.new[[struct {
+@@ -w MacroDefinition -C -p ^MAP_ANONYMOUS$ -s ^MAP_ /usr/include/asm-generic/mman.h
+}]],
+}

@@ -126,17 +126,7 @@ CHECK_EXTRACTED_INOTIFY_CMD := $(EXTRACT_CMD_ENV) $(luajit) \
     -e "require'ljclang_linux_decls'"
 
 $(linux_decls_lua): $(EXTRACTED_ENUMS_LUA) $(sys_h) Makefile
-	@echo 'local ffi=require"ffi"' > $(linux_decls_lua_tmp)
-	@echo 'ffi.cdef[[' >> $(linux_decls_lua_tmp)
-	@$(EXTRACT_CMD_ENV) ./extractdecls.lua -w FunctionDecl -p '^inotify_' $(sys_h) >> $(linux_decls_lua_tmp)
-	@echo ']]' >> $(linux_decls_lua_tmp)
-	@echo 'return { IN = ffi.new[[struct {' >> $(linux_decls_lua_tmp)
-	@$(EXTRACT_CMD_ENV) ./extractdecls.lua -w MacroDefinition -C -p '^IN_' -s '^IN_' $(sys_h) >> $(linux_decls_lua_tmp)
-	@echo '}]], ' >> $(linux_decls_lua_tmp)
-	@echo 'MAP = ffi.new[[struct {' >> $(linux_decls_lua_tmp)
-	@$(EXTRACT_CMD_ENV) ./extractdecls.lua -w MacroDefinition -C -p '^MAP_ANONYMOUS$$' -s '^MAP_' $(mman_h) >> $(linux_decls_lua_tmp)
-	@echo '}]], ' >> $(linux_decls_lua_tmp)
-	@echo '}' >> $(linux_decls_lua_tmp)
+	@$(EXTRACT_CMD_ENV) ./mkdecls.sh ./dev/ljclang_linux_decls.lua.in > $(linux_decls_lua_tmp)
 	@mv $(linux_decls_lua_tmp) $@
 	@($(CHECK_EXTRACTED_INOTIFY_CMD) && \
 	    printf "* \033[1mGenerated $@\033[0m\n") \
