@@ -25,6 +25,7 @@ local io = require("io")
 local math = require("math")
 local string = require("string")
 
+require("posix_types")
 ffi.cdef[[
 time_t time(time_t *);
 ]]

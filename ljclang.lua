@@ -40,7 +40,6 @@ unsigned ljclang_getHardwareConcurrency();
 
 local supportLLVMVersion = ffi.string(support.ljclang_getLLVMVersion()):gsub("git$","")
 
-require("posix_types")
 require("ljclang_Index_h")
 
 local ExtractedEnums = require("ljclang_extracted_enums")
@@ -743,6 +742,16 @@ DiagnosticSet = class
 ---------------------------------- File ---------------------------------
 -------------------------------------------------------------------------
 
+local haveClangGetFileTime = false
+local function setupClangGetFileTime()
+    if (not haveClangGetFileTime) then
+        -- CAUTION: problematic with mkapp.lua
+        require("posix_types")
+        ffi.cdef"time_t clang_getFileTime(CXFile SFile)"
+        haveClangGetFileTime = true
+    end
+end
+
 File = class
 {
     function(cxfile, parent)
@@ -773,6 +782,7 @@ File = class
     end,
 
     time = function(self)
+        setupClangGetFileTime()
         return tonumber(clang.clang_getFileTime(self._cxfile))
     end,
 

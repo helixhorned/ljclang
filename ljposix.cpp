@@ -5,13 +5,7 @@
 #include <string>
 #include <type_traits>
 
-#include <ctime>
-#include <cstddef>
-#include <cstdint>
-
 #include <sys/select.h>
-#include <sys/socket.h>
-#include <sys/types.h>
 #include <dirent.h>
 #include <poll.h>
 #include <signal.h>
@@ -19,23 +13,6 @@
 namespace
 {
     template <typename T> struct TypeString {};
-
-    // NOTE: do not use 'is_same_v', it is absent in Raspbian's libstdc++.
-    constexpr bool LongIntIsInt64 = std::is_same<int64_t, long int>::value;
-    constexpr bool ULongIsUInt64 = std::is_same<uint64_t, unsigned long>::value;
-    struct DummyType1 {};
-    struct DummyType2 {};
-    using LongInt = std::conditional_t<LongIntIsInt64, DummyType1, long int>;
-    using ULong = std::conditional_t<ULongIsUInt64, DummyType2, unsigned long>;
-
-    template <> struct TypeString<int32_t> { static constexpr const char *value = "int32_t"; };
-    template <> struct TypeString<int64_t> { static constexpr const char *value = "int64_t"; };
-    template <> struct TypeString<uint32_t> { static constexpr const char *value = "uint32_t"; };
-    template <> struct TypeString<uint64_t> { static constexpr const char *value = "uint64_t"; };
-    template <> struct TypeString<unsigned short> { static constexpr const char *value = "unsigned short"; };
-
-    template <> struct TypeString<LongInt> { static constexpr const char *value = "long int"; };
-    template <> struct TypeString<ULong> { static constexpr const char *value = "unsigned long"; };
 
     template <> struct TypeString<sigset_t> {
         static const std::string structDef;
@@ -71,34 +48,10 @@ extern "C" {
 const char *ljclang_getTypeDefs()
 {
     static const std::string s =
-        TypeDef(time_t)
-        + TypeDef(blkcnt_t)
-        + TypeDef(blksize_t)
-        + TypeDef(clock_t)
-        + TypeDef(clockid_t)
-        + TypeDef(dev_t)
-        + TypeDef(fsblkcnt_t)
-        + TypeDef(fsfilcnt_t)
-        + TypeDef(gid_t)
-        + TypeDef(id_t)
-        + TypeDef(ino_t)
-        + TypeDef(mode_t)
-        + TypeDef(nlink_t)
-        + TypeDef(off_t)
-        + TypeDef(pid_t)
-        + TypeDef(ssize_t)
-        + TypeDef(suseconds_t)
-        + TypeDef(uid_t)
-        // poll.h
-        + TypeDef(nfds_t)
         // signal.h
-        + TypeDef(sigset_t)
+        TypeDef(sigset_t) +
         // sys/select.h
-        + TypeDef(fd_set)
-        // sys/socket.h
-        + TypeDef(sa_family_t)
-        + TypeDef(socklen_t)
-        ;
+        TypeDef(fd_set);
 
     return s.c_str();
 }
@@ -151,6 +104,7 @@ struct pollfd {
 
 // Check that on our system, the structs we want to expose include *only* the members
 // specified by POSIX.
+// TODO: move to posix_types.lua
 static_assert(sizeof(Check::timeval) == sizeof(struct timeval));
 static_assert(sizeof(Check::timespec) == sizeof(struct timespec));
 static_assert(sizeof(Check::pollfd) == sizeof(struct pollfd));

@@ -29,6 +29,7 @@ local function loadandstrip(filename)
               :gsub("CINDEX_DEPRECATED","")
               :gsub("LLVM_CLANG_C_EXTERN_C_BEGIN","")
               :gsub("LLVM_CLANG_C_EXTERN_C_END","")
+              :gsub("time_t clang_getFileTime.-\n", "// REMOVED: clang_getFileTime\n")
               :gsub(" *\n+", "\n")
 end
 

@@ -188,7 +188,7 @@ typedef enum {
 clang_CXIndex_setInvocationEmissionPathOption(CXIndex, const char *Path);
 typedef void *CXFile;
  CXString clang_getFileName(CXFile SFile);
- time_t clang_getFileTime(CXFile SFile);
+ // REMOVED: clang_getFileTime
 typedef struct {
   unsigned long long data[3];
 } CXFileUniqueID;

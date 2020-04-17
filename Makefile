@@ -55,13 +55,15 @@ linux_decls_lua := ljclang_linux_decls.lua
 linux_decls_lua_tmp := $(linux_decls_lua).tmp
 posix_decls_lua := posix_decls.lua
 posix_decls_lua_tmp := $(posix_decls_lua).tmp
+posix_types_lua := posix_types.lua
+posix_types_lua_tmp := $(posix_types_lua).tmp
 
 LJCLANG_SUPPORT_SO := libljclang_support.so
 LJPOSIX_SO := libljposix.so
 SHARED_LIBRARIES := $(LJCLANG_SUPPORT_SO) $(LJPOSIX_SO)
 
 GENERATED_FILES_STAGE_1 := $(INDEX_H_LUA) $(LIBDIR_INCLUDE_LUA)
-GENERATED_FILES_STAGE_2 := $(GENERATED_FILES_STAGE_1) $(EXTRACTED_ENUMS_LUA)
+GENERATED_FILES_STAGE_2 := $(GENERATED_FILES_STAGE_1) $(EXTRACTED_ENUMS_LUA) $(posix_types_lua)
 
 .PHONY: all app_dependencies apps clean veryclean bootstrap doc test install install-dev _install_common
 
@@ -134,13 +136,18 @@ $(linux_decls_lua): $(EXTRACTED_ENUMS_LUA) $(sys_h) Makefile
 
 # POSIX functionality exposed to us
 
-CHECK_EXTRACTED_POSIX_CMD := $(EXTRACT_CMD_ENV) $(luajit) \
-    -e "require'posix_decls'"
+$(posix_types_lua): $(EXTRACTED_ENUMS_LUA) $(sys_h) Makefile
+	@$(EXTRACT_CMD_ENV) ./mkdecls.sh ./dev/posix_types.lua.in > $(posix_types_lua_tmp)
+	@mv $(posix_types_lua_tmp) $@
+	@($(EXTRACT_CMD_ENV) $(luajit) -e "require'posix_types'" && \
+	    printf "* \033[1mGenerated $@\033[0m\n") \
+	|| (printf "* \033[1;31mError\033[0m generating $@\n" && \
+	    mv $@ $@.reject && false)
 
-$(posix_decls_lua): $(EXTRACTED_ENUMS_LUA) $(sys_h) Makefile
+$(posix_decls_lua): $(EXTRACTED_ENUMS_LUA) $(sys_h) Makefile $(posix_types_lua)
 	@$(EXTRACT_CMD_ENV) ./mkdecls.sh ./dev/posix_decls.lua.in > $(posix_decls_lua_tmp)
 	@mv $(posix_decls_lua_tmp) $@
-	@($(CHECK_EXTRACTED_POSIX_CMD) && \
+	@($(EXTRACT_CMD_ENV) $(luajit) -e "require'posix_decls'" && \
 	    printf "* \033[1mGenerated $@\033[0m\n") \
 	|| (printf "* \033[1;31mError\033[0m generating $@\n" && \
 	    mv $@ $@.reject && false)
