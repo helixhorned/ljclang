@@ -119,7 +119,6 @@ $(EXTRACTED_ENUMS_LUA): $(SHARED_LIBRARIES) $(GENERATED_FILES_STAGE_1)
 
 # Linux-specific functionality exposed to us
 
-mman_h ?= /usr/include/asm-generic/mman.h
 sys_h := ./dev/sys.h
 
 CHECK_EXTRACTED_INOTIFY_CMD := $(EXTRACT_CMD_ENV) $(luajit) \
@@ -135,59 +134,11 @@ $(linux_decls_lua): $(EXTRACTED_ENUMS_LUA) $(sys_h) Makefile
 
 # POSIX functionality exposed to us
 
-errno_h ?= /usr/include/errno.h
-fcntl_h ?= /usr/include/fcntl.h
-signal_h ?= /usr/include/signal.h
-time_h ?= /usr/include/time.h
-unistd_h ?= /usr/include/unistd.h
-
 CHECK_EXTRACTED_POSIX_CMD := $(EXTRACT_CMD_ENV) $(luajit) \
     -e "require'posix_decls'"
 
 $(posix_decls_lua): $(EXTRACTED_ENUMS_LUA) $(sys_h) Makefile
-	@echo 'local ffi=require"ffi"' > $(posix_decls_lua_tmp)
-	@echo 'return { POLL = ffi.new[[struct {' >> $(posix_decls_lua_tmp)
-	@$(EXTRACT_CMD_ENV) ./extractdecls.lua -w MacroDefinition -C -p '^POLLIN$$' -s '^POLL' $(sys_h) >> $(posix_decls_lua_tmp)
-	@echo '}]], ' >> $(posix_decls_lua_tmp)
-	@echo 'AF = ffi.new[[struct {' >> $(posix_decls_lua_tmp)  # NOTE: PF -> AF
-	@$(EXTRACT_CMD_ENV) ./extractdecls.lua -w MacroDefinition -C -p '^PF_INET$$' -s '^PF_' $(sys_h) >> $(posix_decls_lua_tmp)
-	@echo '}]], ' >> $(posix_decls_lua_tmp)
-	@echo 'CLOCK = ffi.new[[struct {' >> $(posix_decls_lua_tmp)
-	@$(EXTRACT_CMD_ENV) ./extractdecls.lua -w MacroDefinition -C -p '^CLOCK_MONOTONIC$$' -s '^CLOCK_' $(time_h) >> $(posix_decls_lua_tmp)
-	@echo '}]], ' >> $(posix_decls_lua_tmp)
-	@echo 'E = ffi.new[[struct {' >> $(posix_decls_lua_tmp)
-	@$(EXTRACT_CMD_ENV) ./extractdecls.lua -w MacroDefinition -C -p '^EAGAIN$$' -s '^E' $(errno_h) >> $(posix_decls_lua_tmp)
-	@$(EXTRACT_CMD_ENV) ./extractdecls.lua -w MacroDefinition -C -p '^EPIPE$$' -s '^E' $(errno_h) >> $(posix_decls_lua_tmp)
-	@echo '}]], ' >> $(posix_decls_lua_tmp)
-	@echo 'MAP = ffi.new[[struct {' >> $(posix_decls_lua_tmp)
-	@$(EXTRACT_CMD_ENV) ./extractdecls.lua -w MacroDefinition -C -p '^MAP_[SPF][HRI][AIX][^_]+$$' -s '^MAP_' $(mman_h) >> $(posix_decls_lua_tmp)
-	@echo '}]], ' >> $(posix_decls_lua_tmp)
-	@echo 'O = ffi.new[[struct {' >> $(posix_decls_lua_tmp)
-	@$(EXTRACT_CMD_ENV) ./extractdecls.lua -w MacroDefinition -C -p '^O_RDONLY$$' -s '^O_' $(fcntl_h) >> $(posix_decls_lua_tmp)
-	@$(EXTRACT_CMD_ENV) ./extractdecls.lua -w MacroDefinition -C -p '^O_WRONLY$$' -s '^O_' $(fcntl_h) >> $(posix_decls_lua_tmp)
-	@$(EXTRACT_CMD_ENV) ./extractdecls.lua -w MacroDefinition -C -p '^O_RDWR$$' -s '^O_' $(fcntl_h) >> $(posix_decls_lua_tmp)
-	@$(EXTRACT_CMD_ENV) ./extractdecls.lua -w MacroDefinition -C -p '^O_NONBLOCK$$' -s '^O_' $(fcntl_h) >> $(posix_decls_lua_tmp)
-	@echo '}]], ' >> $(posix_decls_lua_tmp)
-	@echo 'PROT = ffi.new[[struct {' >> $(posix_decls_lua_tmp)
-	@$(EXTRACT_CMD_ENV) ./extractdecls.lua -w MacroDefinition -C -p '^PROT_[RWN]' -s '^PROT_' $(mman_h) >> $(posix_decls_lua_tmp)
-	@echo '}]], ' >> $(posix_decls_lua_tmp)
-	@echo '_SC = ffi.new[[struct {' >> $(posix_decls_lua_tmp)
-	@$(EXTRACT_CMD_ENV) ./extractdecls.lua -w EnumConstantDecl -C -p '^_SC_PAGESIZE$$' -s '^_SC_' $(unistd_h) >> $(posix_decls_lua_tmp) || \
-		$(EXTRACT_CMD_ENV) ./extractdecls.lua -w MacroDefinition -C -p '^_SC_PAGESIZE$$' -s '^_SC_' $(unistd_h) >> $(posix_decls_lua_tmp)
-	@echo '}]], ' >> $(posix_decls_lua_tmp)
-	@echo 'SHUT = ffi.new[[struct {' >> $(posix_decls_lua_tmp)
-	@$(EXTRACT_CMD_ENV) ./extractdecls.lua -w EnumConstantDecl -C -p '^SHUT_RDWR$$' -s '^SHUT_' $(sys_h) >> $(posix_decls_lua_tmp) || \
-		$(EXTRACT_CMD_ENV) ./extractdecls.lua -w MacroDefinition -C -p '^SHUT_RDWR$$' -s '^SHUT_' $(sys_h) >> $(posix_decls_lua_tmp)
-	@echo '}]], ' >> $(posix_decls_lua_tmp)
-	@echo 'SIG = ffi.new[[struct {' >> $(posix_decls_lua_tmp)
-	@$(EXTRACT_CMD_ENV) ./extractdecls.lua -w MacroDefinition -C -p '^SIGINT$$' -s '^SIG' $(signal_h) >> $(posix_decls_lua_tmp)
-	@$(EXTRACT_CMD_ENV) ./extractdecls.lua -w MacroDefinition -C -p '^SIGPIPE$$' -s '^SIG' $(signal_h) >> $(posix_decls_lua_tmp)
-	@$(EXTRACT_CMD_ENV) ./extractdecls.lua -w MacroDefinition -C -p '^SIG_BLOCK$$' -s '^SIG_' $(signal_h) >> $(posix_decls_lua_tmp)
-	@echo '}]], ' >> $(posix_decls_lua_tmp)
-	@echo 'SOCK = ffi.new[[struct {' >> $(posix_decls_lua_tmp)
-	@$(EXTRACT_CMD_ENV) ./extractdecls.lua -w EnumConstantDecl -C -p '^SOCK_STREAM$$' -s '^SOCK_' $(sys_h) >> $(posix_decls_lua_tmp) || \
-		$(EXTRACT_CMD_ENV) ./extractdecls.lua -w MacroDefinition -C -p '^SOCK_STREAM$$' -s '^SOCK_' $(sys_h) >> $(posix_decls_lua_tmp)
-	@echo '}]] }' >> $(posix_decls_lua_tmp)
+	@$(EXTRACT_CMD_ENV) ./mkdecls.sh ./dev/posix_decls.lua.in > $(posix_decls_lua_tmp)
 	@mv $(posix_decls_lua_tmp) $@
 	@($(CHECK_EXTRACTED_POSIX_CMD) && \
 	    printf "* \033[1mGenerated $@\033[0m\n") \

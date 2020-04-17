@@ -71,7 +71,7 @@ local function usage(hline)
        Incompatible with -C or -R.
   -Q: be quiet
   -w: extract what? Can be
-       EnumConstantDecl (default), TypedefDecl, FunctionDecl, MacroDefinition
+       E+M, EnumConstantDecl (default), MacroDefinition, TypedefDecl, FunctionDecl
 ]]
         -- ^ KEEPINSYNC with IsValidWhat:
         -- TODO: allow more general list in '-w'?
@@ -83,6 +83,16 @@ local function usage(hline)
 
     -- Continue to allow mkapp.lua collect the remaining 'require's.
 end
+
+local EnumOrMacro = "E+M"
+-- KEEPINSYNC with usage text above:
+local IsValidWhat = {
+    [EnumOrMacro] = true,
+    EnumConstantDecl = true,
+    MacroDefinition = true,
+    TypedefDecl = true,
+    FunctionDecl = true,
+}
 
 local parsecmdline = require("parsecmdline_pk")
 
@@ -103,14 +113,16 @@ local quiet = opts.Q
 local what = opts.w or "EnumConstantDecl"
 local fmtfuncCode = opts.f
 
-local extractEnum = (what == "EnumConstantDecl")
-local extractMacro = (what:find("^Macro"))
+local extractEnum = (what == "EnumConstantDecl" or what == EnumOrMacro)
+local extractMacro = (what:find("^Macro") or what == EnumOrMacro)
 
 local prefixString = opts['1']
 local suffixString = opts['2']
 
 if (#args == 0) then
     usage()
+elseif (not IsValidWhat[what]) then
+    usage("Invalid argument to '-w'.")
 end
 
 -- Late load to allow printing the help text with a plain invocation.
@@ -243,6 +255,17 @@ local currentEnumPrefixLength
 -- NOTE: cl.ChildVisitResult is not available when run from 'make bootstrap', so
 -- use string enum constant names.
 
+local function wantedCursorKind(cur)
+    if (what == EnumOrMacro) then
+        return
+            (cur:haskind("EnumConstantDecl") and "EnumConstantDecl") or
+            (cur:haskind("MacroDefinition") and "MacroDefinition") or
+            nil
+    end
+
+    return (cur:haskind(what)) and what or nil
+end
+
 local visitor = cl.regCursorVisitor(
 function(cur, parent)
     if (extractEnum) then
@@ -258,7 +281,9 @@ function(cur, parent)
         end
     end
 
-    if (cur:haskind(what)) then
+    local kind = wantedCursorKind(cur)
+
+    if (kind ~= nil) then
         local name = cur:displayName()
 
         if (filterPattern == nil or name:find(filterPattern)) then
@@ -266,8 +291,8 @@ function(cur, parent)
                 local ourname = stripPattern and name:gsub(stripPattern, "") or name
 
                 if (extractEnum or extractMacro) then
-                    -- Enumeration constants
-                    local val = extractEnum and cur:enumval() or getDefStr(cur)
+                    local isEnum = (kind == "EnumConstantDecl")
+                    local val = isEnum and cur:enumval() or getDefStr(cur)
 
                     -- Notes:
                     --  - tonumber(val) == nil can only happen with #defines that are not
@@ -275,7 +300,7 @@ function(cur, parent)
                     --  - We only use tonumber() for the check here. To convert, we output
                     --    the token as it appears in the source code. This way, numbers
                     --    written in octal are correctly preserved.
-                    if (not extractMacro or tonumber(val) ~= nil) then
+                    if (isEnum or tonumber(val) ~= nil) then
                         if (fmtfunc) then
                             local str = fmtfunc(ourname, val,
                                                 currentEnumName,

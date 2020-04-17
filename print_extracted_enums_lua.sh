@@ -7,7 +7,7 @@ fi
 
 # NOTE: this script has not been tested with $incdir containing whitespace.
 
-EXTRACT_OPTS_KINDS=(-Q -R -e 'CXCursorKind' -p '^CXCursor_' -s '^CXCursor_'
+EXTRACT_OPTS_KINDS=(-w 'EnumConstantDecl' -Q -R -e 'CXCursorKind' -p '^CXCursor_' -s '^CXCursor_'
  -x '_First' -x '_Last' -x '_GCCAsmStmt' -x '_MacroInstantiation'
  -1 'CursorKindName = {' -2 '},')
 
