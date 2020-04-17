@@ -67,7 +67,8 @@ GENERATED_FILES_STAGE_2 := $(GENERATED_FILES_STAGE_1) $(EXTRACTED_ENUMS_LUA)
 
 all: $(SHARED_LIBRARIES) $(GENERATED_FILES_STAGE_2)
 
-apps: extractdecls.app.lua watch_compile_commands.app.lua
+apps := extractdecls.app.lua watch_compile_commands.app.lua
+apps: $(apps)
 
 clean:
 	rm -f $(SHARED_LIBRARIES) $(apps)
