@@ -38,6 +38,25 @@ assert(io.open(nonExistentFileName) == nil)
 --== posix.lua
 
 describe("posix.lua", function()
+    it("tests Dir", function()
+        local dir = posix.Dir("./test_data")
+
+        local ExpectedFileCount = 3
+        local haveFile = {}
+
+        for i = 1, ExpectedFileCount + 2 do
+            local fileName = dir:read()
+            assert.is_true(type(fileName) == "string")
+            assert.is_nil(haveFile[fileName])
+            haveFile[fileName] = true
+        end
+
+        assert.is_nil(dir:read())
+
+        assert.is_true(haveFile["."])
+        assert.is_true(haveFile["simple.hpp"])
+    end)
+
     it("tests fd_set_t", function()
         local MaxFdToTest = 65
         local FdsToTest = { 7, 8+1, 16+2, 24+3, 31, 32, 33, 63, 64, MaxFdToTest }
