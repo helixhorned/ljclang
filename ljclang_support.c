@@ -4,28 +4,24 @@
 
 #include <clang-c/Index.h>
 
-extern "C"
-{
 // Returns the LLVM version obtained with "<llvm-config> --version" when
 // building us.
 const char *ljclang_getLLVMVersion()
 {
     return LJCLANG_LLVM_VERSION;
 }
-}
 
 /* Our cursor visitor takes the CXCursor objects by pointer. */
-using LJCX_CursorVisitor = CXChildVisitResult (*)(
+typedef enum CXChildVisitResult (*LJCX_CursorVisitor)(
     CXCursor *cursor, CXCursor *parent, CXClientData client_data);
 
 static enum CXChildVisitResult
 ourCursorVisitor(CXCursor cursor, CXCursor parent, CXClientData client_data)
 {
-    auto *visitor = static_cast<LJCX_CursorVisitor *>(client_data);
-    return (*visitor)(&cursor, &parent, nullptr);
+    LJCX_CursorVisitor *visitor = (LJCX_CursorVisitor *)(client_data);
+    return (*visitor)(&cursor, &parent, NULL);
 }
 
-extern "C"
 int ljclang_visitChildrenWith(CXCursor parent, LJCX_CursorVisitor visitor)
 {
     const unsigned wasBroken = clang_visitChildren(parent, ourCursorVisitor, &visitor);

@@ -38,6 +38,7 @@ common_flags += -Werror -Wall -Wextra -pedantic
 
 cflags := -std=c99 $(common_flags)
 
+# Development convenience, for test_data/*.cpp only:
 cxxflags := -std=c++17 $(common_flags) -Wold-style-cast
 ifneq ($(findstring clang,$(CXX)),)
     cxxflags += -Wno-unused-const-variable
@@ -82,8 +83,8 @@ bootstrap: $(EXTRACTED_ENUMS_LUA)
 
 # ---------- Build ----------
 
-$(LJCLANG_SUPPORT_SO): ljclang_support.cpp Makefile
-	$(CXX) $(cxxflags) -shared $< $(lib) -o $@
+$(LJCLANG_SUPPORT_SO): ljclang_support.c Makefile
+	$(CC) $(cflags) -shared $< $(lib) -o $@
 
 $(LJPOSIX_SO): ljposix.c Makefile
 	$(CC) $(cflags) -shared $< -o $@
