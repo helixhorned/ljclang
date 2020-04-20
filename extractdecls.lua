@@ -199,7 +199,7 @@ elseif (moduleName) then
     --    it appears that *from within the C function implementing Lua print()*, there is an
     --    access to the global environment which then is not fulfilled.
     local env = getfenv(0)
-    setfenv(0, { check=assert, printf=printfMatch, type=type })
+    setfenv(0, { check=assert, concat=table.concat, printf=printfMatch, type=type })
     moduleFunc = require(moduleName)
     setfenv(0, env)
 
@@ -211,7 +211,7 @@ elseif (moduleName) then
     setfenv(moduleFunc, {})
 end
 
-local tuOptions = extractMacro and {"DetailedPreprocessingRecord"} or nil
+local tuOptions = (extractMacro or moduleFunc) and {"DetailedPreprocessingRecord"} or nil
 
 local filename = args[1]
 do

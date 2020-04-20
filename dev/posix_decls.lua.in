@@ -1,4 +1,12 @@
 local ffi=require"ffi"
+
+local SIG_DFL = [[
+@@ -m dev.exdecl_macro_def -p ^SIG_DFL$ /usr/include/signal.h
+]]
+-- Check that SIG_DFL is #defined as a null pointer cast.
+assert(SIG_DFL:match([[^%(%(.*%)0%)
+$]]))
+
 return {
 POLL = ffi.new[[struct {
 @@ -w MacroDefinition -C -p ^POLLIN$ -s ^POLL ./dev/sys.h

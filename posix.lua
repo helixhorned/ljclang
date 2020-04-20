@@ -86,7 +86,8 @@ int sigaddset(sigset_t *, int);
 int sigemptyset(sigset_t *);
 int sigprocmask(int, const sigset_t *restrict, sigset_t *restrict);
 
-void ljclang_setSigintHandlingToDefault();
+typedef void (*sighandler_t)(int);
+sighandler_t signal(int signum, sighandler_t handler);
 ]]
 
 local pollfd_t = ffi.typeof("struct pollfd")
@@ -146,11 +147,11 @@ fd_set_t = class
 }
 
 local SIG = decls.SIG
-local SIG_DFL = pollfd_t()  -- just a marker with a unique address
 
 local external_SIG = {
     INT = SIG.INT,
-    DFL = SIG_DFL,
+    -- NOTE: that SIG_DFL == NULL has been checked in posix_decls.lua
+    DFL = ffi.new("sighandler_t"),
 }
 
 local api = {
@@ -582,8 +583,11 @@ end
 
 api.signal = function(sig, handler)
     check(sig == SIG.INT, "argument #1 must be SIG.INT", 2)
-    check(handler == SIG_DFL, "argument #2 must be SIG.DFL", 2)
-    ljposix.ljclang_setSigintHandlingToDefault()
+    check(handler == external_SIG.DFL, "argument #2 must be SIG.DFL", 2)
+
+    ffi.errno(0)
+    C.signal(sig, handler)
+    assert(ffi.errno() == 0, "signal() failed unexpectedly")
 end
 
 -- Done!
