@@ -2,6 +2,7 @@
 #include <sys/select.h>
 #include <sys/socket.h>
 #include <sys/types.h>
+#include <dirent.h>
 #include <poll.h>
 #include <signal.h>
 #include <time.h>

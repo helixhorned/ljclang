@@ -58,8 +58,7 @@ posix_types_lua := posix_types.lua
 posix_types_lua_tmp := $(posix_types_lua).tmp
 
 LJCLANG_SUPPORT_SO := libljclang_support.so
-LJPOSIX_SO := libljposix.so
-SHARED_LIBRARIES := $(LJCLANG_SUPPORT_SO) $(LJPOSIX_SO)
+SHARED_LIBRARIES := $(LJCLANG_SUPPORT_SO)
 
 GENERATED_FILES_STAGE_1 := $(INDEX_H_LUA) $(LIBDIR_INCLUDE_LUA)
 GENERATED_FILES_STAGE_2 := $(GENERATED_FILES_STAGE_1) $(EXTRACTED_ENUMS_LUA) $(posix_types_lua)
@@ -85,9 +84,6 @@ bootstrap: $(EXTRACTED_ENUMS_LUA)
 
 $(LJCLANG_SUPPORT_SO): ljclang_support.c Makefile
 	$(CC) $(cflags) -shared $< $(lib) -o $@
-
-$(LJPOSIX_SO): ljposix.c Makefile
-	$(CC) $(cflags) -shared $< -o $@
 
 $(INDEX_H_LUA): ./createheader.lua $(incdir)/clang-c/*
 	@$(luajit) ./createheader.lua $(incdir)/clang-c > $@

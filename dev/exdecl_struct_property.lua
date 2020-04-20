@@ -6,10 +6,11 @@ local printf = printf
 local printed = false
 
 return function(cur, args)
-    check(#args == 1, "Must pass exactly one user argument")
     local property = args[1]
-    check(property == "size" or property == "alignment",
-          "argument must be 'size' or 'alignment'")
+    check(property == "size" or property == "alignment" or property == "offset",
+          "argument must be 'size', 'alignment' or 'offset'")
+    check(property ~= "offset" or #args == 2, "Must pass two user arguments")
+    check(property == "offset" or #args == 1, "Must pass exactly one user arguments")
 
     if (not (cur:haskind("StructDecl") and cur:isDefinition())) then
         return
@@ -19,7 +20,10 @@ return function(cur, args)
     printed = true
 
     local ty = cur:type()
-    local prop = (property == "size") and ty:size() or ty:alignment()
+    local prop =
+        (property == "size") and ty:size() or
+        (property == "alignment") and ty:alignment() or
+        ty:byteOffsetOf(args[2])
 
     check(prop >= 0, "Error obtaining property")
 

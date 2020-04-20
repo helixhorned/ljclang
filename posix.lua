@@ -7,7 +7,6 @@ local string = require("string")
 local class = require("class").class
 local error_util = require("error_util")
 
-local ljposix = ffi.load("ljposix")
 require("posix_types")
 local decls = require("posix_decls")
 local linux_decls = require("ljclang_linux_decls")
@@ -51,8 +50,12 @@ FILE *freopen(const char *pathname, const char *mode, FILE *stream);
 char *realpath(const char *path, char *resolved_path);
 ]]
 
--- NOTE: readdir64() is glibc-specific. We use it instead of readdir() because 'struct
--- dirent' has #ifndef-conditional member definitions while 'struct dirent64' does not.
+-- NOTE: readdir64() is present in glibc and musl. We use it instead of readdir() because
+--  with glibc, 'struct dirent' has #ifndef-conditional member definitions while 'struct
+--  dirent64' does not.
+--
+--  In musl, 'dirent64' is simply #defined to 'dirent'. In Alpine Linux's /usr/lib/libc.a,
+--  'dirent64' is present as 'W' symbol as shown by 'nm'.
 ffi.cdef[[
 struct _DIR;
 struct dirent64;
@@ -60,7 +63,6 @@ typedef struct _DIR DIR;
 DIR *opendir(const char *name);
 int closedir(DIR *dirp);
 struct dirent64 *readdir64(DIR *dirp);
-const char *ljclang_getDirent64Name(const struct dirent64 *dirent);
 ]]
 
 -- NOTE: leave type 'struct sockaddr' incomplete.
@@ -378,7 +380,7 @@ local Directory = class{
             error("readdir failed: %s"..getErrnoString())
         end
 
-        return (dirEnt ~= nil) and ffi.string(ljposix.ljclang_getDirent64Name(dirEnt)) or nil
+        return (dirEnt ~= nil) and ffi.string(decls.getDirent64Name(dirEnt)) or nil
     end
 }
 

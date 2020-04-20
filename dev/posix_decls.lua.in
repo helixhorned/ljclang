@@ -1,5 +1,10 @@
 local ffi=require"ffi"
 
+local assert = assert
+local tonumber = tonumber
+
+----------
+
 local SIG_DFL = [[
 @@ -m dev.exdecl_macro_def -p ^SIG_DFL$ /usr/include/signal.h
 ]]
@@ -7,7 +12,27 @@ local SIG_DFL = [[
 assert(SIG_DFL:match([[^%(%(.*%)0%)
 $]]))
 
+ffi.cdef[[
+struct dirent64;
+]]
+
+-- TODO: musl
+local dirent64_name_offset = tonumber[[
+@@ -m dev.exdecl_struct_property -A -D_LARGEFILE64_SOURCE=1 -p ^dirent64$ -a offset -a d_name ./dev/posix.h
+]];
+
+local uint8_ptr_t = ffi.typeof("const uint8_t *")
+local dirent64_ptr_t = ffi.typeof("struct dirent64 *")
+
 return {
+
+getDirent64Name = function(dirent)
+    assert(ffi.istype(dirent64_ptr_t, dirent))
+    assert(dirent ~= nil)
+    local ptr = ffi.cast(uint8_ptr_t, dirent) + dirent64_name_offset
+    return ffi.string(ptr)
+end,
+
 POLL = ffi.new[[struct {
 @@ -w MacroDefinition -C -p ^POLLIN$ -s ^POLL ./dev/sys.h
 }]], 
@@ -43,4 +68,5 @@ SIG = ffi.new[[struct {
 SOCK = ffi.new[[struct {
 @@ -w E+M -C -p ^SOCK_STREAM$ -s ^SOCK_ ./dev/sys.h
 }]],
+
 }
