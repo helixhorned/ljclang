@@ -35,36 +35,36 @@ end,
 
 POLL = ffi.new[[struct {
 @@ -w MacroDefinition -C -p ^POLLIN$ -s ^POLL ./dev/sys.h
-}]], 
+}]],
 -- NOTE: PF -> AF
 AF = ffi.new[[struct {
 @@ -w MacroDefinition -C -p ^PF_INET$ -s ^PF_ ./dev/sys.h
-}]], 
+}]],
 CLOCK = ffi.new[[struct {
 @@ -w MacroDefinition -C -p ^CLOCK_MONOTONIC$ -s ^CLOCK_ /usr/include/time.h
-}]], 
+}]],
 E = ffi.new[[struct {
 @@ -w MacroDefinition -C -p ^EAGAIN$ -p ^EPIPE$ -s ^E /usr/include/errno.h
-}]], 
+}]],
 MAP = ffi.new[[struct {
 @@ -w MacroDefinition -C -p ^MAP_[SPF][HRI][AIX][^_]+$ -s ^MAP_ /usr/include/asm-generic/mman.h
-}]], 
+}]],
 O = ffi.new[[struct {
 @@ -w MacroDefinition -C -p ^O_RDONLY$ -p ^O_WRONLY$ -p ^O_RDWR$ -p ^O_NONBLOCK$ -s ^O_ /usr/include/fcntl.h
-}]], 
+}]],
 PROT = ffi.new[[struct {
 @@ -w MacroDefinition -C -p ^PROT_[RWN] -s ^PROT_ /usr/include/asm-generic/mman.h
-}]], 
+}]],
 _SC = ffi.new[[struct {
 @@ -w E+M -C -p ^_SC_PAGESIZE$ -s ^_SC_ /usr/include/unistd.h
-}]], 
+}]],
 SHUT = ffi.new[[struct {
 @@ -w E+M -C -p ^SHUT_RDWR$ -s ^SHUT_ ./dev/sys.h
-}]], 
+}]],
 SIG = ffi.new[[struct {
 @@ -w MacroDefinition -C -p ^SIGINT$ -p ^SIGPIPE$ -s ^SIG /usr/include/signal.h
 @@ -w MacroDefinition -C -p ^SIG_BLOCK$ -s ^SIG_ /usr/include/signal.h
-}]], 
+}]],
 SOCK = ffi.new[[struct {
 @@ -w E+M -C -p ^SOCK_STREAM$ -s ^SOCK_ ./dev/sys.h
 }]],
