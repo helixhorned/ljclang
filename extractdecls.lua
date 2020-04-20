@@ -267,11 +267,6 @@ end
 -- Get definition string of #define macro definition cursor.
 local function getDefStr(cur)
     local tokens = cur:_tokens()
-    -- TOKENIZE_WORKAROUND
---    print("tokens: ["..table.concat(tokens, "|", 2, #tokens).."]")
-    if (#tokens >= 3) then
-        tokens[#tokens] = nil
-    end
     return table.concat(tokens, " ", 2, #tokens)
 end
 

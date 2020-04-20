@@ -1214,11 +1214,9 @@ class
         return TranslationUnit_t(cxtu, self, false)
     end,
 
-    -- NOTE: *Sometimes* returns one token too much, see
-    --   http://clang-developers.42468.n3.nabble.com/querying-information-about-preprocessing-directives-in-libclang-td2740612.html
-    -- Related bug report:
+    -- NOTE: Used to sometimes return one token too much:
     --   http://llvm.org/bugs/show_bug.cgi?id=9069
-    -- Also, see TOKENIZE_WORKAROUND in extractdecls.lua
+    -- TODO: is it good enough now?
     _tokens = function(self)
         local tu = self:translationUnit()
         local cxtu = tu._tu
