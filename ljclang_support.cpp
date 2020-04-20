@@ -2,8 +2,6 @@
 // Copyright (C) 2013-2020 Philipp Kutin
 // See LICENSE for license information.
 
-#include <thread>
-
 #include <clang-c/Index.h>
 
 extern "C"
@@ -13,11 +11,6 @@ extern "C"
 const char *ljclang_getLLVMVersion()
 {
     return LJCLANG_LLVM_VERSION;
-}
-
-unsigned ljclang_getHardwareConcurrency()
-{
-    return std::thread::hardware_concurrency();
 }
 }
 

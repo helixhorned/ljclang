@@ -35,7 +35,6 @@ local support = ffi.load("ljclang_support")
 
 ffi.cdef[[
 const char *ljclang_getLLVMVersion();
-unsigned ljclang_getHardwareConcurrency();
 ]]
 
 local supportLLVMVersion = ffi.string(support.ljclang_getLLVMVersion()):gsub("git$","")
@@ -51,9 +50,16 @@ ExtractedEnums.CursorKindName = nil
 
 -- The table of externally exposed elements, returned at the end.
 local api = ExtractedEnums
+local cpuCount
 
 api.hardwareConcurrency = function()
-    return support.ljclang_getHardwareConcurrency()
+    if (cpuCount == nil) then
+        cpuCount = 0
+        for line in io.lines("/proc/cpuinfo") do
+            cpuCount = cpuCount + (line:match("^processor\t: [0-9]+$") and 1 or 0)
+        end
+    end
+    return cpuCount
 end
 
 -----=====
