@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/bin/sh
 
 d=@LJCLANG_DEV_DIR@  # FIXME: remove!
 export LD_LIBRARY_PATH="@LLVM_LIBDIR@:$d"
