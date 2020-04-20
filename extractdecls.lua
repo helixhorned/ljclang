@@ -61,9 +61,13 @@ local function usage(hline)
   -R: reverse mapping, only if one-to-one. Print lines like
        [123] = \"membname\";  (enums/macros only)
   -m <extraction-spec-module>: name of a Lua module to 'require()' which should return a
-     function taking the LJClang cursor as a single argument. In the context of the call to
+     function taking the LJClang cursor as a first argument and a table of strings collected
+     from the -a option instances as the second argument. In the context of the call to
      'require()' and the module function, the functions 'check' and 'printf' are available.
      Incompatible with -1, -2, -C, -R, -f and -w.
+  -a <argument1> [-a <argument2>] ...: arguments passed to the <extraction-spec-module>
+     as a table.
+     Can only be used with -m.
   -f <formatFunc>: user-provided body for formatting function (enums/macros only)
        Arguments to that function are named
          * 'k' (enum constant / macro name)
@@ -106,7 +110,7 @@ local parsecmdline = require("parsecmdline_pk")
 
 -- Meta-information about options, see parsecmdline_pk.
 local opt_meta = { e=true, p=1, A=1, x=1, s=true, C=false, R=false, Q=false,
-                   ['1']=true, ['2']=true, w=true, f=true, m=true }
+                   ['1']=true, ['2']=true, w=true, f=true, m=true, a=1 }
 
 local opts, args = parsecmdline.getopts(opt_meta, arg, usage)
 
@@ -122,6 +126,7 @@ local haveWhat = (opts.w ~= nil)
 local what = opts.w or "EnumConstantDecl"
 local fmtfuncCode = opts.f
 local moduleName = opts.m
+local moduleArgs = opts.a
 
 local extractEnum = (moduleName == nil and what == "EnumConstantDecl" or what == EnumOrMacro)
 local extractMacro = (what:find("^Macro") or what == EnumOrMacro)
@@ -209,6 +214,8 @@ elseif (moduleName) then
     end
 
     setfenv(moduleFunc, {})
+elseif (#moduleArgs > 0) then
+    usage("Module arguments passed with -a are only allowed with -m.")
 end
 
 local tuOptions = (extractMacro or moduleFunc) and {"DetailedPreprocessingRecord"} or nil
@@ -336,7 +343,7 @@ function(cur, parent)
                 local ourname = stripPattern and name:gsub(stripPattern, "") or name
 
                 if (isUserDefined) then
-                    moduleFunc(cur)
+                    moduleFunc(cur, moduleArgs)
                 elseif (extractEnum or extractMacro) then
                     local isEnum = (kind == "EnumConstantDecl")
                     local val = isEnum and cur:enumval() or getDefStr(cur)

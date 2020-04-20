@@ -43,13 +43,13 @@ struct pollfd {
 -- Check that on our system, the structs we want to expose include *only* the members
 -- specified by POSIX.
 assert(ffi.sizeof("struct timeval") ==
-@@ -m dev.exdecl_sizeof_struct -p ^timeval$ ./dev/posix.h
+@@ -m dev.exdecl_struct_property -a size -p ^timeval$ ./dev/posix.h
 )
 assert(ffi.sizeof("struct timespec") ==
-@@ -m dev.exdecl_sizeof_struct -p ^timespec$ ./dev/posix.h
+@@ -m dev.exdecl_struct_property -a size -p ^timespec$ ./dev/posix.h
 )
 assert(ffi.sizeof("struct pollfd") ==
-@@ -m dev.exdecl_sizeof_struct -p ^pollfd$ ./dev/posix.h
+@@ -m dev.exdecl_struct_property -a size -p ^pollfd$ ./dev/posix.h
 )
 
 return {}
