@@ -1,5 +1,7 @@
 local ffi=require"ffi"
 
+local assert = assert
+
 ----------
 
 ffi.cdef[[
@@ -18,5 +20,36 @@ typedef
 @@ -m dev.exdecl_surrogate_struct -p ^sigset_t$ ./dev/posix.h
 sigset_t;
 ]]
+
+-- NOTE: members of time structs have the 'tv_' prefix stripped.
+ffi.cdef[[
+struct timeval {
+    time_t sec;
+    suseconds_t usec;
+};
+
+struct timespec {
+    time_t sec;
+    long   nsec;
+};
+
+struct pollfd {
+    int   fd;
+    short events;
+    short revents;
+};
+]]
+
+-- Check that on our system, the structs we want to expose include *only* the members
+-- specified by POSIX.
+assert(ffi.sizeof("struct timeval") ==
+@@ -m dev.exdecl_sizeof_struct -p ^timeval$ ./dev/posix.h
+)
+assert(ffi.sizeof("struct timespec") ==
+@@ -m dev.exdecl_sizeof_struct -p ^timespec$ ./dev/posix.h
+)
+assert(ffi.sizeof("struct pollfd") ==
+@@ -m dev.exdecl_sizeof_struct -p ^pollfd$ ./dev/posix.h
+)
 
 return {}

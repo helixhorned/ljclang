@@ -74,30 +74,11 @@ int accept(int sockfd, struct sockaddr *addr, socklen_t *addrlen);
 int shutdown(int sockfd, int how);
 ]]
 
--- NOTE: members have 'tv_' prefix stripped.
 ffi.cdef[[
-struct timeval {
-    time_t sec;
-    suseconds_t usec;
-};
-
-struct timespec {
-    time_t sec;
-    long   nsec;
-};
-
 int clock_gettime(clockid_t clock_id, struct timespec *tp);
 int clock_nanosleep(clockid_t clock_id, int flags,
                     const struct timespec *request,
                     struct timespec *remain);
-]]
-
-ffi.cdef[[
-struct pollfd {
-    int   fd;
-    short events;
-    short revents;
-};
 
 int poll(struct pollfd fds[], nfds_t nfds, int timeout);
 

@@ -4,13 +4,10 @@
 
 #include <sys/select.h>
 #include <dirent.h>
-#include <poll.h>
 #include <signal.h>
 
 extern "C" {
 // ---------- fd_set ----------
-
-static_assert(FD_SETSIZE == 8 * sizeof(fd_set));
 
 // TODO: we could also check assumptions here and implement the functions in Lua.
 
@@ -28,38 +25,11 @@ void ljclang_FD_SET(int fd, fd_set *set) {
 
 // NOTE: we do not expose FD_ZERO().
 // We just assume that it is the same as zeroing its bytes.
-// See /usr/include/<triple>/bits/select.h
+// See
+//  - glibc on Ubuntu/Raspbian: /usr/include/<triple>/bits/select.h
+//  - musl on Alpine: /usr/include/sys/select.h
 
 }  // extern "C"
-
-namespace {
-namespace Check {
-
-struct timeval {
-    time_t sec;
-    suseconds_t usec;
-};
-
-struct timespec {
-    time_t sec;
-    long   nsec;
-};
-
-struct pollfd {
-    int   fd;
-    short events;
-    short revents;
-};
-
-}
-}
-
-// Check that on our system, the structs we want to expose include *only* the members
-// specified by POSIX.
-// TODO: move to posix_types.lua
-static_assert(sizeof(Check::timeval) == sizeof(struct timeval));
-static_assert(sizeof(Check::timespec) == sizeof(struct timespec));
-static_assert(sizeof(Check::pollfd) == sizeof(struct pollfd));
 
 extern "C"
 const char *ljclang_getDirent64Name(const struct dirent64 &dirent) {
