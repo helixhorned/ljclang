@@ -6,11 +6,9 @@ local assert = assert
 
 ffi.cdef[[
 @@ -w TypedefDecl ./dev/posix.h \
- -p ^_*clock_t$ -p ^_*clockid_t$ -p ^_*time_t$ -p ^_*suseconds_t$ \
- -p ^_*blkcnt_t$ -p ^_*blksize_t$ -p ^_*fsblkcnt_t$ -p ^_*fsfilcnt_t$ -p ^_*ino_t$ \
- -p ^_*id_t$ -p ^_*gid_t$ -p ^_*pid_t$ -p ^_*uid_t$ \
- -p ^_*mode_t$ -p ^_*nfds_t$ -p ^_*nlink_t$ -p ^_*off_t$ -p ^_*ssize_t$ \
- -p ^__u_quad_t$ -p ^_*dev_t$ -p ^_*sa_family_t$ -p ^_*socklen_t$
+ -p ^_*clockid_t$ -p ^_*time_t$ -p ^_*suseconds_t$ \
+ -p ^_*pid_t$ -p ^_*nfds_t$ -p ^_*off_t$ -p ^_*ssize_t$ \
+ -p ^_*sa_family_t$ -p ^_*socklen_t$
 
 typedef
 @@ -m dev.exdecl_surrogate_struct -p ^fd_set$ ./dev/posix.h
@@ -19,6 +17,15 @@ fd_set;
 typedef
 @@ -m dev.exdecl_surrogate_struct -p ^sigset_t$ ./dev/posix.h
 sigset_t;
+]]
+
+-- Unused, but kept for generation. See POSIX sys/types.h
+--[[
+@@ -w TypedefDecl ./dev/posix.h \
+ -p ^_*clock_t$ \
+ -p ^_*blkcnt_t$ -p ^_*blksize_t$ -p ^_*fsblkcnt_t$ -p ^_*fsfilcnt_t$ -p ^_*ino_t$ \
+ -p ^_*id_t$ -p ^_*gid_t$ -p ^_*uid_t$ \
+ -p ^_*mode_t$ -p ^_*nlink_t$ -p ^__u_quad_t$ -p ^_*dev_t$
 ]]
 
 -- NOTE: members of time structs have the 'tv_' prefix stripped.
