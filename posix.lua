@@ -425,9 +425,11 @@ api.sysconf = function(name)
     return ret
 end
 
-api.poll = function(tab)
+api.poll = function(tab, timeoutMs)
     checktype(tab, 1, "table", 2)
     check(#tab > 0, "passed table must not be empty", 2)
+    check(timeoutMs == nil or type(timeoutMs) == "number",
+          "argument #2 must be nil or a number", 2)
 
     local homogenousEventSet = (tab.events ~= nil) and tab.events or nil
     assert(homogenousEventSet ~= nil, "must provide <tab>.events: "..
@@ -440,7 +442,7 @@ api.poll = function(tab)
         pollfds[i - 1].fd = fd
     end
 
-    local eventCount = call("poll", pollfds, #tab, -1)
+    local eventCount = call("poll", pollfds, #tab, timeoutMs or -1)
     assert(eventCount >= 0)
 
     local events = {}
