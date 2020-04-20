@@ -60,7 +60,7 @@ typedef struct _DIR DIR;
 DIR *opendir(const char *name);
 int closedir(DIR *dirp);
 struct dirent64 *readdir64(DIR *dirp);
-const char *ljclang_getDirent64Name(const struct dirent64 &dirent);
+const char *ljclang_getDirent64Name(const struct dirent64 *dirent);
 ]]
 
 -- NOTE: leave type 'struct sockaddr' incomplete.

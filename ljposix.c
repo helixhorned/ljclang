@@ -2,11 +2,11 @@
 // Copyright (C) 2013-2020 Philipp Kutin
 // See LICENSE for license information.
 
+#define _LARGEFILE64_SOURCE 1
 #include <sys/select.h>
 #include <dirent.h>
 #include <signal.h>
 
-extern "C" {
 // ---------- fd_set ----------
 
 // TODO: we could also check assumptions here and implement the functions in Lua.
@@ -29,14 +29,10 @@ void ljclang_FD_SET(int fd, fd_set *set) {
 //  - glibc on Ubuntu/Raspbian: /usr/include/<triple>/bits/select.h
 //  - musl on Alpine: /usr/include/sys/select.h
 
-}  // extern "C"
-
-extern "C"
-const char *ljclang_getDirent64Name(const struct dirent64 &dirent) {
-    return dirent.d_name;
+const char *ljclang_getDirent64Name(const struct dirent64 *dirent) {
+    return dirent ? dirent->d_name : "";
 }
 
-extern "C"
 void ljclang_setSigintHandlingToDefault()
 {
     signal(SIGINT, SIG_DFL);

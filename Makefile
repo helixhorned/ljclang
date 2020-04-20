@@ -30,20 +30,18 @@ lib := -L$(libdir) -lclang
 # TODO: error or warn if directory does not exist. Ideally, remove.
 llvm_libdir_include := $(libdir)/clang/$(llvm_version)/include
 
-########## OPTIONS ##########
+########## COMPILER OPTIONS ##########
 
-cxxflags := -std=c++17 -I$(incdir) -fPIC -O2
-cxxflags += -DLJCLANG_LLVM_VERSION='"$(llvm_version)"'
-cxxflags += -Werror -Wall -Wextra -Wold-style-cast -pedantic
+common_flags := -I$(incdir) -fPIC -O2
+common_flags += -DLJCLANG_LLVM_VERSION='"$(llvm_version)"'
+common_flags += -Werror -Wall -Wextra -pedantic
+
+cflags := -std=c99 $(common_flags)
+
+cxxflags := -std=c++17 $(common_flags) -Wold-style-cast
 ifneq ($(findstring clang,$(CXX)),)
     cxxflags += -Wno-unused-const-variable
 endif
-
-# NOTE: Additional flags (such as for enabling sanitizers or debugging symbols)
-# can be specified with CXXFLAGS on the command-line, and they will be appended.
-CXXFLAGS ?=
-cxxflags += $(CXXFLAGS)
-
 
 ########## RULES ##########
 
@@ -87,8 +85,8 @@ bootstrap: $(EXTRACTED_ENUMS_LUA)
 $(LJCLANG_SUPPORT_SO): ljclang_support.cpp Makefile
 	$(CXX) $(cxxflags) -shared $< $(lib) -o $@
 
-$(LJPOSIX_SO): ljposix.cpp Makefile
-	$(CXX) $(cxxflags) -shared $< -o $@
+$(LJPOSIX_SO): ljposix.c Makefile
+	$(CC) $(cflags) -shared $< -o $@
 
 $(INDEX_H_LUA): ./createheader.lua $(incdir)/clang-c/*
 	@$(luajit) ./createheader.lua $(incdir)/clang-c > $@
