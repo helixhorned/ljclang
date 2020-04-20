@@ -29,6 +29,7 @@ ssize_t write(int, const void *, size_t);
 int open(const char *pathname, int flags);
 int close(int);
 int dup2(int oldfd, int newfd);
+int fcntl(int fildes, int cmd, ...);
 
 void *mmap(void *addr, size_t length, int prot, int flags,
            int fd, off_t offset);

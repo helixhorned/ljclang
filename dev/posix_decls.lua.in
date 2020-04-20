@@ -46,6 +46,9 @@ CLOCK = ffi.new[[struct {
 E = ffi.new[[struct {
 @@ -w MacroDefinition -C -p ^EAGAIN$ -p ^EPIPE$ -s ^E /usr/include/errno.h
 }]],
+F = ffi.new[[struct {
+@@ -w MacroDefinition -C -p ^F_[GS]ETFL$ -s ^F_ /usr/include/fcntl.h
+}]],
 MAP = ffi.new[[struct {
 @@ -w MacroDefinition -C -p ^MAP_[SPF][HRI][AIX][^_]+$ -s ^MAP_ /usr/include/asm-generic/mman.h
 }]],
