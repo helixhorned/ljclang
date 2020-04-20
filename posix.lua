@@ -93,19 +93,27 @@ local pollfd_t = ffi.typeof("struct pollfd")
 local pollfd_array_t = ffi.typeof("$ [?]", pollfd_t)
 
 ffi.cdef[[
-void ljclang_FD_CLR(int fd, fd_set *set);
-int  ljclang_FD_ISSET(int fd, fd_set *set);
-void ljclang_FD_SET(int fd, fd_set *set);
-
 int select(int nfds, fd_set *readfds, fd_set *writefds,
            fd_set *exceptfds, struct timeval *timeout);
 ]]
 
+local uint32_t = ffi.typeof("uint32_t")
+
 local fd_set_t = ffi.typeof("fd_set")
+-- We just assume that fd_set is made up of fd_mask in sequence handled as "bit array".
+-- See
+--  - glibc on Ubuntu/Raspbian: /usr/include/<triple>/bits/select.h
+--  - musl on Alpine: /usr/include/sys/select.h
+local fd_mask_t = ffi.typeof(
+    ({ [4] = uint32_t, [8] = "uint64_t" })[ffi.alignof(fd_set_t)]
+)
+assert(fd_set_t{{-1}}.v_[0] == fd_mask_t(-1), "inconsistent fd_mask")
+
 local FD_SETSIZE = 8 * ffi.sizeof(fd_set_t)
+local FD_MASK_BIT_COUNT = 8 * ffi.sizeof(fd_mask_t)
 
 local function checkSetFd(fd)
-    checktype(fd, 1, "number", 3)
+    checktype(fd, 1, "number", 4)
     check(fd >= 0 and fd < FD_SETSIZE, "file descriptor value is too large", 3)
 end
 
@@ -114,19 +122,27 @@ fd_set_t = class
     fd_set_t,
 
     set = function(self, fd)
-        checkSetFd(fd)
-        ljposix.ljclang_FD_SET(fd, self)
+        local maskIdx, theBit = self:maskIdxAndBit(fd)
+        self.v_[maskIdx] = bit.bor(self.v_[maskIdx], theBit)
     end,
 
     clear = function(self, fd)
-        checkSetFd(fd)
-        ljposix.ljclang_FD_CLR(fd, self)
+        local maskIdx, theBit = self:maskIdxAndBit(fd)
+        self.v_[maskIdx] = bit.band(self.v_[maskIdx], bit.bnot(theBit))
     end,
 
     isSet = function(self, fd)
-        checkSetFd(fd)
-        return (ljposix.ljclang_FD_ISSET(fd, self) ~= 0)
+        local maskIdx, theBit = self:maskIdxAndBit(fd)
+        return (bit.band(self.v_[maskIdx], theBit) ~= 0)
     end,
+
+-- private:
+    maskIdxAndBit = function(self, fd)
+        checkSetFd(fd)
+        local maskIdx = uint32_t(fd / FD_MASK_BIT_COUNT)
+        local theBit = bit.lshift(1ULL, fd % FD_MASK_BIT_COUNT)
+        return maskIdx, theBit
+    end
 }
 
 local SIG = decls.SIG

@@ -4,6 +4,7 @@
 --  error "wrong number of type parameters" for ffi.cdef 'typedef enum CXChildVisitResult'.
 local cl = require("ljclang")
 local llvm_libdir_include = require("llvm_libdir_include")[1]
+local posix = require("posix")
 
 require 'busted.runner'()
 
@@ -25,7 +26,6 @@ local io = require("io")
 local math = require("math")
 local string = require("string")
 
-require("posix_types")
 ffi.cdef[[
 time_t time(time_t *);
 ]]
@@ -34,6 +34,72 @@ local nonExistentFileName = "/non_exisitent_file"
 assert(io.open(nonExistentFileName) == nil)
 
 ----------
+
+--== posix.lua
+
+describe("posix.lua", function()
+    it("tests fd_set_t", function()
+        local MaxFdToTest = 65
+        local FdsToTest = { 7, 8+1, 16+2, 24+3, 31, 32, 33, 63, 64, MaxFdToTest }
+
+        local fdSet = posix.fd_set_t()
+        local fds = {}  -- posix.Fd objects for anchoring
+
+        repeat
+            local i = C.open("/dev/zero", posix.O.RDONLY)
+            -- POSIX says: "All functions that open one or more file descriptors shall (...)
+            --  allocate the lowest numbered available (...) file descriptor (...)."
+            assert(i >= 0 and i <= FdsToTest[#fds + 1])
+            local fd = posix.Fd(i)
+
+            if (i == FdsToTest[#fds + 1]) then
+                fds[#fds + 1] = fd
+                fdSet:set(i)
+            end
+        until (i == FdsToTest[#FdsToTest])
+
+        assert(#fds, #FdsToTest)
+
+        -- Close the file descriptors we do not care about.
+        collectgarbage()
+
+        local IsFdTested = {}
+        for _, i in ipairs(FdsToTest) do
+            IsFdTested[i] = true
+        end
+
+        for i = 0, MaxFdToTest+1 do
+            assert.is_equal(fdSet:isSet(i), IsFdTested[i] or false)
+        end
+
+        local function getBitsSetCount()
+            local setBitsCount = 0
+            for i = 0, MaxFdToTest + 1 do
+                if (fdSet:isSet(i)) then
+                    setBitsCount = setBitsCount + 1
+                    assert.is_true(IsFdTested[i])
+                end
+            end
+            return setBitsCount
+        end
+
+        repeat
+            local fdReadyCount = C.select(MaxFdToTest + 1, fdSet, nil, nil, nil)
+            assert.is_equal(fdReadyCount, #fds)
+            assert.is_equal(getBitsSetCount(), fdReadyCount)
+
+            -- Exercise fdSet:clear()
+            fdSet:clear(fds[#fds].fd)
+            fds[#fds] = nil
+        until (#fds == 0)
+
+        -- Close the remaining file descriptors.
+        fds = nil
+        collectgarbage()
+    end)
+end)
+
+--== ljclang
 
 local CreateTUFuncs = {
     function(index, ...)
