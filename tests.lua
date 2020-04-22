@@ -23,6 +23,7 @@ local ffi = require("ffi")
 local C = ffi.C
 
 local io = require("io")
+local os = require("os")
 local math = require("math")
 local string = require("string")
 
@@ -641,7 +642,7 @@ describe2("Cross-referencing", function(createTU)
     end)
 end)
 
-describe2("Mangling", function(createTU)
+local function testMangling(createTU)
     local tu = GetTU(createTU, "dev/empty.cpp", 0,
                      {"-std=c++11", "-include", "thread",
                       "-isystem", llvm_libdir_include},
@@ -670,7 +671,11 @@ describe2("Mangling", function(createTU)
     local func = support[mangling]
 
     assert.is_true(type(func) == "cdata")
-end)
+end
+
+if (os.getenv("LJCLANG_TESTS_NO_CXX_STDLIB") ~= "1") then
+    describe2("Mangling", testMangling)
+end
 
 local function makeIndexerCallbacks(tab)
     tab._noGcCheck = true
