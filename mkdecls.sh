@@ -3,8 +3,9 @@
 set -e
 
 # NOTE: this program expects an environment suitable for running:
-extractdecls=./extractdecls.lua
-test -x "$extractdecls"
+extractdecls=${LJCLANG_EXTRACTDECLS:-./extractdecls.lua}
+test -x "$extractdecls" || \
+    (echo "ERROR: '$extractdecls' not found or not executable." >&2 && exit 1)
 
 inFile="$1"
 
@@ -12,9 +13,9 @@ function usageAndExit() {
     echo
     echo "Usage: $0 <template-file>"
     echo "  Reads the template file line by line, copying each one to stdout"
-    echo "  except those starting with '@@', who are taken as arguments to $EXTRACTDECLS"
+    echo "  except those starting with '@@', who are taken as arguments to $extractdecls"
     echo "  which is then run and on success, its output is substituted for the '@@' line."
-    echo "  On the first error from $EXTRACTDECLS, exits with the same exit code as it."
+    echo "  On the first error from $extractdecls, exits with the same exit code as it."
     echo
     exit 1
 }
