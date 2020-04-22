@@ -6,9 +6,12 @@ local printf = printf
 local printed = false
 
 return function(cur, args)
-    local property = args[1]
+    local spec = args[1]
+    local property, printHow = spec:match("^([^:]+)(.*)$")
+    check(printHow == "" or printHow == ":name=value",
+          "argument #1 must be suffixed with ':name=value' or not at all")
     check(property == "size" or property == "alignment" or property == "offset",
-          "argument must be 'size', 'alignment' or 'offset'")
+          "argument #1 must be 'size', 'alignment' or 'offset'")
     check(property ~= "offset" or #args == 2, "Must pass two user arguments")
     check(property == "offset" or #args == 1, "Must pass exactly one user arguments")
 
@@ -16,7 +19,9 @@ return function(cur, args)
         return
     end
 
-    check(not printed, "Found more than one match")
+    if (printHow == "") then
+        check(not printed, "Found more than one match")
+    end
     printed = true
 
     local ty = cur:type()
@@ -27,5 +32,9 @@ return function(cur, args)
 
     check(prop >= 0, "Error obtaining property")
 
-    printf("%d", prop)
+    if (printHow == "") then
+        printf("%d", prop)
+    else
+        printf("[%q]=%d,", ty:name(), prop)
+    end
 end

@@ -16,10 +16,30 @@ ffi.cdef[[
 struct dirent64;
 ]]
 
--- TODO: musl
-local dirent64_name_offset = tonumber[[
-@@ -m dev.exdecl_struct_property -A -D_LARGEFILE64_SOURCE=1 -p ^dirent64$ -a offset -a d_name ./dev/posix.h
-]];
+local d_name_offsets = {
+@@ -m dev.exdecl_struct_property -A -D_LARGEFILE64_SOURCE=1 -p ^dirent6?4?$ -a offset:name=value -a d_name ./dev/posix.h
+}
+local dirent64_name_offset
+do
+    local offset = d_name_offsets["struct dirent"]
+    local offset64 = d_name_offsets["struct dirent64"]
+
+    -- glibc: we (deliberately) did not pass _D_FILE_OFFSET_BITS=64 to see the 32-bit
+    --  __{ino,off}_t 'struct dirent'. We avoid using 'struct dirent' since it is defined
+    --  differently depending on '#ifndef __USE_FILE_OFFSET64'.
+    local isGlibc = ((offset ~= nil and offset64 ~= nil) and offset < offset64)
+    -- musl: off_t is always 64-bit (see FAQ), definition of 'struct dirent' is always the
+    --  same, but there is no 'dirent64' exposed as actual type, only as #define which our
+    --  extractdecls path does not see through. It *is* possible to use 'readdir64' from
+    --  LuaJIT though -- the symbol is present and just redirects to 'readdir', presumably.
+    local isMusl = (offset64 == nil and offset ~= nil)
+    assert(isGlibc or isMusl)
+
+    dirent64_name_offset = isGlibc and offset64 or offset
+    -- Ensure cross-build compatibility wrt this particular binary interface aspect.
+    -- All the dance above just for that...
+    assert(dirent64_name_offset == 19)
+end
 
 local uint8_ptr_t = ffi.typeof("const uint8_t *")
 local dirent64_ptr_t = ffi.typeof("struct dirent64 *")
