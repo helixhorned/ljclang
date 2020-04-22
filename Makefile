@@ -75,8 +75,8 @@ clean:
 
 veryclean: clean
 	rm -f $(GENERATED_FILES_STAGE_2) $(EXTRACTED_ENUMS_LUA_TMP) $(EXTRACTED_ENUMS_LUA).reject \
-		$(linux_decls_lua) $(linux_decls_lua_tmp) \
-		$(posix_decls_lua) $(posix_decls_lua_tmp)
+		$(linux_decls_lua) $(linux_decls_lua_tmp) $(linux_decls_lua).reject \
+		$(posix_decls_lua) $(posix_decls_lua_tmp) $(posix_decls_lua).reject
 
 bootstrap: $(EXTRACTED_ENUMS_LUA)
 
