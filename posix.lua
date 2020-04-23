@@ -277,19 +277,23 @@ api.Fd = class
     end,
 
     readInto = function(self, obj, allowPartial)
-        checktype(obj, 1, "cdata", 2)
-        checktype(allowPartial, 2, "boolean", 2)
+        return self:_readIntoCommon(obj, allowPartial, call)
+    end,
+
+    _readIntoCommon = function(self, obj, allowPartial, _callFunc)  -- private
+        checktype(obj, 1, "cdata", 3)
+        checktype(allowPartial, 2, "boolean", 3)
 
         local length = ffi.sizeof(obj)
-        check(length ~= nil, "argument #1 must have ffi.sizeof() ~= nil", 2)
-        check(length >= 1, "argument #1 must have ffi.sizeof() >= 1", 2)
+        check(length ~= nil, "argument #1 must have ffi.sizeof() ~= nil", 3)
+        check(length >= 1, "argument #1 must have ffi.sizeof() >= 1", 3)
 
         local bytePtr = ffi.cast(uint8_ptr_t, obj)
         local bytesRead = 0
 
         repeat
             local remainByteCount = length - bytesRead
-            local ret = call("read", self.fd, bytePtr, remainByteCount)
+            local ret = _callFunc("read", self.fd, bytePtr, remainByteCount)
             assert(ret >= 0 and ret <= remainByteCount)
             bytePtr = bytePtr + ret
             bytesRead = bytesRead + ret
