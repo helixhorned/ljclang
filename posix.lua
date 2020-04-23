@@ -280,6 +280,14 @@ api.Fd = class
         return self:_readIntoCommon(obj, allowPartial, call)
     end,
 
+    readIntoAllowing = function(self, obj, allowPartial, errnoAllowTab)
+        checktype(errnoAllowTab, 3, "table", 4)
+
+        return self:_readIntoCommon(obj, allowPartial, function(...)
+            return callAllowing(errnoAllowTab, ...)
+        end)
+    end,
+
     _readIntoCommon = function(self, obj, allowPartial, _callFunc)  -- private
         checktype(obj, 1, "cdata", 3)
         checktype(allowPartial, 2, "boolean", 3)
@@ -294,6 +302,11 @@ api.Fd = class
         repeat
             local remainByteCount = length - bytesRead
             local ret = _callFunc("read", self.fd, bytePtr, remainByteCount)
+            if (ret == -1) then
+                assert(_callFunc ~= call)
+                return nil
+            end
+
             assert(ret >= 0 and ret <= remainByteCount)
             bytePtr = bytePtr + ret
             bytesRead = bytesRead + ret
