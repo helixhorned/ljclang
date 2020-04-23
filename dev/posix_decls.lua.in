@@ -64,7 +64,7 @@ CLOCK = ffi.new[[struct {
 @@ -w MacroDefinition -C -p ^CLOCK_MONOTONIC$ -s ^CLOCK_ /usr/include/time.h
 }]],
 E = ffi.new[[struct {
-@@ -w MacroDefinition -C -p ^EAGAIN$ -p ^EPIPE$ -s ^E /usr/include/errno.h
+@@ -w MacroDefinition -C -p ^EAGAIN$ -p ^EPIPE$ -p ^ENODEV$ -s ^E /usr/include/errno.h
 }]],
 F = ffi.new[[struct {
 @@ -w MacroDefinition -C -p ^F_[GS]ETFL$ -s ^F_ /usr/include/fcntl.h

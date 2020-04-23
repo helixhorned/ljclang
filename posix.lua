@@ -157,8 +157,13 @@ local external_SIG = {
     DFL = ffi.new("sighandler_t"),
 }
 
+local external_E = {
+    NODEV = decls.E.NODEV,
+}
+
 local api = {
     AF = decls.AF,
+    E = external_E,
     O = decls.O,
     MAP = decls.MAP,
     POLL = decls.POLL,
