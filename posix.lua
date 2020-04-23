@@ -174,7 +174,8 @@ local api = {
 local function getErrnoString()
     local errno = ffi.errno()
     local errmsgCStr = C.strerror(errno)
-    return (errmsgCStr ~= nil) and ffi.string(errmsgCStr) or "errno="..tostring(errno)
+    local errMsg = (errmsgCStr ~= nil) and " "..ffi.string(errmsgCStr) or ""
+    return ("[E%s]%s"):format(tostring(errno), errMsg)
 end
 
 api.getErrnoString = getErrnoString
