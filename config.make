@@ -1,5 +1,6 @@
 
-# Directory to install scripts (referencing THIS_DIR, i.e. the development directory).
+# Directory to install applications. The resulting scripts reference THIS_DIR (i.e. the
+# development directory) if doing 'install-dev'.
 BINDIR ?= $(HOME)/bin
 
 LLVM_CONFIG ?= llvm-config-10

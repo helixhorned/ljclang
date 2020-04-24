@@ -41,6 +41,7 @@ long sysconf(int name);
 pid_t fork(void);
 pid_t getpid(void);
 pid_t waitpid(pid_t pid, int *stat_loc, int options);
+uid_t geteuid(void);
 int execv(const char *path, char *const argv[]);
 int pipe(int pipefd[2]);
 
