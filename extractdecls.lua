@@ -46,8 +46,9 @@ local function usage(hline)
     print("Usage: extractdecls.lua [our options...] <file.h> [-- [Clang command line args ...]]")
 
     if (not hline) then
-        print("Exits with a non-zero code if there were errors or no match.")
         print[[
+Exits with a non-zero code if there were errors or no match, or if filter
+patterns (-p) were provided and not all of them produced matches.
  (Our options may also come after the file name.)
   -e <enumNameFilterPattern> (enums only)
   -p <filterPattern1> [-p <filterPattern2>] ... (logically OR'd)
@@ -64,6 +65,7 @@ local function usage(hline)
      function taking the LJClang cursor as a first argument and a table of strings collected
      from the -a option instances as the second argument. In the context of the call to
      'require()' and the module function, the functions 'check' and 'printf' are available.
+     The function 'printf' must not be called at module load time.
      Incompatible with -1, -2, -C, -R, -f and -w.
   -a <argument1> [-a <argument2>] ...: arguments passed to the <extraction-spec-module>
      as a table.
@@ -160,10 +162,22 @@ local fmtfunc
 local moduleFunc
 
 local matchCount = 0
+local filterPatternMatchCount = {}
+local currentFilterPatternIdx
 
 local function printfMatch(fmt, ...)
     printf(fmt, ...)
     matchCount = matchCount + 1
+
+    local fpi = currentFilterPatternIdx
+    -- NOTE: this assumes that modules will not print at load time:
+    assert((fpi ~= nil) == (#filterPatterns > 0))
+
+    if (fpi ~= nil) then
+        assert(fpi <= #filterPatterns)
+        local fmc = filterPatternMatchCount[fpi]
+        filterPatternMatchCount[fpi] = (fmc and fmc or 0) + 1
+    end
 end
 
 if (fmtfuncCode and moduleName) then
@@ -308,8 +322,11 @@ local function wantedCursorKind(cur)
 end
 
 local function matchesFilterPattern(name)
-    for _, filterPattern in ipairs(filterPatterns) do
+    currentFilterPatternIdx = nil
+
+    for i, filterPattern in ipairs(filterPatterns) do
         if (name:find(filterPattern)) then
+            currentFilterPatternIdx = i
             return true
         end
     end
@@ -417,5 +434,17 @@ if (suffixString) then
 end
 
 if (haveErrors or matchCount == 0) then
+    -- There were errors or not matches.
     os.exit(1)
+elseif (#filterPatterns > 0) then
+    -- Not every filter pattern had a match.
+    -- NOTE: cannot use #filterPatternMatchCount as the table may be sparse
+    --  (which would invoke nondeterminism of the '#' operator).
+    for i = 1, #filterPatterns do
+        local fmc = filterPatternMatchCount[i]
+        assert(fmc == nil or fmc > 0)
+        if (fmc == nil) then
+            os.exit(2)
+        end
+    end
 end
