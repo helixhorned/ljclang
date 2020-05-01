@@ -25,7 +25,7 @@ sigset_t;
  -p ^_*clock_t$ \
  -p ^_*blkcnt_t$ -p ^_*blksize_t$ -p ^_*fsblkcnt_t$ -p ^_*fsfilcnt_t$ -p ^_*ino_t$ \
  -p ^_*id_t$ -p ^_*gid_t$ \
- -p ^_*mode_t$ -p ^_*nlink_t$ -p ^__u_quad_t$ -p ^_*dev_t$
+ -p ^_*mode_t$ -p ^_*nlink_t$
 ]]
 
 -- NOTE: members of time structs have the 'tv_' prefix stripped.
