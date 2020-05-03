@@ -85,8 +85,8 @@ bootstrap: $(EXTRACTED_ENUMS_LUA)
 $(LJCLANG_SUPPORT_SO): ljclang_support.c Makefile
 	$(CC) $(cflags) -shared $< $(lib) -o $@
 
-$(INDEX_H_LUA): ./createheader.lua $(incdir)/clang-c/*
-	@$(luajit) ./createheader.lua $(incdir)/clang-c > $@
+$(INDEX_H_LUA): ./dev/createheader.lua $(incdir)/clang-c/*
+	@$(luajit) ./dev/createheader.lua $(incdir)/clang-c > $@
 	@printf "* \033[1mGenerated $@ from files in $(incdir)/clang-c \033[0m\n"
 
 $(LIBDIR_INCLUDE_LUA): Makefile config.make
@@ -102,11 +102,11 @@ CHECK_EXTRACTED_ENUMS_CMD := $(EXTRACT_CMD_ENV) $(luajit) \
 
 .SILENT: $(EXTRACTED_ENUMS_LUA)
 
-$(EXTRACTED_ENUMS_LUA): ./print_extracted_enums_lua.sh $(incdir)/clang-c/*
+$(EXTRACTED_ENUMS_LUA): ./dev/print_extracted_enums_lua.sh $(incdir)/clang-c/*
 $(EXTRACTED_ENUMS_LUA): $(SHARED_LIBRARIES) $(GENERATED_FILES_STAGE_1)
 	echo 'return {}' > $(EXTRACTED_ENUMS_LUA)
     # Do the extraction.
-	$(EXTRACT_CMD_ENV) ./print_extracted_enums_lua.sh > $(EXTRACTED_ENUMS_LUA_TMP)
+	$(EXTRACT_CMD_ENV) ./dev/print_extracted_enums_lua.sh > $(EXTRACTED_ENUMS_LUA_TMP)
     # Check that we can load the generated file in Lua.
 	mv $(EXTRACTED_ENUMS_LUA_TMP) $@
 	($(CHECK_EXTRACTED_ENUMS_CMD) && \
