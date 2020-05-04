@@ -11,10 +11,12 @@ inFile="$1"
 
 function usageAndExit() {
     echo
-    echo "Usage: $0 <template-file>"
+    echo "Usage: $0 <template-file> [arguments-to-extractdecls...]"
     echo "  Reads the template file line by line, copying each one to stdout"
     echo "  except those starting with '@@', who are taken as arguments to $extractdecls"
     echo "  which is then run and on success, its output is substituted for the '@@' line."
+    echo "  The trailing arguments from the command line are likewise passed to $extractdecls,"
+    echo "  after the ones from the template file."
     echo "  On the first error from $extractdecls, exits with the same exit code as it."
     echo
     exit 1
@@ -23,6 +25,8 @@ function usageAndExit() {
 if [ -z "$inFile" ]; then
     usageAndExit
 fi
+
+shift
 
 if grep '\\.' "$inFile"; then
     # We allow line continuations, but disallow any other use of the backslash because
@@ -36,7 +40,7 @@ exec {resultFd}< "$inFile"
 while IFS='' read -u $resultFd line; do
     if [ x"${line:0:2}" == x'@@' ]; then
         args="${line:2}"
-        "$extractdecls" $args
+        "$extractdecls" $args "$@"
     else
         echo -E "$line"
     fi
