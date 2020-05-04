@@ -1,34 +1,34 @@
 local ffi=require"ffi"
 return {
 ErrorCode = ffi.new[[struct{
-    static const int Success = CXError_Success;
-    static const int Failure = CXError_Failure;
-    static const int Crashed = CXError_Crashed;
-    static const int InvalidArguments = CXError_InvalidArguments;
-    static const int ASTReadError = CXError_ASTReadError;
+static const int Success = 0;
+static const int Failure = 1;
+static const int Crashed = 2;
+static const int InvalidArguments = 3;
+static const int ASTReadError = 4;
 }]],
 SaveError = ffi.new[[struct{
-    static const int None = CXSaveError_None;
-    static const int Unknown = CXSaveError_Unknown;
-    static const int TranslationErrors = CXSaveError_TranslationErrors;
-    static const int InvalidTU = CXSaveError_InvalidTU;
+static const int None = 0;
+static const int Unknown = 1;
+static const int TranslationErrors = 2;
+static const int InvalidTU = 3;
 }]],
 DiagnosticSeverity = ffi.new[[struct{
-    static const int Ignored = CXDiagnostic_Ignored;
-    static const int Note = CXDiagnostic_Note;
-    static const int Warning = CXDiagnostic_Warning;
-    static const int Error = CXDiagnostic_Error;
-    static const int Fatal = CXDiagnostic_Fatal;
+static const int Ignored = 0;
+static const int Note = 1;
+static const int Warning = 2;
+static const int Error = 3;
+static const int Fatal = 4;
 }]],
 ChildVisitResult = ffi.new[[struct{
-    static const int Break = CXChildVisit_Break;
-    static const int Continue = CXChildVisit_Continue;
-    static const int Recurse = CXChildVisit_Recurse;
+static const int Break = 0;
+static const int Continue = 1;
+static const int Recurse = 2;
 }]],
 RefQualifierKind = ffi.new[[struct{
-    static const int None = CXRefQualifier_None;
-    static const int LValue = CXRefQualifier_LValue;
-    static const int RValue = CXRefQualifier_RValue;
+static const int None = 0;
+static const int LValue = 1;
+static const int RValue = 2;
 }]],
 CursorKindName = {
 [1] = "UnexposedDecl";

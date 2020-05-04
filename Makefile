@@ -92,7 +92,7 @@ $(INDEX_H_LUA): ./dev/createheader.lua $(incdir)/clang-c/*
 $(LIBDIR_INCLUDE_LUA): Makefile config.make
 	@echo "return { '$(llvm_libdir_include)' }" > $@
 
-EXTRACT_CMD_ENV := LD_LIBRARY_PATH="$(libdir):$(THIS_DIR)" incdir="$(incdir)"
+EXTRACT_CMD_ENV := LD_LIBRARY_PATH="$(libdir):$(THIS_DIR)"
 
 CHECK_EXTRACTED_ENUMS_CMD := $(EXTRACT_CMD_ENV) $(luajit) \
     -e "require('ffi').cdef[[typedef int time_t;]]" \
@@ -100,13 +100,16 @@ CHECK_EXTRACTED_ENUMS_CMD := $(EXTRACT_CMD_ENV) $(luajit) \
     -e "l=require '$(subst .lua,,$(EXTRACTED_ENUMS_LUA))'" \
     -e "assert(l.CursorKindName[1] ~= nil)"
 
+# Because we have comments in the executable portion of the rule.
 .SILENT: $(EXTRACTED_ENUMS_LUA)
 
-$(EXTRACTED_ENUMS_LUA): ./dev/print_extracted_enums_lua.sh $(incdir)/clang-c/*
 $(EXTRACTED_ENUMS_LUA): $(SHARED_LIBRARIES) $(GENERATED_FILES_STAGE_1)
+$(EXTRACTED_ENUMS_LUA): ./dev/$(EXTRACTED_ENUMS_LUA).in $(incdir)/clang-c/*
+    # Make loading ljclang.lua not fail. We must not use any "extracted enums" though since
+    # we are about to generate them.
 	echo 'return {}' > $(EXTRACTED_ENUMS_LUA)
     # Do the extraction.
-	$(EXTRACT_CMD_ENV) ./dev/print_extracted_enums_lua.sh > $(EXTRACTED_ENUMS_LUA_TMP)
+	$(EXTRACT_CMD_ENV) ./mkdecls.sh $< -A -I"${incdir}" "${incdir}/clang-c/Index.h" > $(EXTRACTED_ENUMS_LUA_TMP)
     # Check that we can load the generated file in Lua.
 	mv $(EXTRACTED_ENUMS_LUA_TMP) $@
 	($(CHECK_EXTRACTED_ENUMS_CMD) && \
