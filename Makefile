@@ -64,11 +64,14 @@ GENERATED_FILES_STAGE_1 := $(INDEX_H_LUA) $(LIBDIR_INCLUDE_LUA)
 GENERATED_FILES_STAGE_2 := $(GENERATED_FILES_STAGE_1) $(EXTRACTED_ENUMS_LUA) $(posix_types_lua)
 
 .PHONY: all app_dependencies apps clean veryclean bootstrap doc test install install-dev _install_common
+.PHONY: committed-generated
 
 all: $(SHARED_LIBRARIES) $(GENERATED_FILES_STAGE_2)
 
 apps := extractdecls.app.lua watch_compile_commands.app.lua
 apps: $(apps)
+
+committed-generated: $(INDEX_H_LUA) $(EXTRACTED_ENUMS_LUA)
 
 clean:
 	rm -f $(SHARED_LIBRARIES) $(apps)
