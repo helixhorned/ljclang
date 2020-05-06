@@ -1,0 +1,22 @@
+local ffi=require"ffi"
+return {
+ErrorCode = ffi.new[[struct{
+@@ -C -e ^CXErrorCode$ -s ^CXError_
+}]],
+SaveError = ffi.new[[struct{
+@@ -C -e ^CXSaveError$ -s ^CXSaveError_
+}]],
+DiagnosticSeverity = ffi.new[[struct{
+@@ -C -e ^CXDiagnosticSeverity$ -s ^CXDiagnostic_
+}]],
+ChildVisitResult = ffi.new[[struct{
+@@ -C -e ^CXChildVisitResult$ -s ^CXChildVisit_
+}]],
+RefQualifierKind = ffi.new[[struct{
+@@ -C -e ^CXRefQualifierKind$ -s ^CXRefQualifier_
+}]],
+CursorKindName = {
+@@ -w EnumConstantDecl -Q -R -e CXCursorKind -p ^CXCursor_ -s ^CXCursor_ \
+    -x _First -x _Last -x _GCCAsmStmt -x _MacroInstantiation
+},
+}
