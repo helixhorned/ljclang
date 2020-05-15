@@ -1268,20 +1268,27 @@ local SymbolIndex = class
         local PROT, MAP, LMAP = posix.PROT, posix.MAP, linux_decls.MAP
         local SymbolInfoPagePtr = ffi.typeof("$ *", SymbolInfoPage)
 
-        local requestSymPages = function(count, flags)
+        local requestSymPages = function(count, flags, ptrTab)
             local voidPtr = posix.mmap(nil, count * ffi.sizeof(SymbolInfoPage),
                                        PROT.READ + PROT.WRITE, flags, -1, 0)
+            -- Need to retain the pointer as its GC triggers the munmap().
+            ptrTab[#ptrTab + 1] = voidPtr
+
             return ffi.cast(SymbolInfoPagePtr, voidPtr)
         end
 
-        local allLocalPages = {}
+        local allLocalPages, voidPtrs = {}, {}
+
         for i = 1, usedConcurrency do
-            allLocalPages[i] = requestSymPages(MaxSymPages.Local, MAP.SHARED + LMAP.ANONYMOUS)
+            allLocalPages[i] = requestSymPages(
+                MaxSymPages.Local, MAP.SHARED + LMAP.ANONYMOUS, voidPtrs)
         end
 
         return {
-            globalPages = requestSymPages(MaxSymPages.Global, MAP.PRIVATE + LMAP.ANONYMOUS),
+            globalPages = requestSymPages(
+                MaxSymPages.Global, MAP.PRIVATE + LMAP.ANONYMOUS, voidPtrs),
             allLocalPages = allLocalPages,
+            voidPtrs_ = voidPtrs,
         }
     end,
 }
@@ -2377,6 +2384,11 @@ local function main()
         end
 
         startTime = os.time()
+
+        -- Ensure that the memory obtained for the symbol index is munmap()'d.
+        control = nil
+        collectgarbage()
+
         control = Controller(membersTakenOver, newCcIdxs, parserOpts)
     until (false)
 end
