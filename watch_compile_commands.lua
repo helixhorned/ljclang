@@ -754,6 +754,23 @@ function MI.HandleCommand_Diags(args, control, prioritizeCcFunc)
     return table.concat(tab, '\n')    
 end
 
+function MI.FileIsCompileCommandTU(fileName)
+    -- TODO: apply realpath() for all compile command TUs right at the beginning?
+    --  As a bonus, we then would know up-front whether a TU will fail reading.
+
+    for _, cmd in ipairs(compileCommands) do
+        if (fileName == cmd.file) then
+            return true
+        end
+        local realName = posix.realpath(cmd.file)
+        if (realName ~= nil and fileName == realName) then
+            return true
+        end
+    end
+
+    return false
+end
+
 function MI.HandleCommand_FileInfo(args, control, ccInclusionGraphs)
     local subCommand = args[1]
     if (subCommand == nil) then
@@ -783,8 +800,9 @@ function MI.HandleCommand_FileInfo(args, control, ccInclusionGraphs)
 
     local suffix = haveUnhandled and '+' or
         control:haveActiveChildren() and '?' or ""
+    local markerIsTU = MI.FileIsCompileCommandTU(realName) and '!' or ""
 
-    return tonumber(includingTUCount)..suffix
+    return tonumber(includingTUCount)..suffix..markerIsTU
 end
 
 function MI.DoHandleClientRequest(command, args, crTab)
