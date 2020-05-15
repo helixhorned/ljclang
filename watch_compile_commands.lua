@@ -715,7 +715,7 @@ function MI.GetRealNameFor(fileName)
     return realName
 end
 
-function MI.HandleCommand_Diags(args, crTab)
+function MI.HandleCommand_Diags(args, control, prioritizeCcFunc)
     local keepColors = (args[1] == "-k")
     if (keepColors) then
         table.remove(args, 1)
@@ -731,8 +731,6 @@ function MI.HandleCommand_Diags(args, crTab)
     if (idxsForCc == nil) then
         return nil, "no compile commands for file name"
     end
-
-    local control, prioritizeCcFunc = unpack(crTab)
 
     local printer = FormattedDiagSetPrinter()
     local haveUnprocessed = false
@@ -756,12 +754,47 @@ function MI.HandleCommand_Diags(args, crTab)
     return table.concat(tab, '\n')    
 end
 
+function MI.HandleCommand_FileInfo(args, control, ccInclusionGraphs)
+    local subCommand = args[1]
+    if (subCommand == nil) then
+        return nil, "missing sub-command"
+    elseif (subCommand ~= "including-tu-count") then
+        return nil, "unknown sub-command"
+    end
+
+    -- TODO: investigate the effect of precompiled headers.
+
+    local realName, errorMsg = MI.GetRealNameFor(args[2])
+    if (realName == nil) then
+        return nil, errorMsg
+    end
+
+    local haveUnhandled = false
+    local includingTUCount = 0
+
+    for ccIdx = 1, #compileCommands do
+        local incGraph = ccInclusionGraphs[ccIdx]
+        if (incGraph == nil) then
+            haveUnhandled = true
+        elseif (incGraph:getNode(realName) ~= nil) then
+            includingTUCount = includingTUCount + 1
+        end
+    end
+
+    local suffix = haveUnhandled and '+' or
+        control:haveActiveChildren() and '?' or ""
+
+    return tonumber(includingTUCount)..suffix
+end
+
 function MI.DoHandleClientRequest(command, args, crTab)
     if (command == "-C") then
         -- NOTE: arguments are completely ignored.
         return ""
     elseif (command == "diags") then
-        return MI.HandleCommand_Diags(args, crTab)
+        return MI.HandleCommand_Diags(args, crTab[1], crTab[3])
+    elseif (command == "fileinfo") then
+        return MI.HandleCommand_FileInfo(args, crTab[1], crTab[2])
     end
 
     return nil, "unrecognized command"
@@ -843,7 +876,7 @@ function MI.HandleClientRequest(request, crTab)
 end
 
 function MI.HandleClientRequests(crTab)
-    assert(#crTab == 2)
+    assert(#crTab == 3)
 
     -- Read from the client inotify file descriptor (to clear the poll()
     -- status) and discard. We are only interested in the data arrived in
@@ -2143,7 +2176,7 @@ local Controller = class
 
             if (haveClientRequest) then
                 -- Handle client requests that arrived in between processing child results.
-                MI.HandleClientRequests{self, prioritizeCcFunc}
+                MI.HandleClientRequests{self, ccInclusionGraphs, prioritizeCcFunc}
             end
         until (not self:haveActiveChildren())
 
@@ -2286,7 +2319,7 @@ local function main()
                 local isReady = Poll({events=POLL.IN, fileInotifyFd, clientInotifyFd})
 
                 if (isReady[clientInotifyFd]) then
-                    MI.HandleClientRequests{control, function(_)
+                    MI.HandleClientRequests{control, ccInclusionGraphs, function(_)
                         -- A prioritize request can only happen while processing.
                         assert(false)
                     end}
