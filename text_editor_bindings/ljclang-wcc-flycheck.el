@@ -58,8 +58,8 @@
 (flycheck-define-checker c/c++-wcc
   "A C/C++ syntax checker using watch_compile_commands.
 
-See URL `https://github.com/helixhorned/ljclang/tree/staging'."
-  ;; TODO: remove 'staging' once it is merged to master.
+See URL `https://github.com/helixhorned/ljclang/tree/rpi'."
+  ;; TODO: remove 'rpi' once it is merged to master.
   :command ("wcc-client" "diags" source-original)
 
   :error-patterns
