@@ -715,49 +715,53 @@ function MI.GetRealNameFor(fileName)
     return realName
 end
 
-function MI.DoHandleClientRequest(command, args, crTab)
+function MI.HandleCommand_Diags(args, crTab)
+    local keepColors = (args[1] == "-k")
+    if (keepColors) then
+        table.remove(args, 1)
+    end
+
+    local realName, errorMsg = MI.GetRealNameFor(args[1])
+    if (realName == nil) then
+        return nil, errorMsg
+    end
+
+    -- TODO: handle non-sources.
+    local idxsForCc = selectionInfo.ccIdxsFor[realName]
+    if (idxsForCc == nil) then
+        return nil, "no compile commands for file name"
+    end
+
     local control, prioritizeCcFunc = unpack(crTab)
 
+    local printer = FormattedDiagSetPrinter()
+    local haveUnprocessed = false
+    local tab = {}
+
+    for _, ccIdx in ipairs(idxsForCc) do
+        local fDiagSet = control.miFormattedDiagSets[ccIdx]
+        if (fDiagSet == nil) then
+            -- Compile command not yet processed, so:
+            prioritizeCcFunc(ccIdx)
+            haveUnprocessed = true
+        else
+            tab[#tab + 1] = printer:emulatePrint(keepColors, fDiagSet, ccIdx)
+        end
+    end
+
+    if (haveUnprocessed) then
+        table.insert(tab, 1, "INFO: one or more compile commands not yet processed.")
+    end
+
+    return table.concat(tab, '\n')    
+end
+
+function MI.DoHandleClientRequest(command, args, crTab)
     if (command == "-C") then
         -- NOTE: arguments are completely ignored.
         return ""
     elseif (command == "diags") then
-        local keepColors = (args[1] == "-k")
-        if (keepColors) then
-            table.remove(args, 1)
-        end
-
-        local realName, errorMsg = MI.GetRealNameFor(args[1])
-        if (realName == nil) then
-            return nil, errorMsg
-        end
-
-        -- TODO: handle non-sources.
-        local idxsForCc = selectionInfo.ccIdxsFor[realName]
-        if (idxsForCc == nil) then
-            return nil, "no compile commands for file name"
-        end
-
-        local printer = FormattedDiagSetPrinter()
-        local haveUnprocessed = false
-        local tab = {}
-
-        for _, ccIdx in ipairs(idxsForCc) do
-            local fDiagSet = control.miFormattedDiagSets[ccIdx]
-            if (fDiagSet == nil) then
-                -- Compile command not yet processed, so:
-                prioritizeCcFunc(ccIdx)
-                haveUnprocessed = true
-            else
-                tab[#tab + 1] = printer:emulatePrint(keepColors, fDiagSet, ccIdx)
-            end
-        end
-
-        if (haveUnprocessed) then
-            table.insert(tab, 1, "INFO: one or more compile commands not yet processed.")
-        end
-
-        return table.concat(tab, '\n')
+        return MI.HandleCommand_Diags(args, crTab)
     end
 
     return nil, "unrecognized command"
