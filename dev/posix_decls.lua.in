@@ -24,10 +24,9 @@ do
     local offset = d_name_offsets["struct dirent"]
     local offset64 = d_name_offsets["struct dirent64"]
 
-    -- glibc: we (deliberately) did not pass _D_FILE_OFFSET_BITS=64 to see the 32-bit
-    --  __{ino,off}_t 'struct dirent'. We avoid using 'struct dirent' since it is defined
-    --  differently depending on '#ifndef __USE_FILE_OFFSET64'.
-    local isGlibc = ((offset ~= nil and offset64 ~= nil) and offset < offset64)
+    -- glibc: We avoid using 'struct dirent' since it is defined differently depending on
+    --  '#ifndef __USE_FILE_OFFSET64'.
+    local isGlibc = ((offset ~= nil and offset64 ~= nil) and offset <= offset64)
     -- musl: off_t is always 64-bit (see FAQ), definition of 'struct dirent' is always the
     --  same, but there is no 'dirent64' exposed as actual type, only as #define which our
     --  extractdecls path does not see through. It *is* possible to use 'readdir64' from
