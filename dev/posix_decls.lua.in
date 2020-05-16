@@ -66,16 +66,16 @@ E = ffi.new[[struct {
 @@ -w MacroDefinition -C -p ^EAGAIN$ -p ^EPIPE$ -p ^ENODEV$ -s ^E /usr/include/errno.h
 }]],
 F = ffi.new[[struct {
-@@ -w MacroDefinition -C -p ^F_[GS]ETFL$ -s ^F_ /usr/include/fcntl.h
+@@ -w MacroDefinition -C -p ^F_GETFL$ -p ^F_SETFL$ -s ^F_ /usr/include/fcntl.h
 }]],
 MAP = ffi.new[[struct {
-@@ -w MacroDefinition -C -p ^MAP_[SPF][HRI][AIX][^_]+$ -s ^MAP_ /usr/include/asm-generic/mman.h
+@@ -w MacroDefinition -C -p ^MAP_SHARED$ -p ^MAP_PRIVATE$ -p ^MAP_FIXED$ -s ^MAP_ ./dev/posix.h
 }]],
 O = ffi.new[[struct {
 @@ -w MacroDefinition -C -p ^O_RDONLY$ -p ^O_WRONLY$ -p ^O_RDWR$ -p ^O_NONBLOCK$ -s ^O_ /usr/include/fcntl.h
 }]],
 PROT = ffi.new[[struct {
-@@ -w MacroDefinition -C -p ^PROT_[RWN] -s ^PROT_ /usr/include/asm-generic/mman.h
+@@ -w MacroDefinition -C -p ^PROT_READ$ -p ^PROT_WRITE$ -p ^PROT_NONE$ -s ^PROT_ ./dev/posix.h
 }]],
 _SC = ffi.new[[struct {
 @@ -w E+M -C -p ^_SC_PAGESIZE$ -s ^_SC_ /usr/include/unistd.h
