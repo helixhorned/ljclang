@@ -25,6 +25,34 @@ static const int Break = 0;
 static const int Continue = 1;
 static const int Recurse = 2;
 }]],
+-- NOTE: this mixes the constants of the two enums typedef'd as CXIdxEntityKind and
+--  CXIdxEntityCXXTemplateKind.
+IdxEntity = ffi.new[[struct{
+static const int Unexposed = 0;
+static const int Typedef = 1;
+static const int Function = 2;
+static const int Variable = 3;
+static const int Field = 4;
+static const int EnumConstant = 5;
+static const int Enum = 13;
+static const int Struct = 14;
+static const int Union = 15;
+static const int CXXClass = 16;
+static const int CXXNamespace = 17;
+static const int CXXNamespaceAlias = 18;
+static const int CXXStaticVariable = 19;
+static const int CXXStaticMethod = 20;
+static const int CXXInstanceMethod = 21;
+static const int CXXConstructor = 22;
+static const int CXXDestructor = 23;
+static const int CXXConversionFunction = 24;
+static const int CXXTypeAlias = 25;
+static const int CXXInterface = 26;
+static const int NonTemplate = 0;
+static const int Template = 1;
+static const int TemplatePartialSpecialization = 2;
+static const int TemplateSpecialization = 3;
+}]],
 -- NOTE [ANONYMOUS_ENUM_WITH_TYPEDEF]: the enum type is anonymous here, but we are lucky
 --  because the prefix of the enum constant names is unique to this particular enum type.
 -- TODO: teach extractdecls to filter by the name of an immediate typedef.

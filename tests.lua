@@ -842,6 +842,7 @@ describe("Indexer callbacks", function()
             methodRef = 0,
         }
 
+        local IdxEntity = cl.IdxEntity
         local FileName = "test_data/virtual.hpp"
 
         runIndexing(FileName, makeIndexerCallbacks{
@@ -869,7 +870,7 @@ describe("Indexer callbacks", function()
 
                 local entInfo = declInfo.entityInfo
                 assert.is_equal(entInfo.cursor, cur)
-                assert.is_equal(entInfo.templateKind, 'CXIdxEntity_NonTemplate')
+                assert.is_equal(entInfo.templateKind, IdxEntity.NonTemplate)
                 assert.is_equal(cCur:name() == "Final", entInfo.attributes:has('CXXFinalAttr'))
 
                 assert.is_equal(#declInfo.attributes, declInfo.numAttributes)
@@ -891,15 +892,14 @@ describe("Indexer callbacks", function()
 
                 if (not isMethod) then
                     assert.is_equal(entRefInfo.role, SymbolRole.Reference)
-                    -- TODO: better API:
-                    assert.is_equal(entInfo.kind, 'CXIdxEntity_CXXClass')
+                    assert.is_equal(entInfo.kind, IdxEntity.CXXClass)
                 else
                     callCounts.methodRef = callCounts.methodRef + 1
 
                     assert.is_equal(
                         entRefInfo.role,
                         SymbolRole.Reference + SymbolRole.Call + SymbolRole.Dynamic)
-                    assert.is_equal(entInfo.kind, 'CXIdxEntity_CXXInstanceMethod')
+                    assert.is_equal(entInfo.kind, IdxEntity.CXXInstanceMethod)
                 end
 
                 local file, lco = entRefInfo.loc:fileSite()

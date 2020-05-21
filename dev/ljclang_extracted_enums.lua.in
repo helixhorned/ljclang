@@ -12,6 +12,11 @@ DiagnosticSeverity = ffi.new[[struct{
 ChildVisitResult = ffi.new[[struct{
 @@ -C -e ^CXChildVisitResult$ -s ^CXChildVisit_
 }]],
+-- NOTE: this mixes the constants of the two enums typedef'd as CXIdxEntityKind and
+--  CXIdxEntityCXXTemplateKind.
+IdxEntity = ffi.new[[struct{
+@@ -C -w EnumConstantDecl -p ^CXIdxEntity_ -s ^CXIdxEntity_ -x ObjC
+}]],
 -- NOTE [ANONYMOUS_ENUM_WITH_TYPEDEF]: the enum type is anonymous here, but we are lucky
 --  because the prefix of the enum constant names is unique to this particular enum type.
 -- TODO: teach extractdecls to filter by the name of an immediate typedef.
