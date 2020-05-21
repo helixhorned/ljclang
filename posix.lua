@@ -402,7 +402,7 @@ local Directory = class{
         ffi.errno(0)
         local dirEnt = C.readdir64(self.ptr)
         if (ffi.errno() ~= 0) then
-            error("readdir failed: %s"..getErrnoString())
+            error("readdir failed: "..getErrnoString())
         end
 
         return (dirEnt ~= nil) and ffi.string(decls.getDirent64Name(dirEnt)) or nil
@@ -414,7 +414,7 @@ api.Dir = function(name)
 
     local dirPtr = C.opendir(name)
     if (dirPtr == nil) then
-        error("opendir failed: %s"..getErrnoString())
+        error("opendir failed: "..getErrnoString())
     end
 
     return ffi.gc(Directory(dirPtr), function(d)
