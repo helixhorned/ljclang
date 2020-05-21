@@ -52,17 +52,17 @@ api.SymbolIndex = class
             return ffi.cast(SymbolInfoPagePtr, voidPtr)
         end
 
-        local allLocalPages, voidPtrs = {}, {}
+        local localPageArrays, voidPtrs = {}, {}
 
         for i = 1, localPageArrayCount do
-            allLocalPages[i] = requestSymPages(
+            localPageArrays[i] = requestSymPages(
                 MaxSymPages.Local, MAP.SHARED + LMAP.ANONYMOUS, voidPtrs)
         end
 
         return {
-            globalPages = requestSymPages(
+            globalPageArray = requestSymPages(
                 MaxSymPages.Global, MAP.PRIVATE + LMAP.ANONYMOUS, voidPtrs),
-            allLocalPages = allLocalPages,
+            localPageArrays = localPageArrays,
             voidPtrs_ = voidPtrs,
         }
     end,

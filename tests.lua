@@ -139,13 +139,13 @@ describe("Symbol index", function()
         local RefNum = 123000321
 
         local symIndex = SymbolIndex(1)
-        local parentPage = symIndex.allLocalPages[1][LocalPageIdx]
+        local parentPage = symIndex.localPageArrays[1][LocalPageIdx]
         assert.is_equal(parentPage[EntryIdx].intFlags, 0)
 
         local whoami, pid = posix.fork()
 
         if (whoami == "child") then
-            local page = symIndex.allLocalPages[1][LocalPageIdx]
+            local page = symIndex.localPageArrays[1][LocalPageIdx]
             if (page[EntryIdx].intFlags ~= 0) then
                 os.exit(1)
             end
