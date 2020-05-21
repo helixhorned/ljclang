@@ -369,6 +369,7 @@ local POLL = posix.POLL
 local linux_decls = require("ljclang_linux_decls")
 local inotify = require("inotify")
 local IN = inotify.IN
+local SymbolIndex = require("symbol_index").SymbolIndex
 
 if (IsMakingApp) then
     -- KEEPINSYNC: make sure that there are no require() calls below us!
@@ -1261,55 +1262,6 @@ end
 
 local MOVE_OR_DELETE = bit.bor(IN.MOVE_SELF, IN.DELETE_SELF)
 local WATCH_FLAGS = bit.bor(IN.CLOSE_WRITE, MOVE_OR_DELETE)
-
----------- SymbolIndex ----------
-
-local SymbolInfo = ffi.typeof[[struct {
-    uint64_t intFlags;  // intrinsic flags (identifying a particular symbol)
-    uint64_t extFlags;  // extrinsic flags (describing a particular symbol use)
-}]]
-
-local SymbolInfoPage = (function()
-    local pageSize = posix.sysconf(posix._SC.PAGESIZE)
-    assert(pageSize % ffi.sizeof(SymbolInfo) == 0)
-    return ffi.typeof("$ [$]", SymbolInfo, tonumber(pageSize / ffi.sizeof(SymbolInfo)))
-end)()
-
-local MaxSymPages = {
-    Local = (ffi.abi("64bit") and 1*2^30 or 128*2^20) / ffi.sizeof(SymbolInfoPage),
-    Global = (ffi.abi("64bit") and 4*2^30 or 512*2^20) / ffi.sizeof(SymbolInfoPage),
-}
-
-local SymbolIndex = class
-{
-    function()
-        local PROT, MAP, LMAP = posix.PROT, posix.MAP, linux_decls.MAP
-        local SymbolInfoPagePtr = ffi.typeof("$ *", SymbolInfoPage)
-
-        local requestSymPages = function(count, flags, ptrTab)
-            local voidPtr = posix.mmap(nil, count * ffi.sizeof(SymbolInfoPage),
-                                       PROT.READ + PROT.WRITE, flags, -1, 0)
-            -- Need to retain the pointer as its GC triggers the munmap().
-            ptrTab[#ptrTab + 1] = voidPtr
-
-            return ffi.cast(SymbolInfoPagePtr, voidPtr)
-        end
-
-        local allLocalPages, voidPtrs = {}, {}
-
-        for i = 1, usedConcurrency do
-            allLocalPages[i] = requestSymPages(
-                MaxSymPages.Local, MAP.SHARED + LMAP.ANONYMOUS, voidPtrs)
-        end
-
-        return {
-            globalPages = requestSymPages(
-                MaxSymPages.Global, MAP.PRIVATE + LMAP.ANONYMOUS, voidPtrs),
-            allLocalPages = allLocalPages,
-            voidPtrs_ = voidPtrs,
-        }
-    end,
-}
 
 ---------- Main ----------
 
