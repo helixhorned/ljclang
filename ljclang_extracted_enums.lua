@@ -25,10 +25,33 @@ static const int Break = 0;
 static const int Continue = 1;
 static const int Recurse = 2;
 }]],
+-- NOTE [ANONYMOUS_ENUM_WITH_TYPEDEF]: the enum type is anonymous here, but we are lucky
+--  because the prefix of the enum constant names is unique to this particular enum type.
+-- TODO: teach extractdecls to filter by the name of an immediate typedef.
+IdxEntityLang = ffi.new[[struct{
+static const int None = 0;
+static const int C = 1;
+static const int ObjC = 2;
+static const int CXX = 3;
+static const int Swift = 4;
+}]],
 RefQualifierKind = ffi.new[[struct{
 static const int None = 0;
 static const int LValue = 1;
 static const int RValue = 2;
+}]],
+-- NOTE ANONYMOUS_ENUM_WITH_TYPEDEF:
+SymbolRole = ffi.new[[struct{
+static const int None = 0;
+static const int Declaration = 1;
+static const int Definition = 2;
+static const int Reference = 4;
+static const int Read = 8;
+static const int Write = 16;
+static const int Call = 32;
+static const int Dynamic = 64;
+static const int AddressOf = 128;
+static const int Implicit = 256;
 }]],
 CursorKindName = {
 [1] = "UnexposedDecl";

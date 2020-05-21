@@ -878,26 +878,27 @@ describe("Indexer callbacks", function()
                 local isCXXEntity = (entInfo.name ~= "BigNumbers" and
                                      entInfo.name ~= "GetIt")  -- TODO: why?
                 assert.is_equal(entInfo.lang,
-                                isCXXEntity and 'CXIdxEntityLang_CXX' or 'CXIdxEntityLang_C')
+                                isCXXEntity and cl.IdxEntityLang.CXX or cl.IdxEntityLang.C)
             end,
 
             indexEntityReference = function(entRefInfo)
+                local SymbolRole = cl.SymbolRole
+
                 callCounts.ref = callCounts.ref + 1
 
                 local entInfo = entRefInfo.referencedEntity
                 local isMethod = entInfo.cursor:haskind("CXXMethod")
 
                 if (not isMethod) then
-                    assert.is_equal(entRefInfo.role, 'CXSymbolRole_Reference')
+                    assert.is_equal(entRefInfo.role, SymbolRole.Reference)
+                    -- TODO: better API:
                     assert.is_equal(entInfo.kind, 'CXIdxEntity_CXXClass')
                 else
                     callCounts.methodRef = callCounts.methodRef + 1
 
-                    assert.is_equal(entRefInfo.role,
-                                    -- TODO: better API
-                                    C['CXSymbolRole_Reference'] +
-                                    C['CXSymbolRole_Call'] +
-                                    C['CXSymbolRole_Dynamic'])
+                    assert.is_equal(
+                        entRefInfo.role,
+                        SymbolRole.Reference + SymbolRole.Call + SymbolRole.Dynamic)
                     assert.is_equal(entInfo.kind, 'CXIdxEntity_CXXInstanceMethod')
                 end
 

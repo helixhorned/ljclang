@@ -12,8 +12,18 @@ DiagnosticSeverity = ffi.new[[struct{
 ChildVisitResult = ffi.new[[struct{
 @@ -C -e ^CXChildVisitResult$ -s ^CXChildVisit_
 }]],
+-- NOTE [ANONYMOUS_ENUM_WITH_TYPEDEF]: the enum type is anonymous here, but we are lucky
+--  because the prefix of the enum constant names is unique to this particular enum type.
+-- TODO: teach extractdecls to filter by the name of an immediate typedef.
+IdxEntityLang = ffi.new[[struct{
+@@ -C -w EnumConstantDecl -p ^CXIdxEntityLang_ -s ^CXIdxEntityLang_
+}]],
 RefQualifierKind = ffi.new[[struct{
 @@ -C -e ^CXRefQualifierKind$ -s ^CXRefQualifier_
+}]],
+-- NOTE ANONYMOUS_ENUM_WITH_TYPEDEF:
+SymbolRole = ffi.new[[struct{
+@@ -C -w EnumConstantDecl -p ^CXSymbolRole_ -s ^CXSymbolRole_
 }]],
 CursorKindName = {
 @@ -w EnumConstantDecl -Q -R -e CXCursorKind -p ^CXCursor_ -s ^CXCursor_ \
