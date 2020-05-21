@@ -167,12 +167,12 @@ else
 	echo "* Did not generate README.html: '$(MARKDOWN)' not installed"
 endif
 
-test: $(SHARED_LIBRARIES) $(GENERATED_FILES_STAGE_2)
+app_dependencies: $(linux_decls_lua) $(posix_decls_lua)
+
+test: $(SHARED_LIBRARIES) $(GENERATED_FILES_STAGE_2) $(linux_decls_lua) $(posix_decls_lua)
 	LLVM_LIBDIR="$(libdir)" $(SHELL) ./run_tests.sh
 
 sed_common_commands := s|@LJCLANG_DEV_DIR@|$(THIS_DIR)|g; s|@LLVM_BINDIR@|$(bindir)|g; s|@LLVM_LIBDIR@|$(libdir)|g;
-
-app_dependencies: $(linux_decls_lua) $(posix_decls_lua)
 
 extractdecls.app.lua: extractdecls.lua mkapp.lua $(GENERATED_FILES_STAGE_1) app_dependencies
 	@$(EXTRACT_CMD_ENV) $(luajit) -l mkapp $< -Q > /dev/null && \

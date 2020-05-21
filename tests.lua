@@ -5,6 +5,8 @@
 local cl = require("ljclang")
 local llvm_libdir_include = require("llvm_libdir_include")[1]
 local posix = require("posix")
+local symbol_index = require("symbol_index")
+local SymbolIndex = symbol_index.SymbolIndex
 
 require 'busted.runner'()
 
@@ -115,6 +117,48 @@ describe("posix.lua", function()
 
         -- Close the remaining file descriptors.
         fds = nil
+        collectgarbage()
+    end)
+end)
+
+describe("Symbol index", function()
+    it("tests repeated creation and destruction", function()
+        local CreateCount = 100
+
+        for i = 1, CreateCount do
+            local symIndex = SymbolIndex(4)
+            symIndex = nil
+            collectgarbage()
+        end
+    end)
+
+    it("tests that the parent can read a local page written to by the child", function()
+        local LocalPageIdx = 1
+        local EntryIdx = 23
+        assert(EntryIdx < symbol_index.EntriesPerPage)
+        local RefNum = 123000321
+
+        local symIndex = SymbolIndex(1)
+        local parentPage = symIndex.allLocalPages[1][LocalPageIdx]
+        assert.is_equal(parentPage[EntryIdx].intFlags, 0)
+
+        local whoami, pid = posix.fork()
+
+        if (whoami == "child") then
+            local page = symIndex.allLocalPages[1][LocalPageIdx]
+            if (page[EntryIdx].intFlags ~= 0) then
+                os.exit(1)
+            end
+            page[EntryIdx].intFlags = RefNum
+            os.exit(0)
+        else
+            local status, exitCode = posix.waitpid(pid, 0)
+            assert.is_equal(status, "exited")
+            assert.is_equal(exitCode, 0)
+            assert.is_equal(parentPage[EntryIdx].intFlags, RefNum)
+        end
+
+        symIndex = nil
         collectgarbage()
     end)
 end)

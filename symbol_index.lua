@@ -13,7 +13,9 @@ local tonumber = tonumber
 
 ----------
 
-local api = {}
+local api = {
+    EntriesPerPage = nil  -- set below
+}
 
 local SymbolInfo = ffi.typeof[[struct {
     uint64_t intFlags;  // intrinsic flags (identifying a particular symbol)
@@ -23,8 +25,11 @@ local SymbolInfo = ffi.typeof[[struct {
 local SymbolInfoPage = (function()
     local pageSize = posix.sysconf(posix._SC.PAGESIZE)
     assert(pageSize % ffi.sizeof(SymbolInfo) == 0)
-    return ffi.typeof("$ [$]", SymbolInfo, tonumber(pageSize / ffi.sizeof(SymbolInfo)))
+    api.EntriesPerPage = tonumber(pageSize / ffi.sizeof(SymbolInfo))
+    return ffi.typeof("$ [$]", SymbolInfo, api.EntriesPerPage)
 end)()
+
+local SymbolInfoPagePtr = ffi.typeof("$ *", SymbolInfoPage)
 
 local MaxSymPages = {
     Local = (ffi.abi("64bit") and 1*2^30 or 128*2^20) / ffi.sizeof(SymbolInfoPage),
@@ -37,7 +42,6 @@ api.SymbolIndex = class
         checktype(localPageArrayCount, 1, "number", 2)
 
         local PROT, MAP, LMAP = posix.PROT, posix.MAP, linux_decls.MAP
-        local SymbolInfoPagePtr = ffi.typeof("$ *", SymbolInfoPage)
 
         local requestSymPages = function(count, flags, ptrTab)
             local voidPtr = posix.mmap(nil, count * ffi.sizeof(SymbolInfoPage),
