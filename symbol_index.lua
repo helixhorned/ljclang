@@ -7,6 +7,7 @@ local linux_decls = require("ljclang_linux_decls")
 
 local error_util = require("error_util")
 local checktype = error_util.checktype
+local check = error_util.check
 
 local assert = assert
 local tonumber = tonumber
@@ -65,6 +66,32 @@ api.SymbolIndex = class
             localPageArrays = localPageArrays,
             voidPtrs_ = voidPtrs,
         }
+    end,
+
+    remapLocalToGlobalPage = function(self, localPageArrayIdx, srcPageIdx, globalPageIdx)
+        checktype(localPageArrayIdx, 1, "number", 2)
+        check(localPageArrayIdx >= 1 and localPageArrayIdx <= #self.localPageArrays,
+              "argument #1 must be a valid local page array index" ,2)
+
+        checktype(srcPageIdx, 2, "number", 2)
+        check(srcPageIdx >= 0 and srcPageIdx < MaxSymPages.Local,
+              "argument #2 must be a valid local page index", 2)
+        checktype(globalPageIdx, 3, "number", 2)
+        check(globalPageIdx >= 0 and globalPageIdx < MaxSymPages.Global,
+              "argument #3 must be a valid global page index", 2)
+
+        posix.memRemapSinglePage(
+            self:getLocalPageArrayVoidPtr(localPageArrayIdx), srcPageIdx,
+            self:getGlobalPageArrayVoidPtr(), globalPageIdx)
+    end,
+
+-- private, KEEPINSYNC with how self.voidPtrs_ is set up:
+    getLocalPageArrayVoidPtr = function(self, localPageArrayIdx)
+        return self.voidPtrs_[localPageArrayIdx]
+    end,
+
+    getGlobalPageArrayVoidPtr = function(self)
+        return self.voidPtrs_[#self.voidPtrs_]
     end,
 }
 

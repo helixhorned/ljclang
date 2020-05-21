@@ -132,15 +132,15 @@ describe("Symbol index", function()
         end
     end)
 
-    it("tests that the parent can read a local page written to by the child", function()
-        local LocalPageArrayCount = 4
-        local LocalPageArrayIdx = 2
-        assert(LocalPageArrayIdx <= LocalPageArrayCount)
-        local LocalPageIdx = 3
-        local EntryIdx = 45
-        assert(EntryIdx < symbol_index.EntriesPerPage)
-        local RefNum = 123000321
+    local LocalPageArrayCount = 4
+    local LocalPageArrayIdx = 2
+    assert(LocalPageArrayIdx <= LocalPageArrayCount)
+    local LocalPageIdx = 3
+    local EntryIdx = 45
+    assert(EntryIdx < symbol_index.EntriesPerPage)
+    local RefNum = 123000321
 
+    local function testChildToParent()
         local symIndex = SymbolIndex(LocalPageArrayCount)
         local parentPage = symIndex.localPageArrays[LocalPageArrayIdx][LocalPageIdx]
         assert.is_equal(parentPage[EntryIdx].intFlags, 0)
@@ -160,6 +160,24 @@ describe("Symbol index", function()
             assert.is_equal(exitCode, 0)
             assert.is_equal(parentPage[EntryIdx].intFlags, RefNum)
         end
+
+        return symIndex
+    end
+
+    it("tests that the parent can read a local page written to by the child", function()
+        testChildToParent()
+        collectgarbage()
+    end)
+
+    it("tests in addition that the parent can remap a local page to a global one", function()
+        local symIndex = testChildToParent()
+
+        local GlobalPageIdx = 6
+        local gPage = symIndex.globalPageArray[GlobalPageIdx]
+
+        assert.is_equal(gPage[EntryIdx].intFlags, 0)
+        symIndex:remapLocalToGlobalPage(LocalPageArrayIdx, LocalPageIdx, GlobalPageIdx)
+        assert.is_equal(gPage[EntryIdx].intFlags, RefNum)
 
         symIndex = nil
         collectgarbage()
