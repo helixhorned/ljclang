@@ -1,7 +1,9 @@
 local ffi = require("ffi")
+local jit = require("jit")
 local C = ffi.C
 
 local bit = require("bit")
+local math = require("math")
 local string = require("string")
 
 local class = require("class").class
@@ -16,6 +18,7 @@ local check = error_util.check
 local checktype = error_util.checktype
 local error = error
 local ipairs = ipairs
+local setmetatable = setmetatable
 local tostring = tostring
 local type = type
 
@@ -34,6 +37,9 @@ int fcntl(int fildes, int cmd, ...);
 void *mmap(void *addr, size_t length, int prot, int flags,
            int fd, off_t offset);
 int munmap(void *addr, size_t length);
+// Linux-only:
+void *mremap(void *old_address, size_t old_size,
+             size_t new_size, int flags, ... /* void *new_address */);
 
 char *strerror(int);
 long sysconf(int name);
@@ -169,7 +175,6 @@ local api = {
     MAP = decls.MAP,
     POLL = decls.POLL,
     PROT = decls.PROT,
-    _SC = decls._SC,
     SHUT = decls.SHUT,
     SIG = external_SIG,
     SOCK = decls.SOCK,
@@ -442,7 +447,7 @@ api.clock_nanosleep = function(nsec)
     assert(ret == 0)
 end
 
-api.sysconf = function(name)
+local function sysconf(name)
     checktype(name, 2, "number", 2)
     local ret = call("sysconf", name)
     assert(ret ~= -1)
@@ -485,6 +490,8 @@ end
 -- NOTE: Linux's "man mmap" explicitly mentions this value.
 local MAP_FAILED = ffi.cast("void *", -1)
 
+local activeMemMapSizes = setmetatable({}, { __mode='k'})
+
 api.mmap = function(addr, length, prot, flags, fd, offset)
     check(addr == nil, "argument #1 must be nil", 2)
 
@@ -513,9 +520,54 @@ api.mmap = function(addr, length, prot, flags, fd, offset)
         error("mmap failed: "..getErrnoString())
     end
 
-    return ffi.gc(ptr, function(p)
+    local retPtr = ffi.gc(ptr, function(p)
         C.munmap(p, length)
     end)
+
+    activeMemMapSizes[retPtr] = length
+    return retPtr
+end
+
+local CachedPageSize
+local function getPageSize()
+    if (CachedPageSize == nil) then
+        CachedPageSize = sysconf(decls._SC.PAGESIZE)
+    end
+    return CachedPageSize
+end
+
+api.getPageSize = getPageSize
+
+local function checkMemRemapPtr(ptr, pageIdx)
+    checktype(ptr, 1, "cdata", 3)
+
+    local memMapSize = activeMemMapSizes[ptr]
+    check(ptr ~= nil, "pointer argument must have been obtained by posix.mmap()", 3)
+
+    local pageSize = getPageSize()
+    check(pageIdx >= 0 and pageIdx < math.floor(memMapSize / pageSize),
+          "page index argument must refer to a full page of the memory mapping", 3)
+    return ffi.cast(uint8_ptr_t, ptr)
+end
+
+api.memRemapSinglePage = function(srcBasePtr, srcPageIdx, dstBasePtr, dstPageIdx)
+    check(jit.os == "Linux", "This function is available only on Linux", 2)
+
+    srcBasePtr = checkMemRemapPtr(srcBasePtr, srcPageIdx)
+    dstBasePtr = checkMemRemapPtr(dstBasePtr, dstPageIdx)
+
+    local MREMAP = linux_decls.MREMAP
+    local pageSize = getPageSize()
+
+    local srcPtr = srcBasePtr + srcPageIdx*pageSize
+    local dstPtr = dstBasePtr + dstPageIdx*pageSize
+
+    local retPtr = C.mremap(
+        srcPtr, pageSize, pageSize, MREMAP.FIXED + MREMAP.MAYMOVE,
+        dstPtr)
+    if (retPtr ~= dstPtr) then
+        error("mremap failed: "..getErrnoString())
+    end
 end
 
 api.fork = function()

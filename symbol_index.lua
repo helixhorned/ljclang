@@ -23,7 +23,7 @@ local SymbolInfo = ffi.typeof[[struct {
 }]]
 
 local SymbolInfoPage = (function()
-    local pageSize = posix.sysconf(posix._SC.PAGESIZE)
+    local pageSize = posix.getPageSize()
     assert(pageSize % ffi.sizeof(SymbolInfo) == 0)
     api.EntriesPerPage = tonumber(pageSize / ffi.sizeof(SymbolInfo))
     return ffi.typeof("$ [$]", SymbolInfo, api.EntriesPerPage)
