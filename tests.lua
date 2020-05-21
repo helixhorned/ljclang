@@ -133,19 +133,22 @@ describe("Symbol index", function()
     end)
 
     it("tests that the parent can read a local page written to by the child", function()
-        local LocalPageIdx = 1
-        local EntryIdx = 23
+        local LocalPageArrayCount = 4
+        local LocalPageArrayIdx = 2
+        assert(LocalPageArrayIdx <= LocalPageArrayCount)
+        local LocalPageIdx = 3
+        local EntryIdx = 45
         assert(EntryIdx < symbol_index.EntriesPerPage)
         local RefNum = 123000321
 
-        local symIndex = SymbolIndex(1)
-        local parentPage = symIndex.localPageArrays[1][LocalPageIdx]
+        local symIndex = SymbolIndex(LocalPageArrayCount)
+        local parentPage = symIndex.localPageArrays[LocalPageArrayIdx][LocalPageIdx]
         assert.is_equal(parentPage[EntryIdx].intFlags, 0)
 
         local whoami, pid = posix.fork()
 
         if (whoami == "child") then
-            local page = symIndex.localPageArrays[1][LocalPageIdx]
+            local page = symIndex.localPageArrays[LocalPageArrayIdx][LocalPageIdx]
             if (page[EntryIdx].intFlags ~= 0) then
                 os.exit(1)
             end
