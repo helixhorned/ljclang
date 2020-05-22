@@ -1806,7 +1806,7 @@ local Controller = class
             notifier = members.notifier or Notifier(),
 
             -- Will be nil'd in child.
-            symbolIndex = SymbolIndex(),
+            symbolIndex = SymbolIndex(usedConcurrency),
 
             --== Child will have:
             parser = nil,  -- OnDemandParser
