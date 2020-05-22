@@ -55,13 +55,57 @@
     )
 )
 
+(defun ljclang-wcc--get-file-info-string (str)
+  (if (string-equal str "1!")
+      ;; The file is a source file with a count of including TUs of one. Do not
+      ;; show the count as it contains little information. (Most source files
+      ;; only participate in one translation unit. We are interested in headers,
+      ;; and source files which participate in zero or more than one TUs.)
+      ""
+    ;; NOTE: it is deliberate that we pass through a count of zero. Assuming
+    ;;  that wcc-server is finished, this means that a file (even a source!) is
+    ;;  not reachable by any of the compile commands the it was instructed with.
+    (if (string-match-p "^[0-9]+[\+\?]?!?$" str)
+        (concat "⇝" str)
+      ;; Three crosses: wcc-client returned a string of unexpected form.
+      ;; We forgot to update the string validation above?
+      "☓☓☓")))
+
+(defvar-local ljclang-wcc--buffer-file-info-string nil)
+
+(defun ljclang-wcc--parse-with-patterns (output checker buffer)
+  "Parse OUTPUT from CHECKER with error patterns.
+
+Wraps `flycheck-parse-with-patterns' to additionally set a buffer-local
+suffix for the 'FlyC' status text.
+"
+  ;; Match the first line of the wcc-client invocation, which we expect is the output of
+  ;;  the "fileinfo including-tu-count" command.
+  (let* ((firstLine (progn (if (string-match "^\\([^\n]+\\)\n" output)
+                               (match-string 1 output))))
+         (infoStr
+          (if firstLine
+              (ljclang-wcc--get-file-info-string firstLine)
+            ;; High voltage sign: first line of output has unexpected form. This should not
+            ;; happen unless wcc-client is mismatched. (We assume that this function is
+            ;; called only if the checker process exited with a non-zero status.)
+            "⚡")))
+    ;; Set the mode line suffix.
+    (setq ljclang-wcc--buffer-file-info-string infoStr))
+  (flycheck-parse-with-patterns output checker buffer)
+)
+
 (flycheck-define-checker c/c++-wcc
   "A C/C++ syntax checker using watch_compile_commands.
 
 See URL `https://github.com/helixhorned/ljclang/tree/rpi'."
   ;; TODO: remove 'rpi' once it is merged to master.
-  :command ("wcc-client" "diags" source-original)
+  :command ("wcc-client" "-b"
+            "fileinfo" "including-tu-count" source-original
+            "@@"
+            "diags" source-original)
 
+  :error-parser ljclang-wcc--parse-with-patterns
   :error-patterns
   (
    ;;; Same as for 'c/c++-clang' checker, but with '<stdin>' removed.
@@ -100,49 +144,15 @@ See URL `https://github.com/helixhorned/ljclang/tree/rpi'."
   :verify ljclang-wcc-check-diags-request
 )
 
-(defun ljclang-wcc--get-current-file-info-string ()
-  (let ((fileName (buffer-file-name (current-buffer))))
-    (with-temp-buffer
-      ;; TODO: can 'call-process' signal a Lisp error? The documentation says this is the
-      ;;  case when the executable cannot be found, but presumably that is excluded as we
-      ;;  are supposed to run only from an active c/c++-wcc checker. (By which time Flycheck
-      ;;  has verified the existence of the executable associated with the checker.)
-      (let ((status (call-process
-                     "wcc-client" nil (current-buffer) nil
-                     "fileinfo" "including-tu-count" fileName)))
-        (if (eq status 0)
-            ;; NOTE: we assume that the output ends in a newline here.
-            (let* ((str (buffer-substring-no-properties 1 (buffer-size)))
-                   (len (length str)))
-              (if (string-equal str "1!")
-                  ;; The file is a source file with a count of including TUs of one. Do not
-                  ;; show the count as it contains little information. (Most source files
-                  ;; only participate in one translation unit. We are interested in headers,
-                  ;; and source files which participate in zero or more than one TUs.)
-                  ""
-                ;; NOTE: it is deliberate that we pass through a count of zero. Assuming
-                ;;  that wcc-server is finished, this means that a file (even a source!) is
-                ;;  not reachable by any of the compile commands the it was instructed with.
-                (if (string-match-p "^[0-9]+[\+\?]?!?$" str)
-                    (concat "⇝" str)
-                  ;; Three crosses: wcc-client returned a string of unexpected form.
-                  ;; We forgot to update the string validation above?
-                  "☓☓☓"))))))))
-
 (defun ljclang-wcc-mode-line-status-text (&optional status)
   "Get a text describing STATUS for use in the mode line.
 
 Can be used instead of `flycheck-mode-line-status-text' in the
 value for `flycheck-mode-line'.
-
-WARNING: This will run a process on each movement of the cursor.
-TODO: Find a better way.
 "
   (concat
    (flycheck-mode-line-status-text status)
    (let ((checker (flycheck-get-checker-for-buffer)))
      (if (eq checker 'c/c++-wcc)
-         ;; High voltage sign: wcc-client exited with a non-zero status.
-         ;; (Most usual cause: wcc-server is not running?)
-         (or (ljclang-wcc--get-current-file-info-string) "⚡")
+         ljclang-wcc--buffer-file-info-string
        ""))))
