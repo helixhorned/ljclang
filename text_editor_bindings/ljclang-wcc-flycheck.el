@@ -114,8 +114,12 @@ See URL `https://github.com/helixhorned/ljclang/tree/rpi'."
             ;; NOTE: we assume that the output ends in a newline here.
             (let* ((str (buffer-substring-no-properties 1 (buffer-size)))
                    (len (length str)))
-              (if (string-equal (substring str -1 len) "!")
-                  ""  ; the file is a source file, do not show count of including TUs.
+              (if (string-equal str "1!")
+                  ;; The file is a source file with a count of including TUs of one. Do not
+                  ;; show the count as it contains little information. (Most source files
+                  ;; only participate in one translation unit. We are interested in headers,
+                  ;; and source files which participate in zero or more than one TUs.)
+                  ""
                 ;; NOTE: it is deliberate that we pass through a count of zero. Assuming
                 ;;  that wcc-server is finished, this means that a file (even a source!) is
                 ;;  not reachable by any of the compile commands the it was instructed with.
