@@ -37,27 +37,6 @@ if [ ${#@} -eq 0 ]; then
     usage
 fi
 
-## Setup
-
-function cleanup()
-{
-    rm -f "$FIFO"
-}
-
-function setup()
-{
-    if [ ! -w "$REQUEST_SINK" ]; then
-        echo "ERROR: $REQUEST_SINK does not exist or is not writable."
-        echo " Is wcc-server running?"
-        exit 3
-    fi
-
-    if [ $block == yes ]; then
-        mkfifo "$FIFO" || exit 1
-        trap cleanup EXIT
-    fi
-}
-
 # Validate the command
 # NOTE: if this part becomes more complex, it may be reasonable to implement it in Lua.
 
@@ -83,6 +62,27 @@ for ((i=0; i < $numArgs; i++)); do
         exit 2
     fi
 done
+
+## Setup
+
+function cleanup()
+{
+    rm -f "$FIFO"
+}
+
+function setup()
+{
+    if [ ! -w "$REQUEST_SINK" ]; then
+        echo "ERROR: $REQUEST_SINK does not exist or is not writable."
+        echo " Is wcc-server running?"
+        exit 3
+    fi
+
+    if [ $block == yes ]; then
+        mkfifo "$FIFO" || exit 1
+        trap cleanup EXIT
+    fi
+}
 
 setup
 
