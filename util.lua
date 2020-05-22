@@ -57,8 +57,8 @@ function api.checkOptionsArgAndGetDefault(opts, defaultValue)
         opts = defaultValue;
     else
         check(type(opts)=="number" or type(opts)=="table",
-              "argument #1 must be a number or a table", 3)
-        api.check_iftab_iscellstr(opts, "<opts>", 3)
+              "argument #1 must be a number or a table", 4)
+        api.check_iftab_iscellstr(opts, "<opts>", 4)
     end
 
     return opts

@@ -124,6 +124,12 @@ end
 
 -------------------------------------------------------------------------
 
+local function HandleNumberOrStringTabOption(
+        numOrTab, defaultValue, enumConstantPrefix)
+    numOrTab = util.checkOptionsArgAndGetDefault(numOrTab, defaultValue)
+    return util.handleTableOfOptionStrings(clang, enumConstantPrefix, numOrTab)
+end
+
 local function PrepareParse(srcfile, args, opts)
     check(type(srcfile)=="string", "<srcfile> must be a string", 3)
     check(type(args)=="string" or type(args)=="table", "<args> must be a string or table", 3)
@@ -133,15 +139,14 @@ local function PrepareParse(srcfile, args, opts)
         srcfile = nil
     end
 
-    local opts = util.checkOptionsArgAndGetDefault(opts, C.CXTranslationUnit_None)
-
     -- Input argument handling.
 
     if (type(args)=="string") then
         args = api.splitAtWhitespace(args)
     end
 
-    opts = util.handleTableOfOptionStrings(clang, "CXTranslationUnit_", opts)
+    opts = HandleNumberOrStringTabOption(
+        opts, C.CXTranslationUnit_None, "CXTranslationUnit_")
 
     local argsptrs = ffi.new("const char * [?]", #args, args)  -- ARGS_FROM_TAB
 
@@ -432,8 +437,8 @@ local IndexSession = class
                                srcfile, args, opts)
         local srcfile, args, opts, argsptrs, tuAr = PrepareParse(srcfile, args, opts)
 
-        local indexOpts = util.checkOptionsArgAndGetDefault(opts, C.CXIndexOpt_None)
-        indexOpts = util.handleTableOfOptionStrings(clang, "CXIndexOpt_", indexOpts)
+        indexOpts = HandleNumberOrStringTabOption(
+            indexOpts, C.CXIndexOpt_None, "CXIndexOpt_")
 
         check(ffi.istype("IndexerCallbacks", callbacks),
               "<callback> must be a an object obtained with IndexerCallbacks()", 2)
@@ -677,8 +682,8 @@ local Diagnostic = class
     end,
 
     format = function(self, opts)
-        opts = util.checkOptionsArgAndGetDefault(opts, api.defaultDiagnosticDisplayOptions())
-        opts = util.handleTableOfOptionStrings(clang, "CXDiagnostic_", opts)
+        opts = HandleNumberOrStringTabOption(
+            opts, api.defaultDiagnosticDisplayOptions(), "CXDiagnostic_")
         return getString(clang.clang_formatDiagnostic(self._diag, opts))
     end,
 
