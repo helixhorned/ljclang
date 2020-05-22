@@ -187,6 +187,11 @@ end)
 --== ljclang
 
 local CreateTUFuncs = {
+    -- NOTE: The varargs here are: srcfile, args, opts.
+    --  (args: arguments passed to the compiler, used here only to pass Clang *options*,
+    --   opts: 'CXTranslationUnit_*' flags.
+    --  Yes, the terminology has the potential to confuse.)
+
     function(index, ...)
         return index:parse(...)
     end,
@@ -208,7 +213,9 @@ end
 
 local clangOpts = { "-std=c++14", "-Wall", "-pedantic" }
 
-local function GetTU(createTU, fileName, expectedDiagCount, opts)
+local function GetTU(createTU, fileName,
+                     -- optional:
+                     expectedDiagCount, opts)
     local tu = createTU(cl.createIndex(),
                         fileName, (opts ~= nil) and opts or clangOpts)
     assert.is_not_nil(tu)
@@ -754,12 +761,15 @@ end
 describe("Indexer callbacks", function()
     -- TODO: test indexing multiple source files with the within one session.
 
-    local runIndexing = function(fileName, callbacks, ...)
+    local runIndexing = function(fileName, callbacks,
+                                 -- optional:
+                                 expectedDiagCount, opts)
         local createTU = function(index, ...)
-            return index:createSession():indexSourceFile(callbacks, nil, ...)
+            return index:createSession():indexSourceFile(
+                callbacks, nil, ...)
         end
 
-        GetTU(createTU, fileName, ...)
+        GetTU(createTU, fileName, expectedDiagCount, opts)
     end
 
     for runIdx = 1, 2 do

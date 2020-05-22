@@ -668,7 +668,7 @@ local Diagnostic = class
         assert(type(parent) == "table")
 
         return {
-            -- NOTE: since at least LLVM 7, disposition of a diagnostic is a no-op.
+            -- NOTE: since at least LLVM 7, disposal of a diagnostic is a no-op.
             -- (See libclang's CIndexDiagnostic.cpp.)
             -- So, do not attach a GC finalizer.
             _diag = cxdiag,
@@ -731,7 +731,7 @@ DiagnosticSet = class
 
         -- NOTE: do not attach a finalizer (which would be clang_disposeDiagnosticSet()):
         -- all our uses create "non-externally managed" CXDiagnosticSetImpl objects (see
-        -- libclang's CIndexDiagnostic.h) which are not deleted on disposition -- the TU
+        -- libclang's CIndexDiagnostic.h) which are not deleted on disposal -- the TU
         -- owns the diagnostics. In fact, doing so would be potentially harmful.
         --
         -- TODO: research GC order anomalies that were observed with the finalizer in place.
