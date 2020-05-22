@@ -89,6 +89,51 @@ suffix for the 'FlyC' status text.
   (flycheck-parse-with-patterns output checker buffer)
 )
 
+(defun ljclang-wcc--do-list-including-tu-files ()
+  (let* ((fileName (buffer-file-name))
+         (baseName (file-name-base fileName))
+         (ext (file-name-extension fileName t))
+         (newBufferName
+          ;; NOTE: "source" here is meant in a very specific way, namely as shorthand for
+          ;;  "entry file of compile command considered in the active wcc-server session".
+          (concat "*source files including " (concat baseName ext) "*")))
+    (with-current-buffer-window
+     newBufferName nil nil
+     (let* ((msg (ljclang-wcc--invoke-client
+                  t "fileinfo" "including-tu-files" fileName)))
+       ;; TODO: handle errors:
+       ;;  - Non-zero exit status ->
+       ;;    * our short exit-status-message to the minibuffer
+       ;;    * output still into the new buffer?
+       )
+     (goto-char (point-min))
+     ;; Make all file names highlighted and navigatable.
+     (while (re-search-forward "[^\n]+" nil t)
+       (replace-match "\\&:1:" t))
+     (grep-mode))))
+
+(defun ljclang-wcc-list-including-tu-files ()
+  "List the names of the source files affected by the current file.
+
+Here, 'source' means a file that is an entry into a compile command
+that the active wcc-server session is aware of.
+"
+  (interactive)
+  (let ((infoStr ljclang-wcc--buffer-file-info-string))
+    (cond
+     ((not (eq (flycheck-get-checker-for-buffer) 'c/c++-wcc))
+      (message "The current buffer is not flychecked by c/c++-wcc."))
+     ((equal infoStr "⚡")
+      (message "wcc-server not running?"))
+     ((equal infoStr "1!")
+      ;; NOTE: if a file affects more than one compile command, we will open the list, even
+      ;;  if the unique'd listing only contains the file of the current buffer itself.
+      ;;  (This means that there are multiple compile commands take the source file.)
+      ;;  At this point, we do not know the length of the ultimate result list.
+      (message "The file of the current buffer only affects itself in one compile command."))
+     (t
+      (ljclang-wcc--do-list-including-tu-files)))))
+
 (flycheck-define-checker c/c++-wcc
   "A C/C++ syntax checker using watch_compile_commands.
 
