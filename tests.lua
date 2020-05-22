@@ -44,7 +44,7 @@ describe("posix.lua", function()
     it("tests Dir", function()
         local dir = posix.Dir("./test_data")
 
-        local ExpectedFileCount = 3
+        local ExpectedFileCount = 4
         local haveFile = {}
 
         for i = 1, ExpectedFileCount + 2 do
@@ -913,5 +913,111 @@ describe("Indexer callbacks", function()
         assert.is_equal(callCounts.decl, 15)
         assert.is_equal(callCounts.ref, 5)
         assert.is_equal(callCounts.methodRef, 1)
+    end)
+
+    it("tests indexing combining includes, decsl/refs and *Site() functions", function()
+        local FileName = "/tmp/ljclang_test_indexing.cpp"
+        writeToFile(FileName, ([[
+short FirstVar = 1;
+// ^v^v NOTE [DECL_INC_ORDER]: the "included file" event comes first, before the declaration above!
+#include "enums.hpp"
+int ThirdVar = 3;
+long FourthVar = 4;
+// ^v^v NOTE DECL_INC_ORDER.
+#include "defines.hpp"
+// ^v^v Two consecutive includes with no decls or refs in between ^v^v
+// (Relevant because: how do we detect a "left included file" event?)
+#undef LITTLE
+#undef MAKE_MUCH
+#undef MAKE_VAR
+#include "defines.hpp"
+float SixthVar = 6;
+double SeventhVar = 7;
+enum Wow {
+    Much = MAKE_MUCH(Orange),
+    Little = LITTLE,
+};
+// NOTE [SITE_FUNCTIONS]: This is the *only* thing that exhibits different values for
+//  different *Site() functions! Unexpectedly, the entities referenced via the macros
+//  above do not show this behavior.
+MAKE_VAR(long long, Ninth, Green);
+]]):gsub("//[^\n]+\n", ""))
+        local function makePlaceStr(file, lco)
+            local prefix = (file:name() == FileName) and 'T' or 'O'  -- "[T]est" file or "[O]ther"?
+            return prefix..":"..lco.line..":"..lco.column
+        end
+
+        local function makeFullPlaceStr(loc)
+            local f = makePlaceStr(loc:fileSite())
+            local s = makePlaceStr(loc:spellingSite())
+            local e = makePlaceStr(loc:expansionSite())
+            if (f == s and s == e) then
+                return f
+            else
+                return f..','..s..','..e
+            end
+        end
+
+        local function makeEventStr(eventKind, loc, suffix)
+            return eventKind.." "..makeFullPlaceStr(loc)..": "..suffix
+        end
+
+        local function makeSuffix(entInfo)
+            local shortCursorKind = entInfo.cursor:kind():gsub("[a-z]", "")
+            return shortCursorKind.." "..tostring(entInfo.name)
+        end
+
+        local eventStrings = {}
+        local lastFileChar
+
+        local function pushEventStr(...)
+            local eventStr = makeEventStr(...)
+            local curFileChar = eventStr:sub(6,6)
+            if (curFileChar == 'T' or lastFileChar == 'T') then
+                eventStrings[#eventStrings + 1] = eventStr
+            end
+            lastFileChar = curFileChar
+        end
+
+        local callbacks = makeIndexerCallbacks{
+            ppIncludedFile = function(incFileInfo)
+                pushEventStr("#inc", incFileInfo.hashLoc, incFileInfo.filename)
+            end,
+
+            indexDeclaration = function(declInfo)
+                local entInfo = declInfo.entityInfo
+                pushEventStr("decl", declInfo.loc, makeSuffix(entInfo))
+            end,
+
+            indexEntityReference = function(entRefInfo)
+                local entInfo = entRefInfo.referencedEntity
+                pushEventStr("+ref", entRefInfo.loc, makeSuffix(entInfo))
+            end,
+        }
+
+        local additionalOpts = {"-Itest_data/"}
+        runIndexing(FileName, callbacks, 0, concatTables(clangOpts, additionalOpts))
+
+        assert.are.same(eventStrings, {
+            "#inc T:2:1: enums.hpp",
+            -- ^v^v NOTE DECL_INC_ORDER.
+            "decl T:1:7: VD FirstVar",
+            "decl O:2:6: ED Fruits",
+            "decl T:3:5: VD ThirdVar",
+            "#inc T:5:1: defines.hpp",
+            "#inc T:9:1: defines.hpp",
+            -- ^v^v NOTE DECL_INC_ORDER.
+            "decl T:4:6: VD FourthVar",
+            "decl T:10:7: VD SixthVar",
+            "decl T:11:8: VD SeventhVar",
+            "decl T:12:6: ED Wow",
+            "decl T:13:5: ECD Much",
+            "+ref T:13:22: ECD Orange",
+            "+ref T:13:12: ECD Trillion",
+            "decl T:14:5: ECD Little",
+            "+ref T:14:14: ECD Billion",
+            "decl T:16:21,T:16:21,T:16:1: VD Ninth",
+            "+ref T:16:28: ECD Green",  -- NOTE SITE_FUNCTIONS.
+        })
     end)
 end)

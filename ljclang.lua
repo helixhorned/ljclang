@@ -624,8 +624,8 @@ SourceLocation = class
     --  Retrieve the file, line and column represented by the given source location, as
     --  specified in a # line directive.
     --
-    -- Also NOTE: what's returned is a *file name* (as opposed to a File like with the other
-    -- three "Site" functions).
+    -- NOTE: what's returned is a *file name* (as opposed to a File like with the other
+    --  three "Site" functions), plus a line+column object (without offset).
     presumedSite = function(self)
         return SL.getSiteOnlyLineCol(self, clang.clang_getPresumedLocation)
     end,
