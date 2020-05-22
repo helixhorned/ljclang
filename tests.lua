@@ -28,6 +28,7 @@ local io = require("io")
 local os = require("os")
 local math = require("math")
 local string = require("string")
+local table = require("table")
 
 ffi.cdef[[
 time_t time(time_t *);
@@ -44,7 +45,7 @@ describe("posix.lua", function()
     it("tests Dir", function()
         local dir = posix.Dir("./test_data")
 
-        local ExpectedFileCount = 4
+        local ExpectedFileCount = 5
         local haveFile = {}
 
         for i = 1, ExpectedFileCount + 2 do
@@ -923,6 +924,122 @@ describe("Indexer callbacks", function()
         assert.is_equal(callCounts.decl, 15)
         assert.is_equal(callCounts.ref, 5)
         assert.is_equal(callCounts.methodRef, 1)
+    end)
+
+    it("tests indexing options", function()
+        local FileName = "test_data/indexopt.cpp"
+
+        local eventStrings
+
+        local function pushEventStr(eventKind, entInfo)
+            local eventStr =
+                eventKind.." "..entInfo.cursor:kind().." "..tostring(entInfo.name)
+            eventStrings[#eventStrings + 1] = eventStr
+        end
+
+        local callbacks = makeIndexerCallbacks{
+            indexDeclaration = function(declInfo)
+                pushEventStr("decl", declInfo.entityInfo)
+            end,
+
+            indexEntityReference = function(entRefInfo)
+                pushEventStr("+ref", entRefInfo.referencedEntity)
+            end,
+        }
+
+        ---- Default index options ----
+
+        local eventStrings_None = {}
+        eventStrings = eventStrings_None
+        runIndexing(FileName, nil, callbacks)
+
+        local RefEventStrings = {
+            "decl VarDecl C",
+            "decl VarDecl var",
+            "decl FunctionDecl func1",
+            "+ref VarDecl var",
+            "decl FunctionDecl func2",  -- 5
+            "+ref VarDecl var",
+            "decl VarDecl D",
+            "+ref VarDecl C",
+            "decl VarDecl E",
+            "+ref VarDecl C",  -- 10
+            "decl FunctionTemplate Add",
+            "+ref VarDecl var",
+            "decl ClassTemplate StructTemplate",
+            "decl Constructor StructTemplate<T>",
+            "+ref ClassTemplate StructTemplate",  -- 15
+            "decl FieldDecl member",
+            "decl VarDecl F",
+            "+ref FunctionTemplate Add",
+            "decl VarDecl g",
+            "+ref ClassTemplate StructTemplate",  -- 20
+            -- NOTE: this is not spelled out in the code:
+            "+ref Constructor StructTemplate<T>",
+        }
+
+        assert.are.same(eventStrings_None, RefEventStrings)
+
+        ---- "No redundant references" ----
+
+        local eventStrings_NoRedundantRefs = {}
+        eventStrings = eventStrings_NoRedundantRefs
+        runIndexing(FileName, cl.IndexOpt.SuppressRedundantRefs, callbacks)
+
+        do
+            local refEventStrings = {}
+            for _, str in ipairs(RefEventStrings) do
+                -- NOTE: *all* references become "redundant", even first references of a
+                --  previously first-declared entity. This is because "redundant" in this
+                --  case is defined to include previous declarations. (See the wording in
+                --  the libclang docs.)
+                if (str:sub(1,1) ~= '+') then
+                    refEventStrings[#refEventStrings + 1] = str
+                end
+            end
+
+            assert.are.same(eventStrings, refEventStrings)
+        end
+
+        ---- "Index function-local symbols" ----
+
+        local eventStrings_IndexFuncLocalSyms = {}
+        eventStrings = eventStrings_IndexFuncLocalSyms
+        runIndexing(FileName, cl.IndexOpt.IndexFunctionLocalSymbols, callbacks)
+
+        do
+            local refEventStrings = {}
+            for _, str in ipairs(RefEventStrings) do
+                refEventStrings[#refEventStrings + 1] = str
+            end
+            table.insert(refEventStrings, 4, "decl VarDecl funcLocal")
+            table.insert(refEventStrings, 6, "+ref VarDecl funcLocal")
+            table.insert(refEventStrings, 14, "decl ParmDecl a")
+            table.insert(refEventStrings, 15, "decl ParmDecl b")
+            table.insert(refEventStrings, 17, "+ref ParmDecl a")
+            table.insert(refEventStrings, 18, "+ref ParmDecl b")
+
+            assert.are.same(eventStrings, refEventStrings)
+        end
+
+        ---- "Index implicit template instantiations" ----
+
+        local eventStrings_IndexImplicitTemplateInsts = {}
+        eventStrings = eventStrings_IndexImplicitTemplateInsts
+        runIndexing(FileName, cl.IndexOpt.IndexImplicitTemplateInstantiations, callbacks)
+
+        do
+            local refEventStrings = {}
+            for _, str in ipairs(RefEventStrings) do
+                refEventStrings[#refEventStrings + 1] = str
+            end
+            -- NOTE: what is indexed in addition is not the instantiation of Add<>() itself,
+            --  but rather a variable (even if it is of non-dependent type!) inside the
+            --  definition of the function template.
+            table.insert(refEventStrings, 22, "+ref VarDecl var")
+
+            assert.are.same(eventStrings, refEventStrings)
+        end
     end)
 
     it("tests indexing combining includes, decsl/refs and *Site() functions", function()
