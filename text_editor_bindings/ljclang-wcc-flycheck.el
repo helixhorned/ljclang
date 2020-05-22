@@ -65,11 +65,7 @@
     ;; NOTE: it is deliberate that we pass through a count of zero. Assuming
     ;;  that wcc-server is finished, this means that a file (even a source!) is
     ;;  not reachable by any of the compile commands the it was instructed with.
-    (if (string-match-p "^[0-9]+[\+\?]?!?$" str)
-        (concat "⇝" str)
-      ;; Three crosses: wcc-client returned a string of unexpected form.
-      ;; We forgot to update the string validation above?
-      "☓☓☓")))
+    (concat "⇝" str)))
 
 (defvar-local ljclang-wcc--buffer-file-info-string nil)
 
@@ -81,14 +77,15 @@ suffix for the 'FlyC' status text.
 "
   ;; Match the first line of the wcc-client invocation, which we expect is the output of
   ;;  the "fileinfo including-tu-count" command.
-  (let* ((firstLine (progn (if (string-match "^\\([^\n]+\\)\n" output)
+  (let* ((firstLine (progn (if (string-match "^\\([0-9]+[\+\?]?!?\\)\n" output)
                                (match-string 1 output))))
          (infoStr
           (if firstLine
               (ljclang-wcc--get-file-info-string firstLine)
-            ;; High voltage sign: first line of output has unexpected form. This should not
-            ;; happen unless wcc-client is mismatched. (We assume that this function is
-            ;; called only if the checker process exited with a non-zero status.)
+            ;; High voltage sign: first line of output has unexpected form.
+            ;;  This can happen because wcc-client is not running or mismatched.
+            ;; TODO: this can also happen temporarily, when requesting diags
+            ;;  for a TU which need some time to be computed. Address.
             "⚡")))
     ;; Set the mode line suffix.
     (setq ljclang-wcc--buffer-file-info-string infoStr))
