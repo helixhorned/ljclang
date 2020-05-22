@@ -761,12 +761,12 @@ end
 describe("Indexer callbacks", function()
     -- TODO: test indexing multiple source files with the within one session.
 
-    local runIndexing = function(fileName, callbacks,
+    local runIndexing = function(fileName, indexOpts, callbacks,
                                  -- optional:
                                  expectedDiagCount, opts)
         local createTU = function(index, ...)
             return index:createSession():indexSourceFile(
-                callbacks, nil, ...)
+                callbacks, indexOpts, ...)
         end
 
         GetTU(createTU, fileName, expectedDiagCount, opts)
@@ -781,7 +781,7 @@ describe("Indexer callbacks", function()
 
             local callCount = 0
 
-            runIndexing("test_data/virtual.hpp", makeIndexerCallbacks{
+            runIndexing("test_data/virtual.hpp", nil, makeIndexerCallbacks{
                 abortQuery = function()
                     callCount = callCount + 1
                     -- NOTE: an abort request may not be honored immediately,
@@ -842,7 +842,7 @@ describe("Indexer callbacks", function()
         }
 
         local additionalOpts = {"-Itest_data/", "-include-pch", ASTFileName}
-        runIndexing(FileName, callbacks, 2, concatTables(clangOpts, additionalOpts))
+        runIndexing(FileName, nil, callbacks, 2, concatTables(clangOpts, additionalOpts))
     end)
 
     it("tests indexing with declaration and entity reference callbacks", function()
@@ -855,7 +855,7 @@ describe("Indexer callbacks", function()
         local IdxEntity = cl.IdxEntity
         local FileName = "test_data/virtual.hpp"
 
-        runIndexing(FileName, makeIndexerCallbacks{
+        runIndexing(FileName, nil, makeIndexerCallbacks{
             indexDeclaration = function(declInfo)
                 callCounts.decl = callCounts.decl + 1
 
@@ -1006,7 +1006,7 @@ MAKE_VAR(long long, Ninth, Green);
         }
 
         local additionalOpts = {"-Itest_data/"}
-        runIndexing(FileName, callbacks, 0, concatTables(clangOpts, additionalOpts))
+        runIndexing(FileName, nil, callbacks, 0, concatTables(clangOpts, additionalOpts))
 
         assert.are.same(eventStrings, {
             "#inc T:2:1: enums.hpp",
