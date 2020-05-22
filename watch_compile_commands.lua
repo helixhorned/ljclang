@@ -776,10 +776,18 @@ function MI.FileIsCompileCommandTU(fileName)
 end
 
 function MI.HandleCommand_FileInfo(args, control, ccInclusionGraphs)
+    local IsSubCommandKnown = {
+        -- Count of TUs that are affected by the passed file.
+        ["including-tu-count"] = true,
+        -- Unique and sorted list of names of CC files affected by the passed file.
+        ["including-tu-files"] = true,
+    }
+
     local subCommand = args[1]
+
     if (subCommand == nil) then
         return nil, "missing sub-command"
-    elseif (subCommand ~= "including-tu-count") then
+    elseif (not IsSubCommandKnown[subCommand]) then
         return nil, "unknown sub-command"
     end
 
@@ -794,6 +802,8 @@ function MI.HandleCommand_FileInfo(args, control, ccInclusionGraphs)
 
     local haveUnhandled = false
     local includingTUCount = 0
+    local includingTUFiles = {}
+    local haveFile = {}  -- [<fileName>] = {nil|true}
 
     for ccIdx = 1, #compileCommands do
         local incGraph = ccInclusionGraphs[ccIdx]
@@ -801,14 +811,25 @@ function MI.HandleCommand_FileInfo(args, control, ccInclusionGraphs)
             haveUnhandled = true
         elseif (incGraph:getNode(realName) ~= nil) then
             includingTUCount = includingTUCount + 1
+            -- Uniquify by file name.
+            local fileName = compileCommands[ccIdx].file
+            if (not haveFile[fileName]) then
+                includingTUFiles[#includingTUFiles + 1] = fileName
+                haveFile[fileName] = true
+            end
         end
     end
 
-    local suffix = haveUnhandled and '+' or
-        control:haveActiveChildren() and '?' or ""
-    local markerIsTU = MI.FileIsCompileCommandTU(realName) and '!' or ""
+    if (subCommand == "including-tu-count") then
+        local suffix = haveUnhandled and '+' or
+            control:haveActiveChildren() and '?' or ""
+        local markerIsTU = MI.FileIsCompileCommandTU(realName) and '!' or ""
 
-    return tonumber(includingTUCount)..suffix..markerIsTU
+        return tonumber(includingTUCount)..suffix..markerIsTU
+    else
+        table.sort(includingTUFiles)
+        return table.concat(includingTUFiles, '\n')
+    end
 end
 
 function MI.DoHandleClientRequest(command, args, crTab)
