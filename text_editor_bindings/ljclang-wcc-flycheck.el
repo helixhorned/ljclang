@@ -55,7 +55,7 @@
       :face (if (equal message "success") 'success '(bold error))
       ))))
 
-(defun ljclang-wcc--get-file-info-string (str)
+(defun ljclang-wcc--tweak-file-info-string (str)
   (if (string-equal str "1!")
       ;; The file is a source file with a count of including TUs of one. Do not
       ;; show the count as it contains little information. (Most source files
@@ -79,14 +79,11 @@ suffix for the 'FlyC' status text.
   ;;  the "fileinfo including-tu-count" command.
   (let* ((firstLine (progn (if (string-match "^\\([0-9]+[\+\?]?!?\\)\n" output)
                                (match-string 1 output))))
-         (infoStr
-          (if firstLine
-              (ljclang-wcc--get-file-info-string firstLine)
-            ;; High voltage sign: first line of output has unexpected form.
-            ;;  This can happen because wcc-client is not running or mismatched.
-            ;; TODO: this can also happen temporarily, when requesting diags
-            ;;  for a TU which need some time to be computed. Address.
-            "⚡")))
+         ;; High voltage sign: first line of output has unexpected form.
+         ;;  This can happen because wcc-client is not running or mismatched.
+         ;; TODO: this can also happen temporarily, when requesting diags
+         ;;  for a TU which need some time to be computed. Address.
+         (infoStr (or firstLine "⚡")))
     ;; Set the mode line suffix.
     (setq ljclang-wcc--buffer-file-info-string infoStr))
   (flycheck-parse-with-patterns output checker buffer)
@@ -147,9 +144,12 @@ See URL `https://github.com/helixhorned/ljclang/tree/rpi'."
 Can be used instead of `flycheck-mode-line-status-text' in the
 value for `flycheck-mode-line'.
 "
+  ;; TODO: what if someone has their status line (suffix) modified?
+  ;;  Propose a way to do this per-checker in Flycheck?
   (concat
    (flycheck-mode-line-status-text status)
    (let ((checker (flycheck-get-checker-for-buffer)))
      (if (eq checker 'c/c++-wcc)
-         ljclang-wcc--buffer-file-info-string
+         (ljclang-wcc--tweak-file-info-string
+          ljclang-wcc--buffer-file-info-string)
        ""))))
