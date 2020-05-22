@@ -725,6 +725,9 @@ function MI.HandleCommand_Diags(args, control, prioritizeCcFunc)
     local realName, errorMsg = MI.GetRealNameFor(args[1])
     if (realName == nil) then
         return nil, errorMsg
+    elseif (args[2] ~= nil and args[2] ~= '.') then
+        -- NOTE: '.' for supporting repeated invocation from wcc-client.sh
+        return nil, "extraneous arguments provided"
     end
 
     -- TODO: handle non-sources.
@@ -785,6 +788,8 @@ function MI.HandleCommand_FileInfo(args, control, ccInclusionGraphs)
     local realName, errorMsg = MI.GetRealNameFor(args[2])
     if (realName == nil) then
         return nil, errorMsg
+    elseif (args[3] ~= nil) then
+        return nil, "extraneous arguments provided"
     end
 
     local haveUnhandled = false

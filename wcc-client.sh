@@ -12,24 +12,41 @@ REQUEST_SINK=$TEMPDIR/wcc-request.sink
 function usage()
 {
     echo "Usage:"
-    echo " $0 -c [<command> [command options...]]  (ignored)"
+    echo " $0 -c [<command> [command-options...]]  (ignored)"
     echo "   Validate client invocation (and if present, the well-formedness"
     echo "   of the command and its arguments)."
-    echo " $0 -C [<command> [command options...]]  (ignored)"
+    echo " $0 -C [<command> [command-options...]]  (ignored)"
     echo "   In addition to the effects of '-c', actually send the command to"
     echo "   the server (which treats it as a no-op) and wait for the response."
-    echo " $0 [-n] <command> [command options...]"
+    echo " $0 [-n] <command> [command-options...]"
     echo "   Send command to be processed by the watch_compile_commands server."
+    echo " $0 -b <command1> [command1-options...] [@@ <command2> [command2-options...] ...]"
+    echo "   Send multiple commands. Processing stops at the first failing command."
     echo ""
-    echo "Recognized options:"
+    echo "Recognized options in single-command mode"
     echo "  '-n': exit immediately after sending the command."
     exit 1
 }
 
 block=yes
+bulk=no
 
 if [ x"$1" = x"-n" ]; then
     block=no
+    shift
+fi
+
+if [ x"$1" = x"-b" ]; then
+    if [ $block = no ]; then
+        # Notes:
+        #  - This error is for when we are invoked with "-n -b".
+        #    Invoking us as "-b -n" will treat the '-n' as the first command.
+        #  - The reason for disallowing it is that the output from different commands would
+        #    appear in undetermined relative order unless special measures are taken.
+        echo "ERROR: multi-command mode (-b) is not compatible with -n."
+        exit 2
+    fi
+    bulk=yes
     shift
 fi
 
@@ -61,7 +78,41 @@ for ((i=0; i < $numArgs; i++)); do
         echo "ERROR: command and arguments must not match extended regexp '^-[Een]+$'."
         exit 2
     fi
+
+    if [[ $bulk == yes && "$arg" =~ ^- ]]; then
+        # This is very strict and prevents us from passing dash-options server commands,
+        # but this is done in order to exclude passing options to *us* in our recursive
+        # invocations, which otherwise may yield unexpected results.
+        echo "ERROR: in multi-command mode, arguments must not start with '-'."
+    fi
 done
+
+if [ $bulk == yes ]; then
+    ## Multi-command mode handling (recursively invoking this script).
+    curCmdArgs=()
+    k=0
+
+    for ((i=0; i <= $numArgs; i++)); do
+        arg="${args[i]}"
+
+        if [[ $i -lt $numArgs && x"$arg" != x"@@" ]]; then
+            curCmdArgs[$k]="$arg"
+            k=$((++k))
+        else
+            # Invoke us recursively (with the arguments collected so far).
+            "$0" "${curCmdArgs[@]}"
+            exitCode=$?
+            if [ $exitCode -ne 0 ]; then
+                exit $exitCode
+            fi
+
+            curCmdArgs=()
+            k=0
+        fi
+    done
+
+    exit 0
+fi
 
 ## Setup
 
