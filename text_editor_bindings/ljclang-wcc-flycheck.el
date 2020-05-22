@@ -77,8 +77,10 @@ suffix for the 'FlyC' status text.
 "
   ;; Match the first line of the wcc-client invocation, which we expect is the output of
   ;;  the "fileinfo including-tu-count" command.
-  (let* ((firstLine (progn (if (string-match "^\\([0-9]+[\+\?]?!?\\)\n" output)
-                               (match-string 1 output))))
+  (let* ((firstLine
+          ;; NOTE [STRING_VALIDATION]:
+          (progn (if (string-match "^\\(\\(0\\|[1-9]+\\)[\+\?]?!?\\)\n" output)
+                     (match-string 1 output))))
          ;; High voltage sign: first line of output has unexpected form.
          ;;  This can happen because wcc-client is not running or mismatched.
          ;; TODO: this can also happen temporarily, when requesting diags
@@ -125,6 +127,17 @@ that the active wcc-server session is aware of.
       (message "The current buffer is not flychecked by c/c++-wcc."))
      ((equal infoStr "⚡")
       (message "wcc-server not running?"))
+     ((string-match "^0" infoStr)
+      (let* ((lastChar (string-to-char (substring infoStr -1)))
+             (suffix
+              (case lastChar
+                (?+ " (yet)")
+                (?? " (yet)")
+                (?0 "")
+                (t (assert nil))  ;; See STRING_VALIDATION for why.
+                )))
+        (message
+         "The file of the current buffer does not affect any compile commands%s." suffix)))
      ((equal infoStr "1!")
       ;; NOTE: if a file affects more than one compile command, we will open the list, even
       ;;  if the unique'd listing only contains the file of the current buffer itself.
