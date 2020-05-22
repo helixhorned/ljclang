@@ -22,38 +22,38 @@
 ;; TODO:
 ;;  make usable with 'require'.
 
-(defun ljclang-wcc-check-diags-request (_)
-  (let*
+(defun ljclang-wcc--invoke-client (destination &rest args)
+  (let
       ((res
         ;; Execute 'wcc-client -c' to check it being properly set up.
         ;; ignore-errors is used so that we catch the case when the executable is not found.
         ;;  TODO: find out: redundant because flycheck checks this before?
-        (ignore-errors (call-process "wcc-client" nil nil nil "-C")))
-       (message
-        (cond
-         ((null res) "failed to execute wcc-client")
-         ((stringp res) (concat "wcc-client exited with signal: " res))
-         ((numberp res)
-          (case res
-            ;; KEEPINSYNC with wcc-client's exit codes.
-            (0 "success")
-            (1 "failed creating FIFO")
-            (2 "UNEXPECTED ERROR")  ; malformed command/args, shouldn't happen with '-c'.
-            (3 "server not running")
-            ;; May indicate that:
-            ;;  - it is an exit code >=100 (malformed/unexpected reply from server), or
-            ;;  - an update here is necessary.
-            (t "UNEXPECTED EXIT CODE")
-            ))
-         )))
+        (ignore-errors (apply 'call-process "wcc-client" nil destination nil
+                              args))))
+    (cond
+     ((null res) "failed to execute wcc-client")
+     ((stringp res) (concat "wcc-client exited with signal: " res))
+     ((numberp res)
+      (case res
+        ;; KEEPINSYNC with wcc-client's exit codes.
+        (0 "success")
+        (1 "failed creating FIFO")
+        (2 "UNEXPECTED ERROR")  ; malformed command/args, shouldn't happen with '-c'.
+        (3 "server not running")
+        ;; May indicate that:
+        ;;  - it is an exit code >=100 (malformed/unexpected reply from server), or
+        ;;  - an update here is necessary.
+        (t "UNEXPECTED EXIT CODE")
+        )))))
+
+(defun ljclang-wcc-check-diags-request (_)
+  (let ((message (ljclang-wcc--invoke-client nil "-C")))
     (list
      (flycheck-verification-result-new
       :label "wcc-client check"
       :message message
       :face (if (equal message "success") 'success '(bold error))
-      ))
-    )
-)
+      ))))
 
 (defun ljclang-wcc--get-file-info-string (str)
   (if (string-equal str "1!")
