@@ -23,6 +23,9 @@ IdxEntity = ffi.new[[struct{
 IdxEntityLang = ffi.new[[struct{
 @@ -C -w EnumConstantDecl -p ^CXIdxEntityLang_ -s ^CXIdxEntityLang_
 }]],
+IndexOpt = ffi.new[[struct{
+@@ -C -w EnumConstantDecl -p ^CXIndexOpt_ -s ^CXIndexOpt_
+}]],
 RefQualifierKind = ffi.new[[struct{
 @@ -C -e ^CXRefQualifierKind$ -s ^CXRefQualifier_
 }]],

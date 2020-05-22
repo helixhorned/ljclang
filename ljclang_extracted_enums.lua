@@ -63,6 +63,14 @@ static const int ObjC = 2;
 static const int CXX = 3;
 static const int Swift = 4;
 }]],
+IndexOpt = ffi.new[[struct{
+static const int None = 0;
+static const int SuppressRedundantRefs = 1;
+static const int IndexFunctionLocalSymbols = 2;
+static const int IndexImplicitTemplateInstantiations = 4;
+static const int SuppressWarnings = 8;
+static const int SkipParsedBodiesInSession = 16;
+}]],
 RefQualifierKind = ffi.new[[struct{
 static const int None = 0;
 static const int LValue = 1;
