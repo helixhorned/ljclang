@@ -25,9 +25,8 @@
 (defun ljclang-wcc--invoke-client (destination &rest args)
   (let
       ((res
-        ;; Execute 'wcc-client -c' to check it being properly set up.
-        ;; ignore-errors is used so that we catch the case when the executable is not found.
-        ;;  TODO: find out: redundant because flycheck checks this before?
+        ;; ignore-errors: catch the case when the executable is not found.
+        ;;  TODO: find out: redundant when invoked from Flycheck?
         (ignore-errors (apply 'call-process "wcc-client" nil destination nil
                               args))))
     (cond
@@ -47,6 +46,7 @@
         )))))
 
 (defun ljclang-wcc-check-diags-request (_)
+  ;; Execute 'wcc-client -C' to check it being properly set up.
   (let ((message (ljclang-wcc--invoke-client nil "-C")))
     (list
      (flycheck-verification-result-new
@@ -55,7 +55,20 @@
       :face (if (equal message "success") 'success '(bold error))
       ))))
 
-(defun ljclang-wcc--tweak-file-info-string (str)
+(defun ljclang-wcc--file-info-string-from-process-output (output)
+  ;; NOTE [STRING_VALIDATION]:
+  (if (string-match "^\\(\\(0\\|[1-9]+\\)([\+\?]?)(!?)\\)\n" output)
+      (let ((wholeStr (match-string 1 output))
+            (numberStr (match-string 2 output))
+            (infixStr (match-string 3 output))
+            (suffixStr (match-string 4 output)))
+        (if (or (equal infixStr "") (equal suffixStr ""))
+            wholeStr
+          ;; If both work-in-progress and source-file-ness is being indicated,
+          ;; keep only the former.
+          (concat (numberStr infixStr))))))
+
+(defun ljclang-wcc--tweak-file-info-string-for-display (str)
   (if (string-equal str "1!")
       ;; The file is a source file with a count of including TUs of one. Do not
       ;; show the count as it contains little information. (Most source files
@@ -77,10 +90,7 @@ suffix for the 'FlyC' status text.
 "
   ;; Match the first line of the wcc-client invocation, which we expect is the output of
   ;;  the "fileinfo including-tu-count" command.
-  (let* ((firstLine
-          ;; NOTE [STRING_VALIDATION]:
-          (progn (if (string-match "^\\(\\(0\\|[1-9]+\\)[\+\?]?!?\\)\n" output)
-                     (match-string 1 output))))
+  (let* ((firstLine (ljclang-wcc--file-info-string-from-process-output output))
          ;; High voltage sign: first line of output has unexpected form.
          ;;  This can happen because wcc-client is not running or mismatched.
          ;; TODO: this can also happen temporarily, when requesting diags
@@ -208,6 +218,6 @@ value for `flycheck-mode-line'.
    (flycheck-mode-line-status-text status)
    (let ((checker (flycheck-get-checker-for-buffer)))
      (if (eq checker 'c/c++-wcc)
-         (ljclang-wcc--tweak-file-info-string
+         (ljclang-wcc--tweak-file-info-string-for-display
           ljclang-wcc--buffer-file-info-string)
        ""))))
