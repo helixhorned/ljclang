@@ -37,7 +37,7 @@
         ;; KEEPINSYNC with wcc-client's exit codes.
         (0 "success")
         (1 "failed creating FIFO")
-        (2 "UNEXPECTED ERROR")  ; malformed command/args, shouldn't happen with '-c'.
+        (2 "UNEXPECTED ERROR")  ; malformed command/args, shouldn't happen with '-C'.
         (3 "server not running")
         ;; May indicate that:
         ;;  - it is an exit code >=100 (malformed/unexpected reply from server), or
@@ -113,16 +113,16 @@ suffix for the 'FlyC' status text.
      newBufferName nil nil
      (let* ((msg (ljclang-wcc--invoke-client
                   t "fileinfo" "including-tu-files" fileName)))
-       ;; TODO: handle errors:
-       ;;  - Non-zero exit status ->
-       ;;    * our short exit-status-message to the minibuffer
-       ;;    * output still into the new buffer?
-       )
-     (goto-char (point-min))
-     ;; Make all file names highlighted and navigatable.
-     (while (re-search-forward "[^\n]+" nil t)
-       (replace-match "\\&:1:" t))
-     (grep-mode))))
+       (if (not (equal msg "success"))
+           ;; TODO: close the new window?
+           (message "%s" msg)
+         (goto-char (point-min))
+         ;; Make all file names highlighted and navigatable.
+         (while (re-search-forward "[^\n]+" nil t)
+           (replace-match "\\&:1:" t)))
+       ;; NOTE: enter mode even on error, so that 'q' can be pressed to exit it quickly.
+       (grep-mode))
+)))
 
 (defun ljclang-wcc-list-including-tu-files ()
   "List the names of the source files affected by the current file.
