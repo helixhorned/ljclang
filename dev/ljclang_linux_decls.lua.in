@@ -7,7 +7,7 @@ IN = ffi.new[[struct {
 @@ -w MacroDefinition -C -p ^IN_ -s ^IN_ ./dev/sys.h
 }]],
 MAP = ffi.new[[struct {
-@@ -w MacroDefinition -C -p ^MAP_ANONYMOUS$ -s ^MAP_ ./dev/sys.h
+@@ -w MacroDefinition -C -p ^MAP_ANON[YMOUS]*$ -s ^MAP_ ./dev/sys.h
 }]],
 MREMAP = ffi.new[[struct {
 @@ -w MacroDefinition -C -p ^MREMAP_FIXED$ -p ^MREMAP_MAYMOVE$ -s ^MREMAP_ -A -D_GNU_SOURCE=1 ./dev/sys.h

@@ -128,7 +128,7 @@ CHECK_EXTRACTED_INOTIFY_CMD := $(EXTRACT_CMD_ENV) $(luajit) \
     -e "require'ljclang_linux_decls'"
 
 $(linux_decls_lua): ./dev/ljclang_linux_decls.lua.in $(EXTRACTED_ENUMS_LUA) $(sys_h) Makefile
-	@$(EXTRACT_CMD_ENV) ./mkdecls.sh $< > $(linux_decls_lua_tmp)
+	@$(EXTRACT_CMD_ENV) ./mkdecls.sh $< | sed 's/\<ANON\>/ANONYMOUS/g' > $(linux_decls_lua_tmp)
 	@mv $(linux_decls_lua_tmp) $@
 	@($(CHECK_EXTRACTED_INOTIFY_CMD) && \
 	    printf "* \033[1mGenerated $@\033[0m\n") \
