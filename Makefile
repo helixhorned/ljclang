@@ -64,7 +64,7 @@ GENERATED_FILES_STAGE_1 := $(INDEX_H_LUA) $(LIBDIR_INCLUDE_LUA)
 GENERATED_FILES_STAGE_2 := $(GENERATED_FILES_STAGE_1) $(EXTRACTED_ENUMS_LUA) $(posix_types_lua)
 
 .PHONY: all app_dependencies apps clean veryclean bootstrap doc test install install-dev _install_common
-.PHONY: committed-generated
+.PHONY: committed-generated extractdecls_deps print-extractdecls-library-path
 
 all: $(SHARED_LIBRARIES) $(GENERATED_FILES_STAGE_2)
 
@@ -96,6 +96,10 @@ $(LIBDIR_INCLUDE_LUA): Makefile config.make
 	@echo "return { '$(llvm_libdir_include)' }" > $@
 
 EXTRACT_CMD_ENV := LD_LIBRARY_PATH="$(libdir):$(THIS_DIR)"
+# For using an in-tree (non-installed) extractdecls.lua or mkdecls.sh
+# from outside:
+print-extractdecls-library-path:
+	@echo "$(libdir):$(THIS_DIR)"
 
 CHECK_EXTRACTED_ENUMS_CMD := $(EXTRACT_CMD_ENV) $(luajit) \
     -e "require('ffi').cdef[[typedef int time_t;]]" \
@@ -174,7 +178,9 @@ test: $(SHARED_LIBRARIES) $(GENERATED_FILES_STAGE_2) $(linux_decls_lua) $(posix_
 
 sed_common_commands := s|@LJCLANG_DEV_DIR@|$(THIS_DIR)|g; s|@LLVM_BINDIR@|$(bindir)|g; s|@LLVM_LIBDIR@|$(libdir)|g;
 
-extractdecls.app.lua: extractdecls.lua mkapp.lua $(GENERATED_FILES_STAGE_1) app_dependencies
+extractdecls_deps: mkapp.lua $(GENERATED_FILES_STAGE_1) app_dependencies
+
+extractdecls.app.lua: extractdecls.lua extractdecls_deps
 	@$(EXTRACT_CMD_ENV) $(luajit) -l mkapp $< -Q > /dev/null && \
 		printf "* \033[1mCreated $@\033[0m\n"
 
