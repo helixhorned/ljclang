@@ -3,6 +3,7 @@
 -- NOTE: on Raspbian, we need to require ljclang before busted, otherwise we get
 --  error "wrong number of type parameters" for ffi.cdef 'typedef enum CXChildVisitResult'.
 local cl = require("ljclang")
+local linux_decls = require("ljclang_linux_decls")
 local llvm_libdir_include = require("llvm_libdir_include")[1]
 local posix = require("posix")
 local symbol_index = require("symbol_index")
@@ -36,6 +37,8 @@ time_t time(time_t *);
 
 local nonExistentFileName = "/non_exisitent_file"
 assert(io.open(nonExistentFileName) == nil)
+
+local arg0 = arg[0]
 
 ----------
 
@@ -118,6 +121,51 @@ describe("posix.lua", function()
 
         -- Close the remaining file descriptors.
         fds = nil
+        collectgarbage()
+    end)
+end)
+
+describe("Memory mapping with padding", function()
+    local PROT, MAP, LMAP = posix.PROT, posix.MAP, linux_decls.MAP
+    local PageSize = posix.getPageSize()
+
+    it("tests repeated creation and destruction", function()
+        local CreateCount = 100
+
+        local PrefixSize = PageSize
+        local TotalSize = 128 * 1024*1024
+        local PageCount = TotalSize / PageSize
+
+        for i = 1, CreateCount do
+            local ptr = posix.memMapWithPadding(
+                TotalSize, PrefixSize, PROT.READ, MAP.PRIVATE + LMAP.ANONYMOUS, -1)
+
+            assert.is_not_nil(ptr)
+            local uPtr = ffi.cast("const uint8_t *", ptr)
+
+            assert.is_equal(uPtr[0], 0)
+            assert.is_equal(uPtr[TotalSize - 1], 0)
+
+            ptr = nil
+            collectgarbage()
+        end
+    end)
+
+    it("tests overlaying with a file-backed mapping", function()
+        local fd = C.open(arg0, posix.O.RDONLY)
+        assert(fd ~= -1, "Failed opening self (tests.lua) for reading")
+        local Fd = posix.Fd(fd)
+
+        local ptr = posix.memMapWithPadding(
+            2*PageSize, PageSize, PROT.READ, MAP.PRIVATE, fd)
+
+        assert.is_not_nil(ptr)
+        local uPtr = ffi.cast("const uint8_t *", ptr)
+
+        assert.is_equal(uPtr[0], ('#'):byte())  -- first char of '#!' at the beginning.
+        assert.is_equal(uPtr[PageSize], 0)
+
+        ptr = nil
         collectgarbage()
     end)
 end)

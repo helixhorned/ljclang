@@ -18,6 +18,7 @@ local check = error_util.check
 local checktype = error_util.checktype
 local error = error
 local ipairs = ipairs
+local rawequal = rawequal
 local setmetatable = setmetatable
 local tostring = tostring
 local type = type
@@ -490,7 +491,10 @@ end
 -- NOTE: Linux's "man mmap" explicitly mentions this value.
 local MAP_FAILED = ffi.cast("void *", -1)
 
+-- For mmap(): [<ptr>] = <size>:
 local activeMemMapSizes = setmetatable({}, { __mode='k'})
+-- For memMapWithPadding(): [<overlay ptr>] = <underlay ptr>:
+local activeUnderlayPtrs = setmetatable({}, { __mode='k' })
 
 local CachedPageSize
 local function getPageSize()
@@ -542,10 +546,49 @@ api.mmap = function(addr, length, prot, flags, fd, offset)
     return retPtr
 end
 
+function api.memMapWithPadding(totalLength, length, prot, flags, fd)
+    checktype(totalLength, 1, "number", 2)
+    CheckCommonMemMapArgs(1, length, prot, flags, fd)
+
+    check(totalLength > length, "argument #1 must be greater than argument #2", 2)
+    check(length % getPageSize() == 0, "argument #2 must be a multiple of the page size", 2)
+
+    -- First, request the mapping containing the padding. (The "underlay".)
+    local unPtr = C.mmap(nil, totalLength, prot, bit.bor(flags, linux_decls.MAP.ANONYMOUS), -1, 0)
+    if (unPtr == MAP_FAILED) then
+        error("mmap for underlay failed: "..getErrnoString())
+    end
+
+    -- Next, map the non-padding portion at exactly the address obtained for the underlay.
+    local ovPtr = C.mmap(unPtr, length, prot, bit.bor(flags, decls.MAP.FIXED), fd, 0)
+    if (ovPtr == MAP_FAILED) then
+        C.munmap(unPtr, totalLength)
+        error("mmap for overlay failed: "..getErrnoString())
+    end
+
+    assert(ovPtr == unPtr)
+    assert(not rawequal(ovPtr, unPtr))
+
+    -- Set up the GC for the pointer objects to partition the unmapping.
+    -- (Padding part for the underlay, prefix part for the overlay.)
+    local retPtr = ffi.gc(ovPtr, function(p)
+        C.munmap(p, length)
+    end)
+
+    local paddingLength = totalLength - length
+    activeUnderlayPtrs[retPtr] = ffi.gc(unPtr, function(p)
+        C.munmap(ffi.cast(uint8_ptr_t, p) + length, paddingLength)
+    end)
+
+    return retPtr
+end
+
 local function checkMemRemapPtr(ptr, pageIdx)
     checktype(ptr, 1, "cdata", 3)
 
     local memMapSize = activeMemMapSizes[ptr]
+    -- NOTE: this check may wrongly pass, namely in case we are called with a pointer that
+    --  is not reachable from Lua but has not yet been garbage-collected.
     check(ptr ~= nil, "pointer argument must have been obtained by posix.mmap()", 3)
 
     local pageSize = getPageSize()
@@ -658,6 +701,7 @@ end
 api.pipe = function()
     local fds = ffi.new("int [2]")
     local ret = call("pipe", fds)
+    -- TODO: check for resource exhaustion errors.
     assert(ret == 0)
 
     return {
