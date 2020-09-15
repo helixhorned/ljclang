@@ -492,27 +492,41 @@ local MAP_FAILED = ffi.cast("void *", -1)
 
 local activeMemMapSizes = setmetatable({}, { __mode='k'})
 
-api.mmap = function(addr, length, prot, flags, fd, offset)
-    check(addr == nil, "argument #1 must be nil", 2)
+local CachedPageSize
+local function getPageSize()
+    if (CachedPageSize == nil) then
+        CachedPageSize = sysconf(decls._SC.PAGESIZE)
+    end
+    return CachedPageSize
+end
 
-    checktype(length, 2, "number", 2)
-    check(length > 0, "argument #2 must be greater than zero", 2)
+api.getPageSize = getPageSize
 
-    checktype(prot, 3, "number", 2)
-    checktype(flags, 4, "number", 2)
+local function CheckCommonMemMapArgs(argIdxOffset, length, prot, flags, fd)
+    local o = argIdxOffset
+    checktype(length, o+1, "number", 3)
+    check(length > 0, "'length' argument must be greater than zero", 3)
+
+    checktype(prot, o+2, "number", 3)
+    checktype(flags, o+3, "number", 3)
 
     do
         local MAP, PROT = decls.MAP, decls.PROT
         check(bit.band(prot, bit.bnot(PROT.READ + PROT.WRITE)) == 0,
-              "Only PROT.READ and/or PROT.WRITE allowed", 2)
+              "Only PROT.READ and/or PROT.WRITE allowed", 3)
         local allowedFlags = bit.bnot(MAP.SHARED + MAP.PRIVATE + linux_decls.MAP.ANONYMOUS)
         check(bit.band(flags, allowedFlags) == 0,
-              "Only MAP.{SHARED,PRIVATE,ANONYMOUS} allowed", 2)
+              "Only MAP.{SHARED,PRIVATE,ANONYMOUS} allowed", 3)
         check(bit.band(flags, linux_decls.MAP.ANONYMOUS) == 0 or fd == -1,
-              "argument #5 must be -1 when argument #4 has MAP.ANONYMOUS set", 2)
+              "'fd' argument must be -1 when 'flags' argument has MAP.ANONYMOUS set", 3)
     end
 
-    checktype(fd, 5, "number", 2)
+    checktype(fd, o+4, "number", 3)
+end
+
+api.mmap = function(addr, length, prot, flags, fd, offset)
+    check(addr == nil, "argument #1 must be nil", 2)
+    CheckCommonMemMapArgs(1, length, prot, flags, fd)
     checktype(offset, 6, "number", 2)
 
     local ptr = C.mmap(addr, length, prot, flags, fd, offset)
@@ -527,16 +541,6 @@ api.mmap = function(addr, length, prot, flags, fd, offset)
     activeMemMapSizes[retPtr] = length
     return retPtr
 end
-
-local CachedPageSize
-local function getPageSize()
-    if (CachedPageSize == nil) then
-        CachedPageSize = sysconf(decls._SC.PAGESIZE)
-    end
-    return CachedPageSize
-end
-
-api.getPageSize = getPageSize
 
 local function checkMemRemapPtr(ptr, pageIdx)
     checktype(ptr, 1, "cdata", 3)
