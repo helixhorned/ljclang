@@ -151,20 +151,24 @@ describe("Memory mapping with padding", function()
         end
     end)
 
-    it("tests case with no actual padding", function()
-        local TotalSize = 10 * PageSize
+    it("tests cases with no actual padding", function()
+        local MaxAdditionalSize = 99
 
-        local ptr = posix.memMapWithPadding(
-            TotalSize, TotalSize, PROT.READ, MAP.PRIVATE + LMAP.ANONYMOUS, -1)
+        for additionalSize = 0, MaxAdditionalSize do
+            local totalSize = 10 * PageSize + additionalSize
 
-        assert.is_not_nil(ptr)
-        local uPtr = ffi.cast("const uint8_t *", ptr)
+            local ptr = posix.memMapWithPadding(
+                totalSize, totalSize, PROT.READ, MAP.PRIVATE + LMAP.ANONYMOUS, -1)
 
-        assert.is_equal(uPtr[0], 0)
-        assert.is_equal(uPtr[TotalSize - 1], 0)
+            assert.is_not_nil(ptr)
+            local uPtr = ffi.cast("const uint8_t *", ptr)
 
-        ptr = nil
-        collectgarbage()
+            assert.is_equal(uPtr[0], 0)
+            assert.is_equal(uPtr[totalSize - 1], 0)
+
+            ptr = nil
+            collectgarbage()
+            end
     end)
 
     it("tests overlaying with a file-backed mapping", function()

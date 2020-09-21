@@ -551,9 +551,9 @@ function api.memMapWithPadding(totalLength, length, prot, flags, fd)
     CheckCommonMemMapArgs(1, length, prot, flags, fd)
 
     check(totalLength >= length, "argument #1 must be greater than or equal to argument #2", 2)
-    check(length % getPageSize() == 0, "argument #2 must be a multiple of the page size", 2)
-
     local haveUnderlay = (totalLength > length)
+    check(not haveUnderlay or (length % getPageSize() == 0),
+          "with padding, argument #2 must be a multiple of the page size", 2)
 
     -- First, request the mapping containing the padding if needed. (The "underlay".)
     local unPtr = haveUnderlay and
