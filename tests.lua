@@ -151,6 +151,22 @@ describe("Memory mapping with padding", function()
         end
     end)
 
+    it("tests case with no actual padding", function()
+        local TotalSize = 10 * PageSize
+
+        local ptr = posix.memMapWithPadding(
+            TotalSize, TotalSize, PROT.READ, MAP.PRIVATE + LMAP.ANONYMOUS, -1)
+
+        assert.is_not_nil(ptr)
+        local uPtr = ffi.cast("const uint8_t *", ptr)
+
+        assert.is_equal(uPtr[0], 0)
+        assert.is_equal(uPtr[TotalSize - 1], 0)
+
+        ptr = nil
+        collectgarbage()
+    end)
+
     it("tests overlaying with a file-backed mapping", function()
         local fd = C.open(arg0, posix.O.RDONLY)
         assert(fd ~= -1, "Failed opening self (tests.lua) for reading")

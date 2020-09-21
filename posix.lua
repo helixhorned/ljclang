@@ -550,23 +550,33 @@ function api.memMapWithPadding(totalLength, length, prot, flags, fd)
     checktype(totalLength, 1, "number", 2)
     CheckCommonMemMapArgs(1, length, prot, flags, fd)
 
-    check(totalLength > length, "argument #1 must be greater than argument #2", 2)
+    check(totalLength >= length, "argument #1 must be greater than or equal to argument #2", 2)
     check(length % getPageSize() == 0, "argument #2 must be a multiple of the page size", 2)
 
-    -- First, request the mapping containing the padding. (The "underlay".)
-    local unPtr = C.mmap(nil, totalLength, prot, bit.bor(flags, linux_decls.MAP.ANONYMOUS), -1, 0)
+    local haveUnderlay = (totalLength > length)
+
+    -- First, request the mapping containing the padding if needed. (The "underlay".)
+    local unPtr = haveUnderlay and
+        C.mmap(nil, totalLength, prot, bit.bor(flags, linux_decls.MAP.ANONYMOUS), -1, 0) or
+        nil
     if (unPtr == MAP_FAILED) then
         error("mmap for underlay failed: "..getErrnoString())
     end
 
-    -- Next, map the non-padding portion at exactly the address obtained for the underlay.
-    local ovPtr = C.mmap(unPtr, length, prot, bit.bor(flags, decls.MAP.FIXED), fd, 0)
+    assert(haveUnderlay == (unPtr ~= nil))
+
+    -- Next, map the non-padding portion at exactly the address obtained for the underlay
+    -- if the latter is present, otherwise just do a regular mmap().
+    local ovFlags = haveUnderlay and bit.bor(flags, decls.MAP.FIXED) or flags
+    local ovPtr = C.mmap(unPtr, length, prot, ovFlags, fd, 0)
     if (ovPtr == MAP_FAILED) then
-        C.munmap(unPtr, totalLength)
+        if (haveUnderlay) then
+            C.munmap(unPtr, totalLength)
+        end
         error("mmap for overlay failed: "..getErrnoString())
     end
 
-    assert(ovPtr == unPtr)
+    assert(not haveUnderlay or ovPtr == unPtr)
     assert(not rawequal(ovPtr, unPtr))
 
     -- Set up the GC for the pointer objects to partition the unmapping.
@@ -575,10 +585,12 @@ function api.memMapWithPadding(totalLength, length, prot, flags, fd)
         C.munmap(p, length)
     end)
 
-    local paddingLength = totalLength - length
-    activeUnderlayPtrs[retPtr] = ffi.gc(unPtr, function(p)
-        C.munmap(ffi.cast(uint8_ptr_t, p) + length, paddingLength)
-    end)
+    if (haveUnderlay) then
+        local paddingLength = totalLength - length
+        activeUnderlayPtrs[retPtr] = ffi.gc(unPtr, function(p)
+            C.munmap(ffi.cast(uint8_ptr_t, p) + length, paddingLength)
+        end)
+    end
 
     return retPtr
 end
