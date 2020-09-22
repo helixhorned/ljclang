@@ -27,7 +27,7 @@ ifeq ($(native_machine),armv7l)
     native_arch := arm32v7
 endif
 
-# For target 'prepare' invoked recursively from this Makefile.
+# For target '_get-tmpdir' invoked recursively from this Makefile.
 ARCH ?= null
 DISTRO ?= null
 # Check out a specific LuaJIT commit:
@@ -37,14 +37,22 @@ LJ_SHA256 ?= null
 
 ########## RULES ##########
 
-.SILENT: prepare
-.PHONY: check-exists prepare run clean-all-temp
+.SILENT: _get-exists _get-tmpdir
+.PHONY: _get-exists _get-tmpdir all run clean-all-temp
 
-check-exists:
-	@docker image inspect "ljclang-dev-$(ARCH)/$(DISTRO):$(commit)" > /dev/null 2>&1 && \
+all:
+	@echo 'Usage:'
+	@echo ' $$ make ljclang-dev-<arch>/<distro>'
+	@echo '  The created Docker image has the given name and is tagged'
+	@echo '  with the short-commit-SHA.'
+	@echo ''
+	@echo ' $$ make run IMAGE=ljclang-dev-<arch>/<distro>'
+
+_get-exists:
+	docker image inspect "ljclang-dev-$(ARCH)/$(DISTRO):$(commit)" > /dev/null 2>&1 && \
 	echo "yes" || echo "no"
 
-prepare:
+_get-tmpdir:
 	test -d $(tmproot)
 	test `echo $(tmproot)/ljclang-tmp-* | wc -w` -lt 10 || \
 	echo "INFO: Consider running 'make clean-all-temp' after the current build." 1>&2
@@ -73,7 +81,7 @@ ljclang-dev-native/alpine: ljclang-dev-$(native_arch)/alpine
 
 ljclang-dev-arm32v7/alpine:
 	arch=arm32v7 distro=alpine && \
-	test x`$(MAKE) --silent check-exists ARCH=$$arch DISTRO=$$distro` = x'yes' || ( \
+	test x`$(MAKE) --silent _get-exists ARCH=$$arch DISTRO=$$distro` = x'yes' || ( \
 	lj_sha256=79aecd984c3dbfbb12cb67282d5862c58b48e771d5ea7b3445dd5303ad71bab5 && \
-	tmpdir=`$(MAKE) --silent prepare ARCH=$$arch DISTRO=$$distro LJ_SHA256=$$lj_sha256` && \
+	tmpdir=`$(MAKE) --silent _get-tmpdir ARCH=$$arch DISTRO=$$distro LJ_SHA256=$$lj_sha256` && \
 	DOCKER_BUILDKIT=1 docker build --tag $@:$(commit) -f "$$tmpdir/Dockerfile" "$$tmpdir/context")
