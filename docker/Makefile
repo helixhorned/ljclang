@@ -42,6 +42,8 @@ LJ_SHA256 ?= null
 
 prepare:
 	test -d $(tmproot)
+	test `echo $(tmproot)/ljclang-tmp-* | wc -w` -lt 10 || \
+	echo "INFO: Consider running 'make clean-all-temp' after the current build." 1>&2
 	tmpdir=`mktemp -d $(tmproot)/ljclang-tmp-XXXXXXXX` && \
 	mkdir "$$tmpdir/context" && \
 	git clone --bare ../ "$$tmpdir/context/ljclang.git" > /dev/null 2>&1 && \
@@ -55,7 +57,7 @@ run:
 	@test -n "$(IMAGE)"
 	docker run -it --rm "$(IMAGE):$(commit)"
 
-# For manual invocation:
+# For manual invocation when no other build is running:
 clean-all-temp:
 	rm -rf $(tmproot)/ljclang-tmp-*
 
