@@ -40,6 +40,10 @@ LJ_SHA256 ?= null
 .SILENT: prepare
 .PHONY: prepare clean-all-temp ljclang-dev-native/alpine ljclang-dev-arm32v7/alpine
 
+check-exists:
+	@docker image inspect "ljclang-dev-$(ARCH)/$(DISTRO):$(commit)" > /dev/null 2>&1 && \
+	echo "yes" || echo "no"
+
 prepare:
 	test -d $(tmproot)
 	test `echo $(tmproot)/ljclang-tmp-* | wc -w` -lt 10 || \
@@ -66,6 +70,8 @@ clean-all-temp:
 ljclang-dev-native/alpine: ljclang-dev-$(native_arch)/alpine
 
 ljclang-dev-arm32v7/alpine:
-	@lj_sha256=79aecd984c3dbfbb12cb67282d5862c58b48e771d5ea7b3445dd5303ad71bab5 && \
-	tmpdir=`$(MAKE) --silent prepare ARCH=arm32v7 DISTRO=alpine LJ_SHA256=$$lj_sha256` && \
-	DOCKER_BUILDKIT=1 docker build --tag $@:$(commit) -f "$$tmpdir/Dockerfile" "$$tmpdir/context"
+	arch=arm32v7 distro=alpine && \
+	test x`$(MAKE) --silent check-exists ARCH=$$arch DISTRO=$$distro` = x'yes' || ( \
+	lj_sha256=79aecd984c3dbfbb12cb67282d5862c58b48e771d5ea7b3445dd5303ad71bab5 && \
+	tmpdir=`$(MAKE) --silent prepare ARCH=$$arch DISTRO=$$distro LJ_SHA256=$$lj_sha256` && \
+	DOCKER_BUILDKIT=1 docker build --tag $@:$(commit) -f "$$tmpdir/Dockerfile" "$$tmpdir/context")
