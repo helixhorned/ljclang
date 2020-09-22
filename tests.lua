@@ -23,6 +23,7 @@ local tostring = tostring
 local unpack = unpack
 
 local ffi = require("ffi")
+local jit = require("jit")
 local C = ffi.C
 
 local io = require("io")
@@ -190,7 +191,7 @@ describe("Memory mapping with padding", function()
     end)
 end)
 
-describe("Symbol index", function()
+local function testSymbolIndex()
     it("tests repeated creation and destruction", function()
         local CreateCount = 100
 
@@ -251,7 +252,11 @@ describe("Symbol index", function()
         symIndex = nil
         collectgarbage()
     end)
-end)
+end
+
+if (jit.arch ~= "arm64") then
+    describe("Symbol index", testSymbolIndex)
+end
 
 --== ljclang
 
