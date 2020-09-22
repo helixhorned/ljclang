@@ -1,0 +1,34 @@
+FROM @ARCH@/alpine:3.12.0
+
+LABEL maintainer="Philipp Kutin <philipp.kutin@gmail.com>"
+
+# Common:
+RUN apk add git make mg
+# For building LuaJIT:
+RUN apk add gcc libc-dev
+
+RUN adduser -D user
+
+USER user
+WORKDIR /home/user
+
+########## Check out, build and install LuaJIT 2.1 ##########
+
+RUN git clone https://github.com/LuaJIT/LuaJIT.git \
+    --single-branch --branch=v2.1 --shallow-since=2020-08-01 \
+    ./luajit-2.1
+RUN (cd luajit-2.1 && git checkout @LUAJIT_GIT_HASH@)
+
+WORKDIR /home/user/luajit-2.1
+RUN make -j4
+RUN sha256sum src/luajit | grep -q @LUAJIT_SHA256@
+USER root
+RUN make install
+RUN ln -s /usr/local/bin/luajit-2.1.0-beta3 /usr/local/bin/luajit
+USER user
+
+WORKDIR /home/user
+
+##########
+
+ENTRYPOINT ["/bin/sh"]
