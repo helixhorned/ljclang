@@ -20,6 +20,13 @@ IMAGE ?=
 commit := $(shell git rev-parse --short=12 HEAD)
 tmproot := /dev/shm
 
+native_machine := $(shell uname -m)
+native_arch = null
+
+ifeq ($(native_machine),armv7l)
+    native_arch := arm32v7
+endif
+
 # For target 'prepare' invoked recursively from this Makefile.
 ARCH ?= null
 DISTRO ?= null
@@ -31,7 +38,7 @@ LJ_SHA256 ?= null
 ########## RULES ##########
 
 .SILENT: prepare
-.PHONY: prepare clean-all-temp ljclang-dev-arm32v7/alpine
+.PHONY: prepare clean-all-temp ljclang-dev-native/alpine ljclang-dev-arm32v7/alpine
 
 prepare:
 	test -d $(tmproot)
@@ -53,6 +60,8 @@ clean-all-temp:
 	rm -rf $(tmproot)/ljclang-tmp-*
 
 ## Alpine Linux
+
+ljclang-dev-native/alpine: ljclang-dev-$(native_arch)/alpine
 
 ljclang-dev-arm32v7/alpine:
 	@lj_sha256=79aecd984c3dbfbb12cb67282d5862c58b48e771d5ea7b3445dd5303ad71bab5 && \

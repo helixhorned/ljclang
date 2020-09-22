@@ -65,6 +65,7 @@ GENERATED_FILES_STAGE_2 := $(GENERATED_FILES_STAGE_1) $(EXTRACTED_ENUMS_LUA) $(p
 
 .PHONY: all app_dependencies apps clean veryclean bootstrap doc test install install-dev _install_common
 .PHONY: committed-generated extractdecls_deps print-extractdecls-library-path
+.PHONY: docker-ljclang-dev-native clean-all-temp
 
 all: $(SHARED_LIBRARIES) $(GENERATED_FILES_STAGE_2)
 
@@ -82,6 +83,14 @@ veryclean: clean
 		$(posix_decls_lua) $(posix_decls_lua_tmp) $(posix_decls_lua).reject
 
 bootstrap: $(EXTRACTED_ENUMS_LUA)
+
+# ---------- Docker ----------
+
+docker-ljclang-dev-native:
+	@$(MAKE) --silent -C docker ljclang-dev-native/alpine
+
+clean-all-temp:
+	@$(MAKE) -C docker clean-all-temp
 
 # ---------- Build ----------
 
