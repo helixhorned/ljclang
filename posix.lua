@@ -20,6 +20,7 @@ local error = error
 local ipairs = ipairs
 local rawequal = rawequal
 local setmetatable = setmetatable
+local tonumber = tonumber
 local tostring = tostring
 local type = type
 
@@ -501,7 +502,7 @@ local function getPageSize()
     if (CachedPageSize == nil) then
         CachedPageSize = sysconf(decls._SC.PAGESIZE)
     end
-    return CachedPageSize
+    return tonumber(CachedPageSize)
 end
 
 api.getPageSize = getPageSize
