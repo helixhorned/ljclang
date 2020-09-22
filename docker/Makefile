@@ -38,7 +38,7 @@ LJ_SHA256 ?= null
 ########## RULES ##########
 
 .SILENT: prepare
-.PHONY: prepare clean-all-temp ljclang-dev-native/alpine ljclang-dev-arm32v7/alpine
+.PHONY: check-exists prepare run clean-all-temp
 
 check-exists:
 	@docker image inspect "ljclang-dev-$(ARCH)/$(DISTRO):$(commit)" > /dev/null 2>&1 && \
@@ -66,6 +66,8 @@ clean-all-temp:
 	rm -rf $(tmproot)/ljclang-tmp-*
 
 ## Alpine Linux
+
+.PHONY: ljclang-dev-native/alpine ljclang-dev-arm32v7/alpine
 
 ljclang-dev-native/alpine: ljclang-dev-$(native_arch)/alpine
 
