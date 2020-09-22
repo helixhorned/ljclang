@@ -1,4 +1,10 @@
 
+# From the 'GNU make' manual:
+#  "recipes will be invoked as if the shell had been passed the '-e' flag:
+#   the first failing command in a recipe will cause the recipe to fail
+#   immediately."
+.POSIX:
+
 OS := $(shell uname -s)
 THIS_DIR := $(abspath $(dir $(lastword $(MAKEFILE_LIST))))
 
