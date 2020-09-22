@@ -26,6 +26,9 @@ native_arch = null
 ifeq ($(native_machine),armv7l)
     native_arch := arm32v7
 endif
+ifeq ($(native_machine),aarch64)
+	native_arch := arm64v8
+endif
 
 # For target '_get-tmpdir' invoked recursively from this Makefile.
 ARCH ?= null
@@ -75,7 +78,7 @@ clean-all-temp:
 
 ## Alpine Linux
 
-.PHONY: ljclang-dev-native/alpine ljclang-dev-arm32v7/alpine
+.PHONY: ljclang-dev-native/alpine ljclang-dev-arm32v7/alpine ljclang-dev-arm64v8/alpine
 
 ljclang-dev-native/alpine: ljclang-dev-$(native_arch)/alpine
 
@@ -83,5 +86,12 @@ ljclang-dev-arm32v7/alpine:
 	arch=arm32v7 distro=alpine && \
 	test x`$(MAKE) --silent _get-exists ARCH=$$arch DISTRO=$$distro` = x'yes' || ( \
 	lj_sha256=79aecd984c3dbfbb12cb67282d5862c58b48e771d5ea7b3445dd5303ad71bab5 && \
+	tmpdir=`$(MAKE) --silent _get-tmpdir ARCH=$$arch DISTRO=$$distro LJ_SHA256=$$lj_sha256` && \
+	DOCKER_BUILDKIT=1 docker build --tag $@:$(commit) -f "$$tmpdir/Dockerfile" "$$tmpdir/context")
+
+ljclang-dev-arm64v8/alpine:
+	arch=arm64v8 distro=alpine && \
+	test x`$(MAKE) --silent _get-exists ARCH=$$arch DISTRO=$$distro` = x'yes' || ( \
+	lj_sha256=c3e2322da1e9942fabb8eeee08e120580aaa11277d8cc6c0abd4ed736e4311ae && \
 	tmpdir=`$(MAKE) --silent _get-tmpdir ARCH=$$arch DISTRO=$$distro LJ_SHA256=$$lj_sha256` && \
 	DOCKER_BUILDKIT=1 docker build --tag $@:$(commit) -f "$$tmpdir/Dockerfile" "$$tmpdir/context")
