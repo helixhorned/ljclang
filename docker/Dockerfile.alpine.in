@@ -35,7 +35,14 @@ WORKDIR /home/user
 USER root
 RUN apk add bash
 RUN apk add clang-dev
+
+# For LJClang tests:
+RUN apk add luarocks5.1
+# NOTE: CFLAGS=-I/usr/local/include/luajit-2.1 before 'luarocks-5.1' does not work:
+RUN apk add lua5.1-dev
+#
 USER user
+RUN luarocks-5.1 --local install busted
 
 COPY / .
 # Create a non-bare repository:
@@ -62,13 +69,6 @@ RUN sed -i 's|libdir :=.*|libdir := /does-not-exist-and-is-not-relevant-here|' .
 RUN make apps
 
 # Run the LJClang tests.
-USER root
-RUN apk add luarocks5.1
-# NOTE: CFLAGS=-I/usr/local/include/luajit-2.1 before 'luarocks-5.1' does not work:
-RUN apk add lua5.1-dev
-USER user
-RUN luarocks-5.1 --local install busted
-#
 WORKDIR /home/user/ljclang
 RUN LJCLANG_TESTS_NO_CXX_STDLIB=1 make test
 
