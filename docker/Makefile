@@ -29,6 +29,9 @@ endif
 ifeq ($(native_machine),aarch64)
 	native_arch := arm64v8
 endif
+ifeq ($(native_machine),x86_64)
+	native_arch := amd64
+endif
 
 # For target '_get-tmpdir' invoked recursively from this Makefile.
 ARCH ?= null
@@ -79,9 +82,9 @@ clean-all-temp:
 
 ## Rules for the actual Docker images
 
-.PHONY: ljclang-dev-native/alpine ljclang-dev-arm32v7/alpine ljclang-dev-arm64v8/alpine
-.PHONY: ljclang-dev-native/debian ljclang-dev-arm32v7/debian ljclang-dev-arm64v8/debian
-.PHONY: ljclang-dev-native/ubuntu ljclang-dev-arm32v7/ubuntu ljclang-dev-arm64v8/ubuntu
+.PHONY: ljclang-dev-native/alpine ljclang-dev-arm32v7/alpine ljclang-dev-arm64v8/alpine ljclang-dev-amd64/alpine
+.PHONY: ljclang-dev-native/debian ljclang-dev-arm32v7/debian ljclang-dev-arm64v8/debian ljclang-dev-amd64/debian
+.PHONY: ljclang-dev-native/ubuntu ljclang-dev-arm32v7/ubuntu ljclang-dev-arm64v8/ubuntu ljclang-dev-amd64/ubuntu
 .PHONY: ljclang-dev-arm32v7/ubuntu-bionic
 
 ljclang-dev-native/alpine: ljclang-dev-$(native_arch)/alpine
@@ -94,6 +97,13 @@ override define check_or_make_image =
   DOCKER_BUILDKIT=1 docker build --tag $@:$(commit) -f "$$tmpdir/Dockerfile" "$$tmpdir/context")
 endef
 
+# FIXME: on amd64, apparently non-deterministic (!) failure:
+#  posix.lua tests fd_set_t
+#  /home/user/ljclang/tests.lua:116: Expected objects to be equal.
+#  Passed in: (number) 10
+#  Expected: (number) 9
+# (Note, 'passed in' and 'expected' are swapped.)
+
 ljclang-dev-arm32v7/alpine:
 	arch=arm32v7 distro=alpine && \
 	lj_sha256=79aecd984c3dbfbb12cb67282d5862c58b48e771d5ea7b3445dd5303ad71bab5 && \
@@ -104,6 +114,11 @@ ljclang-dev-arm64v8/alpine:
 	lj_sha256=c3e2322da1e9942fabb8eeee08e120580aaa11277d8cc6c0abd4ed736e4311ae && \
 	$(check_or_make_image)
 
+ljclang-dev-amd64/alpine:
+	arch=amd64 distro=alpine && \
+	lj_sha256=e651a92e93f80015e506d1271fca0be39e33a8f85b81d2995338c251db63e82a && \
+	$(check_or_make_image)
+
 ljclang-dev-arm32v7/debian:
 	arch=arm32v7 distro=debian && \
 	lj_sha256=45b69b1e3b14969121c28e5a1b5d23b3c6c0f531d5b8768d5cf8356b237a4ca3 && \
@@ -112,6 +127,11 @@ ljclang-dev-arm32v7/debian:
 ljclang-dev-arm64v8/debian:
 	arch=arm64v8 distro=debian && \
 	lj_sha256=75bcc032114b2c3c1f91aa732bce00647405ef4d4e0b1c66a39f72b7084b3737 && \
+	$(check_or_make_image)
+
+ljclang-dev-amd64/debian:
+	arch=amd64 distro=debian && \
+	lj_sha256=74ddbab26cc4dd89c5ca4df688152db7be5720f1fc01c44a0f5de0673525b23d && \
 	$(check_or_make_image)
 
 # NOTE: when building the Docker on an RPi OS (32-bit) host, can get
@@ -133,4 +153,9 @@ ljclang-dev-arm32v7/ubuntu-bionic:
 ljclang-dev-arm64v8/ubuntu:
 	arch=arm64v8 distro=ubuntu && \
 	lj_sha256=67a8f44f5dd6343f160418ff64af257ff6e614e17c694695da56fd0a0d9c4e39 && \
+	$(check_or_make_image)
+
+ljclang-dev-amd64/ubuntu:
+	arch=amd64 distro=ubuntu && \
+	lj_sha256=02af36870213c5609ab9777da18ba3e92deb38c6928ae292fdf14e457b0d03c1 && \
 	$(check_or_make_image)
