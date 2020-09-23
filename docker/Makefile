@@ -81,9 +81,11 @@ clean-all-temp:
 
 .PHONY: ljclang-dev-native/alpine ljclang-dev-arm32v7/alpine ljclang-dev-arm64v8/alpine
 .PHONY: ljclang-dev-native/debian ljclang-dev-arm32v7/debian ljclang-dev-arm64v8/debian
+.PHONY: ljclang-dev-native/ubuntu ljclang-dev-arm32v7/ubuntu ljclang-dev-arm64v8/ubuntu
 
 ljclang-dev-native/alpine: ljclang-dev-$(native_arch)/alpine
 ljclang-dev-native/debian: ljclang-dev-$(native_arch)/debian
+ljclang-dev-native/ubuntu: ljclang-dev-$(native_arch)/ubuntu
 
 override define check_or_make_image =
   test x`$(MAKE) --silent _get-exists ARCH=$$arch DISTRO=$$distro` = x'yes' || ( \
@@ -109,4 +111,19 @@ ljclang-dev-arm32v7/debian:
 ljclang-dev-arm64v8/debian:
 	arch=arm64v8 distro=debian && \
 	lj_sha256=75bcc032114b2c3c1f91aa732bce00647405ef4d4e0b1c66a39f72b7084b3737 && \
+	$(check_or_make_image)
+
+# NOTE: when building the Docker on an RPi OS (32-bit) host, can get
+#  "GPG error (...) invalid signature" / "repository (...) not signed".
+#  See:
+#   https://askubuntu.com/questions/1263284/apt-update-throws-signature-error-in-ubuntu-20-04-container-on-arm
+#   https://github.com/moby/moby/issues/40734
+ljclang-dev-arm32v7/ubuntu:
+	arch=arm32v7 distro=ubuntu && \
+	lj_sha256=TODO && \
+	$(check_or_make_image)
+
+ljclang-dev-arm64v8/ubuntu:
+	arch=arm64v8 distro=ubuntu && \
+	lj_sha256=67a8f44f5dd6343f160418ff64af257ff6e614e17c694695da56fd0a0d9c4e39 && \
 	$(check_or_make_image)

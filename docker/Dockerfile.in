@@ -59,7 +59,7 @@ WORKDIR ljclang
 #
 # TODO in ljclang:
 #  - remove altogether in favor of an alternative detection scheme that addresses all
-#    now supported platforms (Ubuntu x86_64, Raspberry Pi OS 32-bit, Alpine Linux here)?
+#    now supported distributions (Ubuntu, Raspberry Pi OS 32-bit, Alpine Linux)?
 ENV LLVM_CONFIG=true
 
 WORKDIR /home/user/ljclang
