@@ -2,6 +2,8 @@ FROM @ARCH@/@DISTRO_IMAGE@
 
 LABEL maintainer="Philipp Kutin <philipp.kutin@gmail.com>"
 
+@DO_update_packages@
+
 # Common:
 RUN @install@ git make mg
 # For building LuaJIT:
@@ -61,10 +63,11 @@ WORKDIR ljclang
 ENV LLVM_CONFIG=true
 
 WORKDIR /home/user/ljclang
-RUN sed -i 's|llvm_version :=.*|llvm_version := 10.0.0|' ./Makefile
-RUN sed -i 's|bindir :=.*|bindir := /usr/bin|' ./Makefile
-RUN sed -i 's|incdir :=.*|incdir := /usr/include|' ./Makefile
-RUN sed -i 's|libdir :=.*|libdir := /does-not-exist-and-is-not-relevant-here|' ./Makefile
+# NOTE: The binary directory is relevant only for the install targets.
+RUN sed -i 's|llvm_version :=.*|llvm_version := @llvm_version@|' ./Makefile
+RUN sed -i 's|bindir :=.*|bindir := /does-not-exist-and-not-relevant-here|' ./Makefile
+RUN sed -i 's|incdir :=.*|incdir := @llvm_incdir@|' ./Makefile
+RUN sed -i 's|libdir :=.*|libdir := @llvm_libdir@|' ./Makefile
 
 RUN make apps
 
@@ -76,4 +79,4 @@ WORKDIR /home/user
 
 ##########
 
-ENTRYPOINT ["/bin/sh"]
+ENTRYPOINT ["/bin/@SHELL@"]

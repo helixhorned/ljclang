@@ -77,11 +77,13 @@ run:
 clean-all-temp:
 	rm -rf $(tmproot)/ljclang-tmp-*
 
-## Alpine Linux
+## Rules for the actual Docker images
 
 .PHONY: ljclang-dev-native/alpine ljclang-dev-arm32v7/alpine ljclang-dev-arm64v8/alpine
+.PHONY: ljclang-dev-native/debian ljclang-dev-arm32v7/debian ljclang-dev-arm64v8/debian
 
 ljclang-dev-native/alpine: ljclang-dev-$(native_arch)/alpine
+ljclang-dev-native/debian: ljclang-dev-$(native_arch)/debian
 
 override define check_or_make_image =
   test x`$(MAKE) --silent _get-exists ARCH=$$arch DISTRO=$$distro` = x'yes' || ( \
@@ -97,4 +99,14 @@ ljclang-dev-arm32v7/alpine:
 ljclang-dev-arm64v8/alpine:
 	arch=arm64v8 distro=alpine && \
 	lj_sha256=c3e2322da1e9942fabb8eeee08e120580aaa11277d8cc6c0abd4ed736e4311ae && \
+	$(check_or_make_image)
+
+ljclang-dev-arm32v7/debian:
+	arch=arm32v7 distro=debian && \
+	lj_sha256=45b69b1e3b14969121c28e5a1b5d23b3c6c0f531d5b8768d5cf8356b237a4ca3 && \
+	$(check_or_make_image)
+
+ljclang-dev-arm64v8/debian:
+	arch=arm64v8 distro=debian && \
+	lj_sha256=75bcc032114b2c3c1f91aa732bce00647405ef4d4e0b1c66a39f72b7084b3737 && \
 	$(check_or_make_image)
