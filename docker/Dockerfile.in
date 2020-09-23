@@ -48,7 +48,7 @@ RUN @luarocks@ --local install busted
 
 COPY / .
 # Create a non-bare repository:
-RUN git clone --depth=1 ./ljclang.git ./ljclang
+RUN git clone ./ljclang.git ./ljclang
 WORKDIR ljclang
 
 # Do not install llvm-dev, do not rely on llvm-config. (See 'sed -i' invocations below.)
