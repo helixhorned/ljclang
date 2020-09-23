@@ -82,6 +82,7 @@ clean-all-temp:
 .PHONY: ljclang-dev-native/alpine ljclang-dev-arm32v7/alpine ljclang-dev-arm64v8/alpine
 .PHONY: ljclang-dev-native/debian ljclang-dev-arm32v7/debian ljclang-dev-arm64v8/debian
 .PHONY: ljclang-dev-native/ubuntu ljclang-dev-arm32v7/ubuntu ljclang-dev-arm64v8/ubuntu
+.PHONY: ljclang-dev-arm32v7/ubuntu-bionic
 
 ljclang-dev-native/alpine: ljclang-dev-$(native_arch)/alpine
 ljclang-dev-native/debian: ljclang-dev-$(native_arch)/debian
@@ -121,6 +122,12 @@ ljclang-dev-arm64v8/debian:
 ljclang-dev-arm32v7/ubuntu:
 	arch=arm32v7 distro=ubuntu && \
 	lj_sha256=TODO && \
+	$(check_or_make_image)
+#
+# Docker image of Ubuntu 18.04 as a workaround for the above issue.
+ljclang-dev-arm32v7/ubuntu-bionic:
+	arch=arm32v7 distro=ubuntu-bionic && \
+	lj_sha256=80448776cfa0625f455cef100528756230094b9eebf857b8e2937e6d1aebb4c2 && \
 	$(check_or_make_image)
 
 ljclang-dev-arm64v8/ubuntu:
