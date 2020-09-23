@@ -57,6 +57,7 @@ _get-exists:
 
 _get-tmpdir:
 	test -d $(tmproot)
+	test -f vars.$(DISTRO).sed
 	test `echo $(tmproot)/ljclang-tmp-* | wc -w` -lt 10 || \
 	echo "INFO: Consider running 'make clean-all-temp' after the current build." 1>&2
 	tmpdir=`mktemp -d $(tmproot)/ljclang-tmp-XXXXXXXX` && \
@@ -65,7 +66,7 @@ _get-tmpdir:
 	test `git rev-parse --short=12 HEAD` = "$(commit)" && \
 	test -n "$(ARCH)" && \
 	sedcmds='s/@ARCH@/$(ARCH)/; s/@LUAJIT_GIT_HASH@/$(LJ_GIT_HASH)/; s/@LUAJIT_SHA256@/$(LJ_SHA256)/' && \
-	sed "$$sedcmds" Dockerfile.$(DISTRO).in > "$$tmpdir/Dockerfile" && \
+	sed -e "$$sedcmds" -f vars.$(DISTRO).sed Dockerfile.in > "$$tmpdir/Dockerfile" && \
 	echo "$$tmpdir"
 
 run:

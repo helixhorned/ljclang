@@ -1,13 +1,13 @@
-FROM @ARCH@/alpine:3.12.0
+FROM @ARCH@/@DISTRO_IMAGE@
 
 LABEL maintainer="Philipp Kutin <philipp.kutin@gmail.com>"
 
 # Common:
-RUN apk add git make mg
+RUN @install@ git make mg
 # For building LuaJIT:
-RUN apk add gcc libc-dev
+RUN @install@ gcc $pkg_libc_dev
 
-RUN adduser -D user
+RUN @adduser@ user
 
 USER user
 WORKDIR /home/user
@@ -33,16 +33,16 @@ WORKDIR /home/user
 
 # Install prerequisites
 USER root
-RUN apk add bash
-RUN apk add clang-dev
+RUN @install@ bash
+RUN @install@ $pkg_libclang_dev
 
 # For LJClang tests:
-RUN apk add luarocks5.1
+RUN @install@ $pkg_luarocks
 # NOTE: CFLAGS=-I/usr/local/include/luajit-2.1 before 'luarocks-5.1' does not work:
-RUN apk add lua5.1-dev
+RUN @install@ $pkg_liblua51_dev
 #
 USER user
-RUN luarocks-5.1 --local install busted
+RUN @luarocks@ --local install busted
 
 COPY / .
 # Create a non-bare repository:
