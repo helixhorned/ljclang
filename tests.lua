@@ -85,7 +85,7 @@ describe("posix.lua", function()
             end
         until (i == FdsToTest[#FdsToTest])
 
-        assert(#fds, #FdsToTest)
+        assert(#fds == #FdsToTest)
 
         -- Close the file descriptors we do not care about.
         collectgarbage()
@@ -117,10 +117,11 @@ describe("posix.lua", function()
 
             -- Exercise fdSet:clear()
             fdSet:clear(fds[#fds].fd)
+            -- Remove the last Fd object -- the associated file may be GC'd following that.
             fds[#fds] = nil
         until (#fds == 0)
 
-        -- Close the remaining file descriptors.
+        -- Close the files which did not happen to have their Fd objects garbage-collected.
         fds = nil
         collectgarbage()
     end)
