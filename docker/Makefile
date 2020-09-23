@@ -86,10 +86,13 @@ clean-all-temp:
 .PHONY: ljclang-dev-native/debian ljclang-dev-arm32v7/debian ljclang-dev-arm64v8/debian ljclang-dev-amd64/debian
 .PHONY: ljclang-dev-native/ubuntu ljclang-dev-arm32v7/ubuntu ljclang-dev-arm64v8/ubuntu ljclang-dev-amd64/ubuntu
 .PHONY: ljclang-dev-arm32v7/ubuntu-bionic
+.PHONY: ljclang-dev-native/ALL
 
 ljclang-dev-native/alpine: ljclang-dev-$(native_arch)/alpine
 ljclang-dev-native/debian: ljclang-dev-$(native_arch)/debian
 ljclang-dev-native/ubuntu: ljclang-dev-$(native_arch)/ubuntu
+
+ljclang-dev-native/ALL: ljclang-dev-native/alpine ljclang-dev-native/debian ljclang-dev-native/ubuntu
 
 override define check_or_make_image =
   test x`$(MAKE) --silent _get-exists ARCH=$$arch DISTRO=$$distro` = x'yes' || ( \
