@@ -94,7 +94,7 @@ ljclang-dev-native/ubuntu: ljclang-dev-$(native_arch)/ubuntu
 
 ljclang-dev-native/ALL: ljclang-dev-native/alpine ljclang-dev-native/debian ljclang-dev-native/ubuntu
 
-override define check_or_make_image =
+define check_or_make_image =
   test x`$(MAKE) --silent _get-exists ARCH=$$arch DISTRO=$$distro` = x'yes' || ( \
   tmpdir=`$(MAKE) --silent _get-tmpdir ARCH=$$arch DISTRO=$$distro LJ_SHA256=$$lj_sha256` && \
   DOCKER_BUILDKIT=1 docker build --tag $@:$(commit) -f "$$tmpdir/Dockerfile" "$$tmpdir/context")

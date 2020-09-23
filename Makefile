@@ -69,7 +69,8 @@ SHARED_LIBRARIES := $(LJCLANG_SUPPORT_SO)
 GENERATED_FILES_STAGE_1 := $(INDEX_H_LUA) $(LIBDIR_INCLUDE_LUA)
 GENERATED_FILES_STAGE_2 := $(GENERATED_FILES_STAGE_1) $(EXTRACTED_ENUMS_LUA) $(posix_types_lua)
 
-.PHONY: all app_dependencies apps clean veryclean bootstrap doc test install install-dev _install_common
+.PHONY: all app_dependencies apps clean veryclean bootstrap doc test test-loop
+.PHONY: install install-dev _install_common
 .PHONY: committed-generated extractdecls_deps print-extractdecls-library-path
 .PHONY: docker-ljclang-dev-native clean-all-temp
 
@@ -188,8 +189,17 @@ endif
 
 app_dependencies: $(linux_decls_lua) $(posix_decls_lua)
 
+define do_test =
+  LLVM_LIBDIR="$(libdir)" $(SHELL) ./run_tests.sh
+endef
+
 test: $(SHARED_LIBRARIES) $(GENERATED_FILES_STAGE_2) $(linux_decls_lua) $(posix_decls_lua)
-	LLVM_LIBDIR="$(libdir)" $(SHELL) ./run_tests.sh
+	$(do_test)
+
+TEST_LOOP_COUNT ?= 10
+test-loop: test
+	@echo "INFO: Repeating for a total of $(TEST_LOOP_COUNT) runs."
+	@i=1; while test $$i -lt $(TEST_LOOP_COUNT); do i=$$((i+1)); $(do_test); done
 
 sed_common_commands := s|@LJCLANG_DEV_DIR@|$(THIS_DIR)|g; s|@LLVM_BINDIR@|$(bindir)|g; s|@LLVM_LIBDIR@|$(libdir)|g;
 

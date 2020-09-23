@@ -73,7 +73,7 @@ RUN make apps
 
 # Run the LJClang tests.
 WORKDIR /home/user/ljclang
-RUN LJCLANG_TESTS_NO_CXX_STDLIB=1 make test
+RUN LJCLANG_TESTS_NO_CXX_STDLIB=1 TEST_LOOP_COUNT=20 make test-loop
 
 WORKDIR /home/user
 
