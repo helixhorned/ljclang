@@ -15,6 +15,13 @@
 #  $ make run IMAGE=ljclang-dev-arm32v7/alpine  <--(invoke this)
 IMAGE ?=
 
+# If non-empty, will build images up to and including the LuaJIT build step, tagged
+# 'LJ_SHA' instead of the Git commit hash of this repository. Instead of the shell,
+# the ENTRYPOINTs of these images will be 'sha256 <path-to>/luajit'. This way, the
+# SHA-256 hashes of all LuaJIT builds can be obtained conveniently. (Especially in
+# combination with building foreign-architecture images, see below.)
+LJ_SHA_ONLY ?=
+
 ## Private
 
 commit := $(shell git rev-parse --short=12 HEAD)
@@ -83,6 +90,8 @@ endif
 .SILENT: _get-exists _get-tmpdir
 .PHONY: _get-exists _get-tmpdir all run clean-all-temp
 
+image_tag := $(if $(LJ_SHA_ONLY),LJ_SHA,$(commit))
+
 all:
 	@echo 'Usage:'
 	@echo ' $$ make ljclang-dev-<arch>/<distro>'
@@ -92,17 +101,32 @@ all:
 	@echo ' $$ make run IMAGE=ljclang-dev-<arch>/<distro>'
 
 _get-exists:
-	docker image inspect "ljclang-dev-$(ARCH)/$(DISTRO):$(commit)" > /dev/null 2>&1 && \
+	docker image inspect "ljclang-dev-$(ARCH)/$(DISTRO):$(image_tag)" > /dev/null 2>&1 && \
 	echo "yes" || echo "no"
 
 ifneq ($(qemu_suffix),)
   _get-tmpdir-in1 = echo "INFO: Building image using '$(qemu_prefix)$(qemu_suffix)'." 1>&2
   _get-tmpdir-in2 = cp '$(qemu_prefix)$(qemu_suffix)' "$$tmpdir/context"
-  _get-tmpdir-in3 = sedcmds="$$sedcmds; s/^\#@if-foreign://g; s/@qemu-suffix@/$(qemu_suffix)/g"
+  _get-tmpdir-in4 = sedcmds="$$sedcmds; s/^\#@if-foreign://g; s/@qemu-suffix@/$(qemu_suffix)/g"
 else
   _get-tmpdir-in1 = true
   _get-tmpdir-in2 = true
+  _get-tmpdir-in4 = true
+endif
+
+Dockerfile_in := Dockerfile.in
+
+ifneq ($(LJ_SHA_ONLY),)
   _get-tmpdir-in3 = true
+  _tmp-lnum := $(shell grep -m1 -n '^RUN make -j4' $(Dockerfile_in) | sed 's/:.*//g')
+  ifeq ($(_tmp-lnum),)
+    $(error INTERNAL: Failed obtaining line number of LuaJIT build invocation)
+  endif
+  _tmp-ENTRYPOINT := 'ENTRYPOINT sha256sum /home/user/luajit-2.1/src/luajit'
+  _cat_Dockerfile_in := echo $(_tmp-ENTRYPOINT) | head -q -n "$(_tmp-lnum)" $(Dockerfile_in) -
+else
+  _get-tmpdir-in3 = git clone --bare ../ "$$tmpdir/context/ljclang.git" > /dev/null 2>&1
+  _cat_Dockerfile_in := cat $(Dockerfile_in)
 endif
 
 _get-tmpdir:
@@ -114,24 +138,42 @@ _get-tmpdir:
 	tmpdir=`mktemp -d $(tmproot)/ljclang-tmp-XXXXXXXX` && \
 	mkdir "$$tmpdir/context" && \
 	$(_get-tmpdir-in2) && \
-	git clone --bare ../ "$$tmpdir/context/ljclang.git" > /dev/null 2>&1 && \
+	$(_get-tmpdir-in3) && \
 	test `git rev-parse --short=12 HEAD` = "$(commit)" && \
 	test -n "$(ARCH)" && \
 	sedcmds='s/@ARCH@/$(ARCH)/; s/@LUAJIT_GIT_HASH@/$(LJ_GIT_HASH)/; s/@LUAJIT_SHA256@/$(LJ_SHA256)/' && \
-	$(_get-tmpdir-in3) && \
-	sed -e "$$sedcmds" -f vars.$(DISTRO).sed Dockerfile.in > "$$tmpdir/Dockerfile" && \
+	$(_get-tmpdir-in4) && \
+	$(_cat_Dockerfile_in) | sed -e "$$sedcmds" -f vars.$(DISTRO).sed > "$$tmpdir/Dockerfile" && \
 	echo "$$tmpdir"
 
 replace_NATIVE = $(subst NATIVE,$(native_arch),$(1))
 image_to_run := $(call replace_NATIVE,$(IMAGE))
 
+define get_sha_only_images :=
+  docker images -q --filter=reference='ljclang-dev-*/*:LJ_SHA'
+endef
+
+define get_sha_only_images_repo-tag :=
+  $(get_sha_only_images) --format "{{.Repository}}:{{.Tag}}"
+endef
+
+define clean_sha_only_images :=
+  images=`$(get_sha_only_images)` && (test -z "$$images" || docker rmi $$images)
+endef
+
 run:
 	@test -n "$(image_to_run)"
-	docker run -it --rm "$(image_to_run):$(commit)"
+	docker run -it --rm "$(image_to_run):$(image_tag)"
+
+run-lj-sha-only:
+	@images=`$(get_sha_only_images_repo-tag)` && \
+	(test -n "$$images" || (echo "ERROR: no LJ_SHA-tagged images." 1>&2 && false)) && \
+	for i in $$images; do echo "$$i" && docker run -it --rm "$$i"; done
 
 # For manual invocation when no other build is running:
 clean-all-temp:
 	rm -rf $(tmproot)/ljclang-tmp-*
+	$(clean_sha_only_images)
 
 ## Rules for the actual Docker images
 
@@ -170,7 +212,7 @@ ljclang-dev-NATIVE/ALL: ljclang-dev-NATIVE/alpine ljclang-dev-NATIVE/debian ljcl
 define check_or_make_image =
   test x`$(MAKE) --silent _get-exists ARCH=$$arch DISTRO=$$distro` = x'yes' || ( \
   tmpdir=`$(MAKE) --silent _get-tmpdir ARCH=$$arch DISTRO=$$distro LJ_SHA256=$$lj_sha256` && \
-  DOCKER_BUILDKIT=1 docker build --tag $@:$(commit) -f "$$tmpdir/Dockerfile" "$$tmpdir/context")
+  DOCKER_BUILDKIT=1 docker build --tag $@:$(image_tag) -f "$$tmpdir/Dockerfile" "$$tmpdir/context")
 endef
 
 ifneq ($(canRunArm32),)
