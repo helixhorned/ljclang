@@ -100,13 +100,6 @@ define check_or_make_image =
   DOCKER_BUILDKIT=1 docker build --tag $@:$(commit) -f "$$tmpdir/Dockerfile" "$$tmpdir/context")
 endef
 
-# FIXME: on amd64, apparently non-deterministic (!) failure:
-#  posix.lua tests fd_set_t
-#  /home/user/ljclang/tests.lua:116: Expected objects to be equal.
-#  Passed in: (number) 10
-#  Expected: (number) 9
-# (Note, 'passed in' and 'expected' are swapped.)
-
 ljclang-dev-arm32v7/alpine:
 	arch=arm32v7 distro=alpine && \
 	lj_sha256=79aecd984c3dbfbb12cb67282d5862c58b48e771d5ea7b3445dd5303ad71bab5 && \
