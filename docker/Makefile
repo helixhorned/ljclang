@@ -21,6 +21,7 @@ commit := $(shell git rev-parse --short=12 HEAD)
 tmproot := /dev/shm
 
 native_machine := $(shell uname -m)
+# The architecture part of Docker image names:
 native_arch = null
 
 ifeq ($(native_machine),armv7l)
@@ -32,6 +33,22 @@ endif
 ifeq ($(native_machine),x86_64)
 	native_arch := amd64
 endif
+
+equals = $(findstring ~$(1)~,~$(2)~)
+qemuSuffixFromArch = $(strip \
+$(if $(call equals,arm32v7,$(1)),arm,\
+$(if $(call equals,arm64v8,$(1)),aarch64,\
+$(if $(call equals,amd64,$(1)),x86_64))))
+
+qemu_prefix := /usr/local/bin/qemu-
+haveQemu = $(realpath $(qemu_prefix)$(1))
+# Return: empty (false) or non-empty (true)
+canRunNatively_ = $(call equals,$(1),$(native_arch))
+canRunEmulated_ = $(and $(call qemuSuffixFromArch,$(1)),$(call haveQemu,$(call qemuSuffixFromArch,$(1))))
+# Return: empty (false), 1 (can run natively) or 2 (can run emulated)
+canRunNatively = $(if $(call canRunNatively_,$(1)),1)
+canRunEmulated = $(if $(call canRunEmulated_,$(1)),2)
+canRun = $(or $(call canRunNatively,$(1)),$(call canRunEmulated,$(1)))
 
 # For target '_get-tmpdir' invoked recursively from this Makefile.
 ARCH ?= null
@@ -82,10 +99,24 @@ clean-all-temp:
 
 ## Rules for the actual Docker images
 
+canRunArm32 := $(call canRun,arm32v7)
+canRunArm64 := $(call canRun,arm64v8)
+canRunAmd64 := $(call canRun,amd64)
+
+ifeq ($(canRunArm32)$(canRunArm64)$(canRunAmd64),)
+  $(error Cannot build any Docker image: unsupported architecture)
+endif
+
+ifneq ($(canRunArm32),)
 .PHONY: ljclang-dev-arm32v7/alpine ljclang-dev-arm32v7/debian ljclang-dev-arm32v7/ubuntu
 .PHONY: ljclang-dev-arm32v7/ubuntu-bionic
+endif
+ifneq ($(canRunArm64),)
 .PHONY: ljclang-dev-arm64v8/alpine ljclang-dev-arm64v8/debian ljclang-dev-arm64v8/ubuntu
+endif
+ifneq ($(canRunAmd64),)
 .PHONY: ljclang-dev-amd64/alpine ljclang-dev-amd64/debian ljclang-dev-amd64/ubuntu
+endif
 
 .PHONY: ljclang-dev-native/alpine ljclang-dev-native/debian ljclang-dev-native/ubuntu
 ljclang-dev-native/alpine: ljclang-dev-$(native_arch)/alpine
@@ -101,6 +132,7 @@ define check_or_make_image =
   DOCKER_BUILDKIT=1 docker build --tag $@:$(commit) -f "$$tmpdir/Dockerfile" "$$tmpdir/context")
 endef
 
+ifneq ($(canRunArm32),)
 ljclang-dev-arm32v7/alpine:
 	arch=arm32v7 distro=alpine && \
 	lj_sha256=79aecd984c3dbfbb12cb67282d5862c58b48e771d5ea7b3445dd5303ad71bab5 && \
@@ -126,7 +158,9 @@ ljclang-dev-arm32v7/ubuntu-bionic:
 	arch=arm32v7 distro=ubuntu-bionic && \
 	lj_sha256=80448776cfa0625f455cef100528756230094b9eebf857b8e2937e6d1aebb4c2 && \
 	$(check_or_make_image)
+endif
 
+ifneq ($(canRunArm64),)
 ljclang-dev-arm64v8/alpine:
 	arch=arm64v8 distro=alpine && \
 	lj_sha256=c3e2322da1e9942fabb8eeee08e120580aaa11277d8cc6c0abd4ed736e4311ae && \
@@ -141,7 +175,9 @@ ljclang-dev-arm64v8/ubuntu:
 	arch=arm64v8 distro=ubuntu && \
 	lj_sha256=67a8f44f5dd6343f160418ff64af257ff6e614e17c694695da56fd0a0d9c4e39 && \
 	$(check_or_make_image)
+endif
 
+ifneq ($(canRunAmd64),)
 ljclang-dev-amd64/alpine:
 	arch=amd64 distro=alpine && \
 	lj_sha256=e651a92e93f80015e506d1271fca0be39e33a8f85b81d2995338c251db63e82a && \
@@ -156,3 +192,4 @@ ljclang-dev-amd64/ubuntu:
 	arch=amd64 distro=ubuntu && \
 	lj_sha256=02af36870213c5609ab9777da18ba3e92deb38c6928ae292fdf14e457b0d03c1 && \
 	$(check_or_make_image)
+endif
