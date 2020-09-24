@@ -194,7 +194,7 @@ ljclang-dev-arm32v7/debian:
 #   https://github.com/moby/moby/issues/40734
 ljclang-dev-arm32v7/ubuntu:
 	arch=arm32v7 distro=ubuntu && \
-	lj_sha256=TODO && \
+	lj_sha256=3bf5f4bfd12b28871f07f8ba3427b66466447ffe4b7bf7361ffb7e08a9d12445 && \
 	$(check_or_make_image)
 #
 # Docker image of Ubuntu 18.04 as a workaround for the above issue.
