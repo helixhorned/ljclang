@@ -2,6 +2,8 @@ FROM @ARCH@/@DISTRO_IMAGE@
 
 LABEL maintainer="Philipp Kutin <philipp.kutin@gmail.com>"
 
+#@if-foreign:COPY /qemu-@qemu-suffix@ /usr/local/bin
+
 @DO_update_packages@
 
 # Common:

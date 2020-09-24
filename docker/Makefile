@@ -40,6 +40,21 @@ $(if $(call equals,arm32v7,$(1)),arm,\
 $(if $(call equals,arm64v8,$(1)),aarch64,\
 $(if $(call equals,amd64,$(1)),x86_64))))
 
+# To build the foreign-architecture images, statics builds of qemu-<arch> are required
+# on the host system.
+#
+# Example arguments to qemu's 'configure':
+#  --target-list=aarch64-linux-user,arm-linux-user --disable-system --static
+#
+# These binaries need to be registered with binfmt_misc (again, on the host). Example:
+#
+# $ <qemu-checkout>/scripts/qemu-binfmt-conf.sh --debian --exportdir <template-dir>
+# $ (Remove all but the necessary templates...)
+# $ sudo mkdir /usr/local/share/binfmts && sudo cp <template-dir>/qemu-* /usr/local/share/binfmts
+# For each available architecture <arch>:
+#  $ sudo update-binfmts --importdir /usr/local/share/binfmts --import qemu-<arch>
+# (See '<qemu-checkout>/scripts/qemu-binfmt-conf.sh --help'.)
+# (See '/proc/sys/fs/binfmt_misc/qemu-*' which are then created.)
 qemu_prefix := /usr/local/bin/qemu-
 haveQemu = $(realpath $(qemu_prefix)$(1))
 # Return: empty (false) or non-empty (true)
@@ -57,6 +72,11 @@ DISTRO ?= null
 #  "Fix lua_yield() from C hook."
 LJ_GIT_HASH := dd5032ed844c56964347c7916db66b0eb11d8091
 LJ_SHA256 ?= null
+#
+qemu_suffix :=
+ifeq ($(call canRun,$(ARCH)),2)
+  qemu_suffix := $(call qemuSuffixFromArch,$(ARCH))
+endif
 
 ########## RULES ##########
 
@@ -75,17 +95,30 @@ _get-exists:
 	docker image inspect "ljclang-dev-$(ARCH)/$(DISTRO):$(commit)" > /dev/null 2>&1 && \
 	echo "yes" || echo "no"
 
+ifneq ($(qemu_suffix),)
+  _get-tmpdir-in1 = echo "INFO: Building image using '$(qemu_prefix)$(qemu_suffix)'." 1>&2
+  _get-tmpdir-in2 = cp '$(qemu_prefix)$(qemu_suffix)' "$$tmpdir/context"
+  _get-tmpdir-in3 = sedcmds="$$sedcmds; s/^\#@if-foreign://g; s/@qemu-suffix@/$(qemu_suffix)/g"
+else
+  _get-tmpdir-in1 = true
+  _get-tmpdir-in2 = true
+  _get-tmpdir-in3 = true
+endif
+
 _get-tmpdir:
 	test -d $(tmproot)
 	test -f vars.$(DISTRO).sed
 	test `echo $(tmproot)/ljclang-tmp-* | wc -w` -lt 10 || \
 	echo "INFO: Consider running 'make clean-all-temp' after the current build." 1>&2
+	$(_get-tmpdir-in1)
 	tmpdir=`mktemp -d $(tmproot)/ljclang-tmp-XXXXXXXX` && \
 	mkdir "$$tmpdir/context" && \
+	$(_get-tmpdir-in2) && \
 	git clone --bare ../ "$$tmpdir/context/ljclang.git" > /dev/null 2>&1 && \
 	test `git rev-parse --short=12 HEAD` = "$(commit)" && \
 	test -n "$(ARCH)" && \
 	sedcmds='s/@ARCH@/$(ARCH)/; s/@LUAJIT_GIT_HASH@/$(LJ_GIT_HASH)/; s/@LUAJIT_SHA256@/$(LJ_SHA256)/' && \
+	$(_get-tmpdir-in3) && \
 	sed -e "$$sedcmds" -f vars.$(DISTRO).sed Dockerfile.in > "$$tmpdir/Dockerfile" && \
 	echo "$$tmpdir"
 
