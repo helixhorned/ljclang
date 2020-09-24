@@ -151,13 +151,13 @@ ifneq ($(canRunAmd64),)
 .PHONY: ljclang-dev-amd64/alpine ljclang-dev-amd64/debian ljclang-dev-amd64/ubuntu
 endif
 
-.PHONY: ljclang-dev-native/alpine ljclang-dev-native/debian ljclang-dev-native/ubuntu
-ljclang-dev-native/alpine: ljclang-dev-$(native_arch)/alpine
-ljclang-dev-native/debian: ljclang-dev-$(native_arch)/debian
-ljclang-dev-native/ubuntu: ljclang-dev-$(native_arch)/ubuntu
+.PHONY: ljclang-dev-NATIVE/alpine ljclang-dev-NATIVE/debian ljclang-dev-NATIVE/ubuntu
+ljclang-dev-NATIVE/alpine: ljclang-dev-$(native_arch)/alpine
+ljclang-dev-NATIVE/debian: ljclang-dev-$(native_arch)/debian
+ljclang-dev-NATIVE/ubuntu: ljclang-dev-$(native_arch)/ubuntu
 
-.PHONY: ljclang-dev-native/ALL
-ljclang-dev-native/ALL: ljclang-dev-native/alpine ljclang-dev-native/debian ljclang-dev-native/ubuntu
+.PHONY: ljclang-dev-NATIVE/ALL
+ljclang-dev-NATIVE/ALL: ljclang-dev-NATIVE/alpine ljclang-dev-NATIVE/debian ljclang-dev-NATIVE/ubuntu
 
 define check_or_make_image =
   test x`$(MAKE) --silent _get-exists ARCH=$$arch DISTRO=$$distro` = x'yes' || ( \
