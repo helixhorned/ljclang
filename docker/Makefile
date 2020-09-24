@@ -122,9 +122,12 @@ _get-tmpdir:
 	sed -e "$$sedcmds" -f vars.$(DISTRO).sed Dockerfile.in > "$$tmpdir/Dockerfile" && \
 	echo "$$tmpdir"
 
+replace_NATIVE = $(subst NATIVE,$(native_arch),$(1))
+image_to_run := $(call replace_NATIVE,$(IMAGE))
+
 run:
-	@test -n "$(IMAGE)"
-	docker run -it --rm "$(IMAGE):$(commit)"
+	@test -n "$(image_to_run)"
+	docker run -it --rm "$(image_to_run):$(commit)"
 
 # For manual invocation when no other build is running:
 clean-all-temp:
