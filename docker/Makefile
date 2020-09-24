@@ -143,12 +143,15 @@ endif
 ifneq ($(canRunArm32),)
 .PHONY: ljclang-dev-arm32v7/alpine ljclang-dev-arm32v7/debian ljclang-dev-arm32v7/ubuntu
 .PHONY: ljclang-dev-arm32v7/ubuntu-bionic
+.PHONY: ljclang-dev-arm32v7/ALL
 endif
 ifneq ($(canRunArm64),)
 .PHONY: ljclang-dev-arm64v8/alpine ljclang-dev-arm64v8/debian ljclang-dev-arm64v8/ubuntu
+.PHONY: ljclang-dev-arm64v8/ALL
 endif
 ifneq ($(canRunAmd64),)
 .PHONY: ljclang-dev-amd64/alpine ljclang-dev-amd64/debian ljclang-dev-amd64/ubuntu
+.PHONY: ljclang-dev-amd64/ALL
 endif
 
 .PHONY: ljclang-dev-NATIVE/alpine ljclang-dev-NATIVE/debian ljclang-dev-NATIVE/ubuntu
@@ -166,6 +169,8 @@ define check_or_make_image =
 endef
 
 ifneq ($(canRunArm32),)
+ljclang-dev-arm32v7/ALL: ljclang-dev-arm32v7/alpine ljclang-dev-arm32v7/debian ljclang-dev-arm32v7/ubuntu ljclang-dev-arm32v7/ubuntu-bionic
+
 ljclang-dev-arm32v7/alpine:
 	arch=arm32v7 distro=alpine && \
 	lj_sha256=79aecd984c3dbfbb12cb67282d5862c58b48e771d5ea7b3445dd5303ad71bab5 && \
@@ -194,6 +199,8 @@ ljclang-dev-arm32v7/ubuntu-bionic:
 endif
 
 ifneq ($(canRunArm64),)
+ljclang-dev-arm64v8/ALL: ljclang-dev-arm64v8/alpine ljclang-dev-arm64v8/debian ljclang-dev-arm64v8/ubuntu
+
 ljclang-dev-arm64v8/alpine:
 	arch=arm64v8 distro=alpine && \
 	lj_sha256=c3e2322da1e9942fabb8eeee08e120580aaa11277d8cc6c0abd4ed736e4311ae && \
@@ -211,6 +218,8 @@ ljclang-dev-arm64v8/ubuntu:
 endif
 
 ifneq ($(canRunAmd64),)
+ljclang-dev-amd64/ALL: ljclang-dev-amd64/alpine ljclang-dev-amd64/debian ljclang-dev-amd64/ubuntu
+
 ljclang-dev-amd64/alpine:
 	arch=amd64 distro=alpine && \
 	lj_sha256=e651a92e93f80015e506d1271fca0be39e33a8f85b81d2995338c251db63e82a && \
