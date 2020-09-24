@@ -76,8 +76,8 @@ canRun = $(or $(call canRunNatively,$(1)),$(call canRunEmulated,$(1)))
 ARCH ?= null
 DISTRO ?= null
 # Check out a specific LuaJIT commit:
-#  "Fix lua_yield() from C hook."
-LJ_GIT_HASH := dd5032ed844c56964347c7916db66b0eb11d8091
+#  "Another fix for lua_yield() from C hook."
+LJ_GIT_HASH := dd0f09f95f36caf1f2111c10fec02748116003bb
 LJ_SHA256 ?= null
 #
 qemu_suffix :=
@@ -221,12 +221,12 @@ ljclang-dev-ALL/ALL: ljclang-dev-arm32v7/ALL
 
 ljclang-dev-arm32v7/alpine:
 	arch=arm32v7 distro=alpine && \
-	lj_sha256=79aecd984c3dbfbb12cb67282d5862c58b48e771d5ea7b3445dd5303ad71bab5 && \
+	lj_sha256=b2f9befa02dc001560a6e4ee84f0fb02e8a9ea364ed6e34d25cfb040113156fe && \
 	$(check_or_make_image)
 
 ljclang-dev-arm32v7/debian:
 	arch=arm32v7 distro=debian && \
-	lj_sha256=45b69b1e3b14969121c28e5a1b5d23b3c6c0f531d5b8768d5cf8356b237a4ca3 && \
+	lj_sha256=7e8181f4f7bcce9d018d00e1e6c9756e2d2decce7be3252b532f3ee86472ca20 && \
 	$(check_or_make_image)
 
 # NOTE: when building the Docker on an RPi OS (32-bit) host, can get
@@ -236,13 +236,13 @@ ljclang-dev-arm32v7/debian:
 #   https://github.com/moby/moby/issues/40734
 ljclang-dev-arm32v7/ubuntu:
 	arch=arm32v7 distro=ubuntu && \
-	lj_sha256=3bf5f4bfd12b28871f07f8ba3427b66466447ffe4b7bf7361ffb7e08a9d12445 && \
+	lj_sha256=e0238eebd74846f19a2bf74cd0ceb93576b0c8a92d86c6f1a1589afa100e9867 && \
 	$(check_or_make_image)
 #
 # Docker image of Ubuntu 18.04 as a workaround for the above issue.
 ljclang-dev-arm32v7/ubuntu-bionic:
 	arch=arm32v7 distro=ubuntu-bionic && \
-	lj_sha256=80448776cfa0625f455cef100528756230094b9eebf857b8e2937e6d1aebb4c2 && \
+	lj_sha256=38ec0368b59110c9f035ae1f0568d00f909d9d9f1a4a04b86ca7c48176f3bbb6 && \
 	$(check_or_make_image)
 endif
 
@@ -252,17 +252,17 @@ ljclang-dev-ALL/ALL: ljclang-dev-arm64v8/ALL
 
 ljclang-dev-arm64v8/alpine:
 	arch=arm64v8 distro=alpine && \
-	lj_sha256=c3e2322da1e9942fabb8eeee08e120580aaa11277d8cc6c0abd4ed736e4311ae && \
+	lj_sha256=5efc80796359cd259f5b436b848944b734973258c17ac1dddfe31e61a8ea48b2 && \
 	$(check_or_make_image)
 
 ljclang-dev-arm64v8/debian:
 	arch=arm64v8 distro=debian && \
-	lj_sha256=75bcc032114b2c3c1f91aa732bce00647405ef4d4e0b1c66a39f72b7084b3737 && \
+	lj_sha256=fa675e1aa7ebc9ec47ff6eaa064f35a56f3cc3982024289af713ac2c0cd08954 && \
 	$(check_or_make_image)
 
 ljclang-dev-arm64v8/ubuntu:
 	arch=arm64v8 distro=ubuntu && \
-	lj_sha256=67a8f44f5dd6343f160418ff64af257ff6e614e17c694695da56fd0a0d9c4e39 && \
+	lj_sha256=088cdf750c8da1fe83768f23a92b8efb364745b1bde7f42773599158f25d3eb9 && \
 	$(check_or_make_image)
 endif
 
@@ -272,16 +272,16 @@ ljclang-dev-ALL/ALL: ljclang-dev-amd64/ALL
 
 ljclang-dev-amd64/alpine:
 	arch=amd64 distro=alpine && \
-	lj_sha256=e651a92e93f80015e506d1271fca0be39e33a8f85b81d2995338c251db63e82a && \
+	lj_sha256=539669a633e4f93021198caaca548561920bdf326f46535cb28833c39a7d0cec && \
 	$(check_or_make_image)
 
 ljclang-dev-amd64/debian:
 	arch=amd64 distro=debian && \
-	lj_sha256=74ddbab26cc4dd89c5ca4df688152db7be5720f1fc01c44a0f5de0673525b23d && \
+	lj_sha256=959ef99ea6c045482a1d93c9333a794efd0a261981739e689b214bdd95bb5fb6 && \
 	$(check_or_make_image)
 
 ljclang-dev-amd64/ubuntu:
 	arch=amd64 distro=ubuntu && \
-	lj_sha256=02af36870213c5609ab9777da18ba3e92deb38c6928ae292fdf14e457b0d03c1 && \
+	lj_sha256=1487c862c032a91d79731c91c0623494717019fd29fdd857119d876cdb6ec981 && \
 	$(check_or_make_image)
 endif
