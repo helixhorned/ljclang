@@ -138,6 +138,8 @@ canRunAmd64 := $(call canRun,amd64)
 
 ifeq ($(canRunArm32)$(canRunArm64)$(canRunAmd64),)
   $(error Cannot build any Docker image: unsupported architecture)
+else
+.PHONY: ljclang-dev-ALL/ALL
 endif
 
 ifneq ($(canRunArm32),)
@@ -170,6 +172,7 @@ endef
 
 ifneq ($(canRunArm32),)
 ljclang-dev-arm32v7/ALL: ljclang-dev-arm32v7/alpine ljclang-dev-arm32v7/debian ljclang-dev-arm32v7/ubuntu ljclang-dev-arm32v7/ubuntu-bionic
+ljclang-dev-ALL/ALL: ljclang-dev-arm32v7/ALL
 
 ljclang-dev-arm32v7/alpine:
 	arch=arm32v7 distro=alpine && \
@@ -200,6 +203,7 @@ endif
 
 ifneq ($(canRunArm64),)
 ljclang-dev-arm64v8/ALL: ljclang-dev-arm64v8/alpine ljclang-dev-arm64v8/debian ljclang-dev-arm64v8/ubuntu
+ljclang-dev-ALL/ALL: ljclang-dev-arm64v8/ALL
 
 ljclang-dev-arm64v8/alpine:
 	arch=arm64v8 distro=alpine && \
@@ -219,6 +223,7 @@ endif
 
 ifneq ($(canRunAmd64),)
 ljclang-dev-amd64/ALL: ljclang-dev-amd64/alpine ljclang-dev-amd64/debian ljclang-dev-amd64/ubuntu
+ljclang-dev-ALL/ALL: ljclang-dev-amd64/ALL
 
 ljclang-dev-amd64/alpine:
 	arch=amd64 distro=alpine && \
