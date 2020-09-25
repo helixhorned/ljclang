@@ -95,10 +95,15 @@ image_tag := $(if $(LJ_SHA_ONLY),LJ_SHA,$(commit))
 all:
 	@echo 'Usage:'
 	@echo ' $$ make ljclang-dev-<arch>/<distro>'
-	@echo '  The created Docker image has the given name and is tagged'
-	@echo '  with the short-commit-SHA.'
-	@echo ''
+	@echo '  Build a Docker image. It has the given name and is tagged'
+	@echo '  with the short-commit-SHA of *this* Git repository (ljclang).'
 	@echo ' $$ make run IMAGE=ljclang-dev-<arch>/<distro>'
+	@echo '  Run the specified Docker image.'
+	@echo ''
+	@echo ' $$ LJ_SHA_ONLY=1 make ljclang-dev-<arch>/<distro>'
+	@echo "  Build Docker images tagged 'LJ_SHA' only up to LuaJIT build."
+	@echo ' $$ make run-lj-sha-only'
+	@echo "  Run all LJ_SHA-tagged images, printing SHA256 of each 'luajit'."
 
 _get-exists:
 	docker image inspect "ljclang-dev-$(ARCH)/$(DISTRO):$(image_tag)" > /dev/null 2>&1 && \
