@@ -139,6 +139,12 @@ else
   _get-tmpdir-in4 = true
 endif
 
+ifeq ($(ARCH)~$(DISTRO),arm32v7~debian)
+  _get-tmpdir-in5 = sedcmds="$$sedcmds; s/^\#@if-ljrM://g"
+else
+  _get-tmpdir-in5 = true
+endif
+
 Dockerfile_in := Dockerfile.in
 
 ifneq ($(LJ_SHA_ONLY),)
@@ -168,6 +174,7 @@ _get-tmpdir:
 	test -n "$(ARCH)" && \
 	sedcmds='s/@ARCH@/$(ARCH)/; s/@LUAJIT_GIT_HASH@/$(LJ_GIT_HASH)/; s/@LUAJIT_SHA256@/$(LJ_SHA256)/' && \
 	$(_get-tmpdir-in4) && \
+	$(_get-tmpdir-in5) && \
 	$(_cat_Dockerfile_in) | sed -e "$$sedcmds" -f vars.$(DISTRO).sed > "$$tmpdir/Dockerfile" && \
 	echo "$$tmpdir"
 
