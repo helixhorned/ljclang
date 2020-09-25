@@ -32,13 +32,13 @@ native_machine := $(shell uname -m)
 native_arch = null
 
 ifeq ($(native_machine),armv7l)
-    native_arch := arm32v7
+  native_arch := arm32v7
 endif
 ifeq ($(native_machine),aarch64)
-	native_arch := arm64v8
+  native_arch := arm64v8
 endif
 ifeq ($(native_machine),x86_64)
-	native_arch := amd64
+  native_arch := amd64
 endif
 
 equals = $(findstring ~$(1)~,~$(2)~)
