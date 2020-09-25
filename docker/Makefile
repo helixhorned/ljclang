@@ -30,6 +30,7 @@ LJ_SHA_ONLY ?=
 SUFFIX_DOCKERFILE_IN ?=
 OVERRIDE_IMAGE_NAME ?=
 OVERRIDE_IMAGE_TAG ?=
+ADDITIONAL_CONTEXT_REPO ?=
 
 ifneq ($(SUFFIX_DOCKERFILE_IN),)
   ifneq ($(LJ_SHA_ONLY),)
@@ -165,6 +166,13 @@ else
   _cat_Dockerfile_in := cat $(Dockerfile_in) $(SUFFIX_DOCKERFILE_IN)
 endif
 
+ifneq ($(ADDITIONAL_CONTEXT_REPO),)
+  _clone_additional_repo := \
+    git clone --bare '$(ADDITIONAL_CONTEXT_REPO)' "$$tmpdir/context/additional.git" > /dev/null 2>&1
+else
+  _clone_additional_repo := true
+endif
+
 _get-tmpdir:
 	test -d $(tmproot)
 	test -f vars.$(DISTRO).sed
@@ -175,6 +183,7 @@ _get-tmpdir:
 	mkdir "$$tmpdir/context" && \
 	$(_get-tmpdir-in2) && \
 	$(_get-tmpdir-in3) && \
+	$(_clone_additional_repo) && \
 	test `git rev-parse --short=12 HEAD` = "$(commit)" && \
 	test -n "$(ARCH)" && \
 	sedcmds='s/@ARCH@/$(ARCH)/; s/@LUAJIT_GIT_HASH@/$(LJ_GIT_HASH)/; s/@LUAJIT_SHA256@/$(LJ_SHA256)/' && \

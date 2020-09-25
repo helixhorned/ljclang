@@ -48,7 +48,7 @@ RUN @install@ $pkg_liblua51_dev
 USER user
 RUN @luarocks@ --local install busted
 
-COPY / .
+COPY /ljclang.git/ ./ljclang.git/
 # Create a non-bare repository:
 RUN git clone ./ljclang.git ./ljclang
 WORKDIR ljclang
