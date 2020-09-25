@@ -22,6 +22,25 @@ IMAGE ?=
 # combination with building foreign-architecture images, see below.)
 LJ_SHA_ONLY ?=
 
+## Semi-private
+
+SUFFIX_DOCKERFILE_IN ?=
+OVERRIDE_IMAGE_NAME ?=
+OVERRIDE_IMAGE_TAG ?=
+
+ifneq ($(SUFFIX_DOCKERFILE_IN),)
+  ifneq ($(LJ_SHA_ONLY),)
+    $(error When passing SUFFIX_DOCKERFILE_IN, must not pass LJ_SHA_ONLY)
+  endif
+
+  ifeq ($(OVERRIDE_IMAGE_NAME),)
+    $(error When passing SUFFIX_DOCKERFILE_IN, must pass OVERRIDE_IMAGE_NAME)
+  endif
+  ifeq ($(OVERRIDE_IMAGE_TAG),)
+    $(error When passing SUFFIX_DOCKERFILE_IN, must pass OVERRIDE_IMAGE_TAG)
+  endif
+endif
+
 ## Private
 
 commit := $(shell git rev-parse --short=12 HEAD)
@@ -90,7 +109,8 @@ endif
 .SILENT: _get-exists _get-tmpdir
 .PHONY: _get-exists _get-tmpdir all run clean-all-temp
 
-image_tag := $(if $(LJ_SHA_ONLY),LJ_SHA,$(commit))
+image_name_prefix := $(or $(OVERRIDE_IMAGE_NAME),ljclang-dev)
+image_tag := $(or $(OVERRIDE_IMAGE_TAG),$(if $(LJ_SHA_ONLY),LJ_SHA,$(commit)))
 
 all:
 	@echo 'Usage:'
@@ -106,7 +126,7 @@ all:
 	@echo "  Run all LJ_SHA-tagged images, printing SHA256 of each 'luajit'."
 
 _get-exists:
-	docker image inspect "ljclang-dev-$(ARCH)/$(DISTRO):$(image_tag)" > /dev/null 2>&1 && \
+	docker image inspect "$(image_name_prefix)-$(ARCH)/$(DISTRO):$(image_tag)" > /dev/null 2>&1 && \
 	echo "yes" || echo "no"
 
 ifneq ($(qemu_suffix),)
@@ -131,7 +151,7 @@ ifneq ($(LJ_SHA_ONLY),)
   _cat_Dockerfile_in := echo $(_tmp-ENTRYPOINT) | head -q -n "$(_tmp-lnum)" $(Dockerfile_in) -
 else
   _get-tmpdir-in3 = git clone --bare ../ "$$tmpdir/context/ljclang.git" > /dev/null 2>&1
-  _cat_Dockerfile_in := cat $(Dockerfile_in)
+  _cat_Dockerfile_in := cat $(Dockerfile_in) $(SUFFIX_DOCKERFILE_IN)
 endif
 
 _get-tmpdir:
@@ -214,10 +234,12 @@ ljclang-dev-NATIVE/ubuntu: ljclang-dev-$(native_arch)/ubuntu
 .PHONY: ljclang-dev-NATIVE/ALL
 ljclang-dev-NATIVE/ALL: ljclang-dev-NATIVE/alpine ljclang-dev-NATIVE/debian ljclang-dev-NATIVE/ubuntu
 
+_image_name = $(subst ljclang-dev,$(image_name_prefix),$@)
+#
 define check_or_make_image =
   test x`$(MAKE) --silent _get-exists ARCH=$$arch DISTRO=$$distro` = x'yes' || ( \
   tmpdir=`$(MAKE) --silent _get-tmpdir ARCH=$$arch DISTRO=$$distro LJ_SHA256=$$lj_sha256` && \
-  DOCKER_BUILDKIT=1 docker build --tag $@:$(image_tag) -f "$$tmpdir/Dockerfile" "$$tmpdir/context")
+  DOCKER_BUILDKIT=1 docker build --tag $(_image_name):$(image_tag) -f "$$tmpdir/Dockerfile" "$$tmpdir/context")
 endef
 
 ifneq ($(canRunArm32),)
