@@ -15,6 +15,9 @@
 #  $ make run IMAGE=ljclang-dev-arm32v7/alpine  <--(invoke this)
 IMAGE ?=
 
+# Use '--no-cache'?
+NOCACHE ?=
+
 # If non-empty, will build images up to and including the LuaJIT build step, tagged
 # 'LJ_SHA' instead of the Git commit hash of this repository. Instead of the shell,
 # the ENTRYPOINTs of these images will be 'sha256 <path-to>/luajit'. This way, the
@@ -119,6 +122,8 @@ all:
 	@echo '  with the short-commit-SHA of *this* Git repository (ljclang).'
 	@echo ' $$ make run IMAGE=ljclang-dev-<arch>/<distro>'
 	@echo '  Run the specified Docker image.'
+	@echo ''
+	@echo " Passing NOCACHE=1 will add '--no-cache' to the 'docker build' invocation(s)."
 	@echo ''
 	@echo ' $$ LJ_SHA_ONLY=1 make ljclang-dev-<arch>/<distro>'
 	@echo "  Build Docker images tagged 'LJ_SHA' only up to LuaJIT build."
@@ -242,11 +247,12 @@ ljclang-dev-NATIVE/ubuntu: ljclang-dev-$(native_arch)/ubuntu
 ljclang-dev-NATIVE/ALL: ljclang-dev-NATIVE/alpine ljclang-dev-NATIVE/debian ljclang-dev-NATIVE/ubuntu
 
 _image_name = $(subst ljclang-dev,$(image_name_prefix),$@)
+_opts := $(if $(NOCACHE),--no-cache)
 #
 define check_or_make_image =
   test x`$(MAKE) --silent _get-exists ARCH=$$arch DISTRO=$$distro` = x'yes' || ( \
   tmpdir=`$(MAKE) --silent _get-tmpdir ARCH=$$arch DISTRO=$$distro LJ_SHA256=$$lj_sha256` && \
-  DOCKER_BUILDKIT=1 docker build --tag $(_image_name):$(image_tag) -f "$$tmpdir/Dockerfile" "$$tmpdir/context")
+  DOCKER_BUILDKIT=1 docker build $(_opts) --tag $(_image_name):$(image_tag) -f "$$tmpdir/Dockerfile" "$$tmpdir/context")
 endef
 
 ifneq ($(canRunArm32),)
