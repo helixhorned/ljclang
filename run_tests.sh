@@ -18,6 +18,4 @@ fi
 
 export LUA_PATH LUA_CPATH LD_LIBRARY_PATH
 
-# TODO: remove '-O2' when this is resolved:
-#  https://www.freelists.org/post/luajit/With-luajit-O3-repeated-invocations-of-a-function-unexpectedly-return-different-values
-luajit -O2 "$d/tests.lua" "$@"
+luajit "$d/tests.lua" "$@"
