@@ -19,10 +19,10 @@ IMAGE ?=
 NOCACHE ?=
 
 # If non-empty, will build images up to and including the LuaJIT build step, tagged
-# 'LJ_SHA' instead of the Git commit hash of this repository. Instead of the shell,
-# the ENTRYPOINTs of these images will be 'sha256 <path-to>/luajit'. This way, the
-# SHA-256 hashes of all LuaJIT builds can be obtained conveniently. (Especially in
-# combination with building foreign-architecture images, see below.)
+# 'LJ_SHA' instead of the Git commit hash of this repository. Running a container
+# with an appropriate '--entrypoint', the SHA-256 hashes of all LuaJIT builds can
+# be obtained. (This is especially useful in combination with building
+# foreign-architecture images, see below.)
 LJ_SHA_ONLY ?=
 
 ## Semi-private
@@ -159,8 +159,7 @@ ifneq ($(LJ_SHA_ONLY),)
   ifeq ($(_tmp-lnum),)
     $(error INTERNAL: Failed obtaining line number of LuaJIT build invocation)
   endif
-  _tmp-ENTRYPOINT := 'ENTRYPOINT sha256sum /home/user/luajit-2.1/src/luajit'
-  _cat_Dockerfile_in := echo $(_tmp-ENTRYPOINT) | head -q -n "$(_tmp-lnum)" $(Dockerfile_in) -
+  _cat_Dockerfile_in := head -q -n "$(_tmp-lnum)" $(Dockerfile_in)
 else
   _get-tmpdir-in3 = git clone --bare ../ "$$tmpdir/context/ljclang.git" > /dev/null 2>&1
   _cat_Dockerfile_in := cat $(Dockerfile_in) $(SUFFIX_DOCKERFILE_IN)
@@ -214,7 +213,7 @@ run:
 run-lj-sha-only:
 	@images=`$(get_sha_only_images_repo-tag)` && \
 	(test -n "$$images" || (echo "ERROR: no LJ_SHA-tagged images." 1>&2 && false)) && \
-	for i in $$images; do echo "$$i" && docker run -it --rm "$$i"; done
+	for i in $$images; do echo "$$i" && docker run --rm --entrypoint sha256sum "$$i" src/luajit; done
 
 # For manual invocation when no other build is running:
 clean-all-temp:
