@@ -258,10 +258,30 @@ ljclang-dev-NATIVE/ALL: ljclang-dev-NATIVE/alpine ljclang-dev-NATIVE/debian ljcl
 _image_name = $(subst ljclang-dev,$(image_name_prefix),$@)
 _opts := $(if $(NOCACHE),--no-cache)
 #
+define _docker_build =
+  DOCKER_BUILDKIT=1 docker build $(_opts) --tag $(_image_name):$(image_tag) \
+    -f "$$tmpdir/Dockerfile" "$$tmpdir/context"
+endef
+
+# We want to detect whether we are invoked with potentially-parallel execution
+# (-j/--jobs) and if so, redirect output from 'docker build' to a file.
+#
+# Unfortunately, this logic cannot be pulled into Makefile code: the thing to keep
+# in mind is that the special MAKEFLAGS variable evaluates to a (normalized)
+# representation of passed command line arguments *only in recipe context*.
+#
+# NOTE: this handles both the long form '--jobs' (because GNU Make maps that to the
+#  short form for the internal variable) as well as a plain option without argument.
+define invoke_docker_build
+  if expr match '$(MAKEFLAGS)' '[[:space:]]-j[0-9]*\>' > /dev/null; then \
+    $(_docker_build) > $$tmpdir/docker-build.log 2>&1; else $(_docker_build); \
+  fi
+endef
+
 define check_or_make_image =
   test x`$(MAKE) --silent _get-exists ARCH=$$arch DISTRO=$$distro` = x'yes' || ( \
   tmpdir=`$(MAKE) --silent _get-tmpdir ARCH=$$arch DISTRO=$$distro LJ_SHA256=$$lj_sha256` && \
-  DOCKER_BUILDKIT=1 docker build $(_opts) --tag $(_image_name):$(image_tag) -f "$$tmpdir/Dockerfile" "$$tmpdir/context")
+  $(invoke_docker_build))
 endef
 
 ifneq ($(canRunArm32),)
@@ -269,12 +289,12 @@ ljclang-dev-arm32v7/ALL: ljclang-dev-arm32v7/alpine ljclang-dev-arm32v7/debian l
 ljclang-dev-ALL/ALL: ljclang-dev-arm32v7/ALL
 
 ljclang-dev-arm32v7/alpine:
-	arch=arm32v7 distro=alpine && \
+	+arch=arm32v7 distro=alpine && \
 	lj_sha256=eea5e20a5ccf08ccdd2c6218ef8caba4a69376af40b89858463348579993649e && \
 	$(check_or_make_image)
 
 ljclang-dev-arm32v7/debian:
-	arch=arm32v7 distro=debian && \
+	+arch=arm32v7 distro=debian && \
 	lj_sha256=e0c0bfdd298c24568ed4a377dbaf6da88400dadbb9d3b5cbd3f767aca67eebfc && \
 	$(check_or_make_image)
 
@@ -284,13 +304,13 @@ ljclang-dev-arm32v7/debian:
 #   https://askubuntu.com/questions/1263284/apt-update-throws-signature-error-in-ubuntu-20-04-container-on-arm
 #   https://github.com/moby/moby/issues/40734
 ljclang-dev-arm32v7/ubuntu:
-	arch=arm32v7 distro=ubuntu && \
+	+arch=arm32v7 distro=ubuntu && \
 	lj_sha256=22124c435490d5f874916c52c0bc15d09f61a5b9f122fc030d6f6f80179fc11d && \
 	$(check_or_make_image)
 #
 # Docker image of Ubuntu 18.04 as a workaround for the above issue.
 ljclang-dev-arm32v7/ubuntu-bionic:
-	arch=arm32v7 distro=ubuntu-bionic && \
+	+arch=arm32v7 distro=ubuntu-bionic && \
 	lj_sha256=a4f4f26234545c822b26798da5c3e0ada75e29be2b4ae0cc826d4dd45e2ace28 && \
 	$(check_or_make_image)
 endif
@@ -300,17 +320,17 @@ ljclang-dev-arm64v8/ALL: ljclang-dev-arm64v8/alpine ljclang-dev-arm64v8/debian l
 ljclang-dev-ALL/ALL: ljclang-dev-arm64v8/ALL
 
 ljclang-dev-arm64v8/alpine:
-	arch=arm64v8 distro=alpine && \
+	+arch=arm64v8 distro=alpine && \
 	lj_sha256=c6114dff87dfe3c4c65b6564211619fb930dd2bf848ff3185e06e1063bee8661 && \
 	$(check_or_make_image)
 
 ljclang-dev-arm64v8/debian:
-	arch=arm64v8 distro=debian && \
+	+arch=arm64v8 distro=debian && \
 	lj_sha256=fc146b3ba2669fedbfa3fec5d01c43a01baf85d4f674afb49e0beb2adaa70e04 && \
 	$(check_or_make_image)
 
 ljclang-dev-arm64v8/ubuntu:
-	arch=arm64v8 distro=ubuntu && \
+	+arch=arm64v8 distro=ubuntu && \
 	lj_sha256=d78a53c5296743f1a20c8faf07660c23b7e3d47e0624dacbd486337e8db5ba57 && \
 	$(check_or_make_image)
 endif
@@ -320,17 +340,17 @@ ljclang-dev-amd64/ALL: ljclang-dev-amd64/alpine ljclang-dev-amd64/debian ljclang
 ljclang-dev-ALL/ALL: ljclang-dev-amd64/ALL
 
 ljclang-dev-amd64/alpine:
-	arch=amd64 distro=alpine && \
+	+arch=amd64 distro=alpine && \
 	lj_sha256=163a6c339a1a1d1122312cf8a46a307c16c7fc49ccd78e2d857c78d9935d6591 && \
 	$(check_or_make_image)
 
 ljclang-dev-amd64/debian:
-	arch=amd64 distro=debian && \
+	+arch=amd64 distro=debian && \
 	lj_sha256=569948910bcbeb90b2af5298a45c1c39e7d067b7a0c3abc4e1b6cbe3873567e6 && \
 	$(check_or_make_image)
 
 ljclang-dev-amd64/ubuntu:
-	arch=amd64 distro=ubuntu && \
+	+arch=amd64 distro=ubuntu && \
 	lj_sha256=aa2a057ba6b291d1bb8124f5863dd72c25dcfc2641501001136488b5bb2b1143 && \
 	$(check_or_make_image)
 endif
