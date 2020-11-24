@@ -1,5 +1,5 @@
 s/@DISTRO_IMAGE@/debian:buster-20200908/g
-s/@DO_update_packages@/RUN apt update/g
+s!@DO_update_packages@!RUN apt update > /tmp/apt-update.log \&\& grep -v -q '^\(E:\|Err:\|W:\)' /tmp/apt-update.log!g
 s/@adduser@/adduser --disabled-password/g
 s/@install@/DEBIAN_FRONTEND=noninteractive apt install -y/g
 s/@luarocks@/luarocks/g
