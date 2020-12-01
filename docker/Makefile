@@ -305,13 +305,13 @@ ljclang-dev-arm32v7/debian:
 #   https://github.com/moby/moby/issues/40734
 ljclang-dev-arm32v7/ubuntu:
 	+arch=arm32v7 distro=ubuntu && \
-	lj_sha256=22124c435490d5f874916c52c0bc15d09f61a5b9f122fc030d6f6f80179fc11d && \
+	lj_sha256=319d1d6af571cb7f41d9df409ae84eb99805e009a4173b8195d1380b48066b6e && \
 	$(check_or_make_image)
 #
 # Docker image of Ubuntu 18.04 as a workaround for the above issue.
 ljclang-dev-arm32v7/ubuntu-bionic:
 	+arch=arm32v7 distro=ubuntu-bionic && \
-	lj_sha256=a4f4f26234545c822b26798da5c3e0ada75e29be2b4ae0cc826d4dd45e2ace28 && \
+	lj_sha256=7672379e7cbeb2c0d9a6e4445a5d4ffb2a232223a1a5e93f772cf764ab1de2af && \
 	$(check_or_make_image)
 endif
 
@@ -331,7 +331,7 @@ ljclang-dev-arm64v8/debian:
 
 ljclang-dev-arm64v8/ubuntu:
 	+arch=arm64v8 distro=ubuntu && \
-	lj_sha256=d78a53c5296743f1a20c8faf07660c23b7e3d47e0624dacbd486337e8db5ba57 && \
+	lj_sha256=409338416a0faea74a0627b7e62b9ba4069183bd02237d5e6fad338788fcc2a3 && \
 	$(check_or_make_image)
 endif
 
@@ -351,6 +351,6 @@ ljclang-dev-amd64/debian:
 
 ljclang-dev-amd64/ubuntu:
 	+arch=amd64 distro=ubuntu && \
-	lj_sha256=aa2a057ba6b291d1bb8124f5863dd72c25dcfc2641501001136488b5bb2b1143 && \
+	lj_sha256=89f245fcf5f8ca7522fd653285b9d5b950298866614a09c1952d2c0160a89759 && \
 	$(check_or_make_image)
 endif

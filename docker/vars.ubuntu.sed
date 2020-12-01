@@ -1,4 +1,4 @@
-s/@DISTRO_IMAGE@/ubuntu:focal-20200916/g
+s/@DISTRO_IMAGE@/ubuntu:focal-20201008/g
 s!@DO_update_packages@!RUN apt update > /tmp/apt-update.log \&\& grep -v -q '^\(E:\|Err:\|W:\)' /tmp/apt-update.log!g
 s/@adduser@/adduser --disabled-password/g
 s/@install@/DEBIAN_FRONTEND=noninteractive apt install -y/g
