@@ -70,8 +70,8 @@ $(if $(call equals,arm32v7,$(1)),arm,\
 $(if $(call equals,arm64v8,$(1)),aarch64,\
 $(if $(call equals,amd64,$(1)),x86_64))))
 
-# To build the foreign-architecture images, statics builds of qemu-<arch> are required
-# on the host system.
+# To build the foreign-architecture images, static builds of qemu-<arch> are required
+# on the host system. Exception: Armv7 can be built and run on an Armv8 host directly.
 #
 # Example arguments to qemu's 'configure':
 #  --target-list=aarch64-linux-user,arm-linux-user --disable-system --static
@@ -88,7 +88,8 @@ $(if $(call equals,amd64,$(1)),x86_64))))
 qemu_prefix := /usr/local/bin/qemu-
 haveQemu = $(realpath $(qemu_prefix)$(1))
 # Return: empty (false) or non-empty (true)
-canRunNatively_ = $(call equals,$(1),$(native_arch))
+canRunLowerVersion_ = $(and $(call equals,arm64v8,$(native_arch)),$(call equals,arm32v7,$(1)))
+canRunNatively_ = $(or $(call equals,$(1),$(native_arch)),$(call canRunLowerVersion_,$(1)))
 canRunEmulated_ = $(and $(call qemuSuffixFromArch,$(1)),$(call haveQemu,$(call qemuSuffixFromArch,$(1))))
 # Return: empty (false), 1 (can run natively) or 2 (can run emulated)
 canRunNatively = $(if $(call canRunNatively_,$(1)),1)
