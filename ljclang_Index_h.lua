@@ -193,8 +193,8 @@ typedef struct {
   unsigned long long data[3];
 } CXFileUniqueID;
  int clang_getFileUniqueID(CXFile file, CXFileUniqueID *outID);
- unsigned
-clang_isFileMultipleIncludeGuarded(CXTranslationUnit tu, CXFile file);
+ unsigned clang_isFileMultipleIncludeGuarded(CXTranslationUnit tu,
+                                                           CXFile file);
  CXFile clang_getFile(CXTranslationUnit tu,
                                     const char *file_name);
  const char *clang_getFileContents(CXTranslationUnit tu,
@@ -214,8 +214,7 @@ typedef struct {
  unsigned clang_equalLocations(CXSourceLocation loc1,
                                              CXSourceLocation loc2);
  CXSourceLocation clang_getLocation(CXTranslationUnit tu,
-                                                  CXFile file,
-                                                  unsigned line,
+                                                  CXFile file, unsigned line,
                                                   unsigned column);
  CXSourceLocation clang_getLocationForOffset(CXTranslationUnit tu,
                                                            CXFile file,
@@ -229,29 +228,23 @@ typedef struct {
                                           CXSourceRange range2);
  int clang_Range_isNull(CXSourceRange range);
  void clang_getExpansionLocation(CXSourceLocation location,
-                                               CXFile *file,
-                                               unsigned *line,
+                                               CXFile *file, unsigned *line,
                                                unsigned *column,
                                                unsigned *offset);
  void clang_getPresumedLocation(CXSourceLocation location,
                                               CXString *filename,
-                                              unsigned *line,
-                                              unsigned *column);
+                                              unsigned *line, unsigned *column);
  void clang_getInstantiationLocation(CXSourceLocation location,
-                                                   CXFile *file,
-                                                   unsigned *line,
+                                                   CXFile *file, unsigned *line,
                                                    unsigned *column,
                                                    unsigned *offset);
  void clang_getSpellingLocation(CXSourceLocation location,
-                                              CXFile *file,
-                                              unsigned *line,
+                                              CXFile *file, unsigned *line,
                                               unsigned *column,
                                               unsigned *offset);
  void clang_getFileLocation(CXSourceLocation location,
-                                          CXFile *file,
-                                          unsigned *line,
-                                          unsigned *column,
-                                          unsigned *offset);
+                                          CXFile *file, unsigned *line,
+                                          unsigned *column, unsigned *offset);
  CXSourceLocation clang_getRangeStart(CXSourceRange range);
  CXSourceLocation clang_getRangeEnd(CXSourceRange range);
 typedef struct {
@@ -262,19 +255,20 @@ typedef struct {
 } CXSourceRangeList;
  CXSourceRangeList *clang_getSkippedRanges(CXTranslationUnit tu,
                                                          CXFile file);
- CXSourceRangeList *clang_getAllSkippedRanges(CXTranslationUnit tu);
+ CXSourceRangeList *
+clang_getAllSkippedRanges(CXTranslationUnit tu);
  void clang_disposeSourceRangeList(CXSourceRangeList *ranges);
 enum CXDiagnosticSeverity {
 
   CXDiagnostic_Ignored = 0,
 
-  CXDiagnostic_Note    = 1,
+  CXDiagnostic_Note = 1,
 
   CXDiagnostic_Warning = 2,
 
-  CXDiagnostic_Error   = 3,
+  CXDiagnostic_Error = 3,
 
-  CXDiagnostic_Fatal   = 4
+  CXDiagnostic_Fatal = 4
 };
 typedef void *CXDiagnostic;
 typedef void *CXDiagnosticSet;
@@ -291,16 +285,15 @@ enum CXLoadDiag_Error {
 
   CXLoadDiag_InvalidFile = 3
 };
- CXDiagnosticSet clang_loadDiagnostics(const char *file,
-                                                  enum CXLoadDiag_Error *error,
-                                                  CXString *errorString);
+ CXDiagnosticSet clang_loadDiagnostics(
+    const char *file, enum CXLoadDiag_Error *error, CXString *errorString);
  void clang_disposeDiagnosticSet(CXDiagnosticSet Diags);
  CXDiagnosticSet clang_getChildDiagnostics(CXDiagnostic D);
  unsigned clang_getNumDiagnostics(CXTranslationUnit Unit);
  CXDiagnostic clang_getDiagnostic(CXTranslationUnit Unit,
                                                 unsigned Index);
  CXDiagnosticSet
-  clang_getDiagnosticSetFromTU(CXTranslationUnit Unit);
+clang_getDiagnosticSetFromTU(CXTranslationUnit Unit);
  void clang_disposeDiagnostic(CXDiagnostic Diagnostic);
 enum CXDiagnosticDisplayOptions {
 
@@ -320,38 +313,32 @@ enum CXDiagnosticDisplayOptions {
                                                unsigned Options);
  unsigned clang_defaultDiagnosticDisplayOptions(void);
  enum CXDiagnosticSeverity
-clang_getDiagnosticSeverity(CXDiagnostic);
+    clang_getDiagnosticSeverity(CXDiagnostic);
  CXSourceLocation clang_getDiagnosticLocation(CXDiagnostic);
  CXString clang_getDiagnosticSpelling(CXDiagnostic);
  CXString clang_getDiagnosticOption(CXDiagnostic Diag,
                                                   CXString *Disable);
  unsigned clang_getDiagnosticCategory(CXDiagnostic);
-
-CXString clang_getDiagnosticCategoryName(unsigned Category);
+  CXString
+clang_getDiagnosticCategoryName(unsigned Category);
  CXString clang_getDiagnosticCategoryText(CXDiagnostic);
  unsigned clang_getDiagnosticNumRanges(CXDiagnostic);
  CXSourceRange clang_getDiagnosticRange(CXDiagnostic Diagnostic,
                                                       unsigned Range);
  unsigned clang_getDiagnosticNumFixIts(CXDiagnostic Diagnostic);
- CXString clang_getDiagnosticFixIt(CXDiagnostic Diagnostic,
-                                                 unsigned FixIt,
-                                               CXSourceRange *ReplacementRange);
+ CXString clang_getDiagnosticFixIt(
+    CXDiagnostic Diagnostic, unsigned FixIt, CXSourceRange *ReplacementRange);
  CXString
 clang_getTranslationUnitSpelling(CXTranslationUnit CTUnit);
  CXTranslationUnit clang_createTranslationUnitFromSourceFile(
-                                         CXIndex CIdx,
-                                         const char *source_filename,
-                                         int num_clang_command_line_args,
-                                   const char * const *clang_command_line_args,
-                                         unsigned num_unsaved_files,
-                                         struct CXUnsavedFile *unsaved_files);
- CXTranslationUnit clang_createTranslationUnit(
-    CXIndex CIdx,
-    const char *ast_filename);
- enum CXErrorCode clang_createTranslationUnit2(
-    CXIndex CIdx,
-    const char *ast_filename,
-    CXTranslationUnit *out_TU);
+    CXIndex CIdx, const char *source_filename, int num_clang_command_line_args,
+    const char *const *clang_command_line_args, unsigned num_unsaved_files,
+    struct CXUnsavedFile *unsaved_files);
+ CXTranslationUnit
+clang_createTranslationUnit(CXIndex CIdx, const char *ast_filename);
+ enum CXErrorCode
+clang_createTranslationUnit2(CXIndex CIdx, const char *ast_filename,
+                             CXTranslationUnit *out_TU);
 enum CXTranslationUnit_Flags {
 
   CXTranslationUnit_None = 0x0,
@@ -389,23 +376,16 @@ enum CXTranslationUnit_Flags {
   CXTranslationUnit_RetainExcludedConditionalBlocks = 0x8000
 };
  unsigned clang_defaultEditingTranslationUnitOptions(void);
- CXTranslationUnit
-clang_parseTranslationUnit(CXIndex CIdx,
-                           const char *source_filename,
-                           const char *const *command_line_args,
-                           int num_command_line_args,
-                           struct CXUnsavedFile *unsaved_files,
-                           unsigned num_unsaved_files,
-                           unsigned options);
- enum CXErrorCode
-clang_parseTranslationUnit2(CXIndex CIdx,
-                            const char *source_filename,
-                            const char *const *command_line_args,
-                            int num_command_line_args,
-                            struct CXUnsavedFile *unsaved_files,
-                            unsigned num_unsaved_files,
-                            unsigned options,
-                            CXTranslationUnit *out_TU);
+ CXTranslationUnit clang_parseTranslationUnit(
+    CXIndex CIdx, const char *source_filename,
+    const char *const *command_line_args, int num_command_line_args,
+    struct CXUnsavedFile *unsaved_files, unsigned num_unsaved_files,
+    unsigned options);
+ enum CXErrorCode clang_parseTranslationUnit2(
+    CXIndex CIdx, const char *source_filename,
+    const char *const *command_line_args, int num_command_line_args,
+    struct CXUnsavedFile *unsaved_files, unsigned num_unsaved_files,
+    unsigned options, CXTranslationUnit *out_TU);
  enum CXErrorCode clang_parseTranslationUnit2FullArgv(
     CXIndex CIdx, const char *source_filename,
     const char *const *command_line_args, int num_command_line_args,
@@ -436,10 +416,10 @@ enum CXReparse_Flags {
   CXReparse_None = 0x0
 };
  unsigned clang_defaultReparseOptions(CXTranslationUnit TU);
- int clang_reparseTranslationUnit(CXTranslationUnit TU,
-                                                unsigned num_unsaved_files,
-                                          struct CXUnsavedFile *unsaved_files,
-                                                unsigned options);
+ int
+clang_reparseTranslationUnit(CXTranslationUnit TU, unsigned num_unsaved_files,
+                             struct CXUnsavedFile *unsaved_files,
+                             unsigned options);
 enum CXTUResourceUsageKind {
   CXTUResourceUsage_AST = 1,
   CXTUResourceUsage_Identifiers = 2,
@@ -457,7 +437,7 @@ enum CXTUResourceUsageKind {
   CXTUResourceUsage_Preprocessor_HeaderSearch = 14,
   CXTUResourceUsage_MEMORY_IN_BYTES_BEGIN = CXTUResourceUsage_AST,
   CXTUResourceUsage_MEMORY_IN_BYTES_END =
-    CXTUResourceUsage_Preprocessor_HeaderSearch,
+      CXTUResourceUsage_Preprocessor_HeaderSearch,
   CXTUResourceUsage_First = CXTUResourceUsage_AST,
   CXTUResourceUsage_Last = CXTUResourceUsage_Preprocessor_HeaderSearch
 };
@@ -478,216 +458,216 @@ typedef struct CXTUResourceUsage {
             usage. */
   CXTUResourceUsageEntry *entries;
 } CXTUResourceUsage;
- CXTUResourceUsage clang_getCXTUResourceUsage(CXTranslationUnit TU);
+ CXTUResourceUsage
+clang_getCXTUResourceUsage(CXTranslationUnit TU);
  void clang_disposeCXTUResourceUsage(CXTUResourceUsage usage);
  CXTargetInfo
 clang_getTranslationUnitTargetInfo(CXTranslationUnit CTUnit);
- void
-clang_TargetInfo_dispose(CXTargetInfo Info);
- CXString
-clang_TargetInfo_getTriple(CXTargetInfo Info);
- int
-clang_TargetInfo_getPointerWidth(CXTargetInfo Info);
+ void clang_TargetInfo_dispose(CXTargetInfo Info);
+ CXString clang_TargetInfo_getTriple(CXTargetInfo Info);
+ int clang_TargetInfo_getPointerWidth(CXTargetInfo Info);
 enum CXCursorKind {
   /* Declarations */
 
-  CXCursor_UnexposedDecl                 = 1,
+  CXCursor_UnexposedDecl = 1,
 
-  CXCursor_StructDecl                    = 2,
+  CXCursor_StructDecl = 2,
 
-  CXCursor_UnionDecl                     = 3,
+  CXCursor_UnionDecl = 3,
 
-  CXCursor_ClassDecl                     = 4,
+  CXCursor_ClassDecl = 4,
 
-  CXCursor_EnumDecl                      = 5,
+  CXCursor_EnumDecl = 5,
 
-  CXCursor_FieldDecl                     = 6,
+  CXCursor_FieldDecl = 6,
 
-  CXCursor_EnumConstantDecl              = 7,
+  CXCursor_EnumConstantDecl = 7,
 
-  CXCursor_FunctionDecl                  = 8,
+  CXCursor_FunctionDecl = 8,
 
-  CXCursor_VarDecl                       = 9,
+  CXCursor_VarDecl = 9,
 
-  CXCursor_ParmDecl                      = 10,
+  CXCursor_ParmDecl = 10,
 
-  CXCursor_ObjCInterfaceDecl             = 11,
+  CXCursor_ObjCInterfaceDecl = 11,
 
-  CXCursor_ObjCCategoryDecl              = 12,
+  CXCursor_ObjCCategoryDecl = 12,
 
-  CXCursor_ObjCProtocolDecl              = 13,
+  CXCursor_ObjCProtocolDecl = 13,
 
-  CXCursor_ObjCPropertyDecl              = 14,
+  CXCursor_ObjCPropertyDecl = 14,
 
-  CXCursor_ObjCIvarDecl                  = 15,
+  CXCursor_ObjCIvarDecl = 15,
 
-  CXCursor_ObjCInstanceMethodDecl        = 16,
+  CXCursor_ObjCInstanceMethodDecl = 16,
 
-  CXCursor_ObjCClassMethodDecl           = 17,
+  CXCursor_ObjCClassMethodDecl = 17,
 
-  CXCursor_ObjCImplementationDecl        = 18,
+  CXCursor_ObjCImplementationDecl = 18,
 
-  CXCursor_ObjCCategoryImplDecl          = 19,
+  CXCursor_ObjCCategoryImplDecl = 19,
 
-  CXCursor_TypedefDecl                   = 20,
+  CXCursor_TypedefDecl = 20,
 
-  CXCursor_CXXMethod                     = 21,
+  CXCursor_CXXMethod = 21,
 
-  CXCursor_Namespace                     = 22,
+  CXCursor_Namespace = 22,
 
-  CXCursor_LinkageSpec                   = 23,
+  CXCursor_LinkageSpec = 23,
 
-  CXCursor_Constructor                   = 24,
+  CXCursor_Constructor = 24,
 
-  CXCursor_Destructor                    = 25,
+  CXCursor_Destructor = 25,
 
-  CXCursor_ConversionFunction            = 26,
+  CXCursor_ConversionFunction = 26,
 
-  CXCursor_TemplateTypeParameter         = 27,
+  CXCursor_TemplateTypeParameter = 27,
 
-  CXCursor_NonTypeTemplateParameter      = 28,
+  CXCursor_NonTypeTemplateParameter = 28,
 
-  CXCursor_TemplateTemplateParameter     = 29,
+  CXCursor_TemplateTemplateParameter = 29,
 
-  CXCursor_FunctionTemplate              = 30,
+  CXCursor_FunctionTemplate = 30,
 
-  CXCursor_ClassTemplate                 = 31,
+  CXCursor_ClassTemplate = 31,
 
   CXCursor_ClassTemplatePartialSpecialization = 32,
 
-  CXCursor_NamespaceAlias                = 33,
+  CXCursor_NamespaceAlias = 33,
 
-  CXCursor_UsingDirective                = 34,
+  CXCursor_UsingDirective = 34,
 
-  CXCursor_UsingDeclaration              = 35,
+  CXCursor_UsingDeclaration = 35,
 
-  CXCursor_TypeAliasDecl                 = 36,
+  CXCursor_TypeAliasDecl = 36,
 
-  CXCursor_ObjCSynthesizeDecl            = 37,
+  CXCursor_ObjCSynthesizeDecl = 37,
 
-  CXCursor_ObjCDynamicDecl               = 38,
+  CXCursor_ObjCDynamicDecl = 38,
 
-  CXCursor_CXXAccessSpecifier            = 39,
-  CXCursor_FirstDecl                     = CXCursor_UnexposedDecl,
-  CXCursor_LastDecl                      = CXCursor_CXXAccessSpecifier,
+  CXCursor_CXXAccessSpecifier = 39,
+  CXCursor_FirstDecl = CXCursor_UnexposedDecl,
+  CXCursor_LastDecl = CXCursor_CXXAccessSpecifier,
   /* References */
-  CXCursor_FirstRef                      = 40, /* Decl references */
-  CXCursor_ObjCSuperClassRef             = 40,
-  CXCursor_ObjCProtocolRef               = 41,
-  CXCursor_ObjCClassRef                  = 42,
+  CXCursor_FirstRef = 40, /* Decl references */
+  CXCursor_ObjCSuperClassRef = 40,
+  CXCursor_ObjCProtocolRef = 41,
+  CXCursor_ObjCClassRef = 42,
 
-  CXCursor_TypeRef                       = 43,
-  CXCursor_CXXBaseSpecifier              = 44,
+  CXCursor_TypeRef = 43,
+  CXCursor_CXXBaseSpecifier = 44,
 
-  CXCursor_TemplateRef                   = 45,
+  CXCursor_TemplateRef = 45,
 
-  CXCursor_NamespaceRef                  = 46,
+  CXCursor_NamespaceRef = 46,
 
-  CXCursor_MemberRef                     = 47,
+  CXCursor_MemberRef = 47,
 
-  CXCursor_LabelRef                      = 48,
+  CXCursor_LabelRef = 48,
 
-  CXCursor_OverloadedDeclRef             = 49,
+  CXCursor_OverloadedDeclRef = 49,
 
-  CXCursor_VariableRef                   = 50,
-  CXCursor_LastRef                       = CXCursor_VariableRef,
+  CXCursor_VariableRef = 50,
+  CXCursor_LastRef = CXCursor_VariableRef,
   /* Error conditions */
-  CXCursor_FirstInvalid                  = 70,
-  CXCursor_InvalidFile                   = 70,
-  CXCursor_NoDeclFound                   = 71,
-  CXCursor_NotImplemented                = 72,
-  CXCursor_InvalidCode                   = 73,
-  CXCursor_LastInvalid                   = CXCursor_InvalidCode,
+  CXCursor_FirstInvalid = 70,
+  CXCursor_InvalidFile = 70,
+  CXCursor_NoDeclFound = 71,
+  CXCursor_NotImplemented = 72,
+  CXCursor_InvalidCode = 73,
+  CXCursor_LastInvalid = CXCursor_InvalidCode,
   /* Expressions */
-  CXCursor_FirstExpr                     = 100,
+  CXCursor_FirstExpr = 100,
 
-  CXCursor_UnexposedExpr                 = 100,
+  CXCursor_UnexposedExpr = 100,
 
-  CXCursor_DeclRefExpr                   = 101,
+  CXCursor_DeclRefExpr = 101,
 
-  CXCursor_MemberRefExpr                 = 102,
+  CXCursor_MemberRefExpr = 102,
 
-  CXCursor_CallExpr                      = 103,
+  CXCursor_CallExpr = 103,
 
-  CXCursor_ObjCMessageExpr               = 104,
+  CXCursor_ObjCMessageExpr = 104,
 
-  CXCursor_BlockExpr                     = 105,
+  CXCursor_BlockExpr = 105,
 
-  CXCursor_IntegerLiteral                = 106,
+  CXCursor_IntegerLiteral = 106,
 
-  CXCursor_FloatingLiteral               = 107,
+  CXCursor_FloatingLiteral = 107,
 
-  CXCursor_ImaginaryLiteral              = 108,
+  CXCursor_ImaginaryLiteral = 108,
 
-  CXCursor_StringLiteral                 = 109,
+  CXCursor_StringLiteral = 109,
 
-  CXCursor_CharacterLiteral              = 110,
+  CXCursor_CharacterLiteral = 110,
 
-  CXCursor_ParenExpr                     = 111,
+  CXCursor_ParenExpr = 111,
 
-  CXCursor_UnaryOperator                 = 112,
+  CXCursor_UnaryOperator = 112,
 
-  CXCursor_ArraySubscriptExpr            = 113,
+  CXCursor_ArraySubscriptExpr = 113,
 
-  CXCursor_BinaryOperator                = 114,
+  CXCursor_BinaryOperator = 114,
 
-  CXCursor_CompoundAssignOperator        = 115,
+  CXCursor_CompoundAssignOperator = 115,
 
-  CXCursor_ConditionalOperator           = 116,
+  CXCursor_ConditionalOperator = 116,
 
-  CXCursor_CStyleCastExpr                = 117,
+  CXCursor_CStyleCastExpr = 117,
 
-  CXCursor_CompoundLiteralExpr           = 118,
+  CXCursor_CompoundLiteralExpr = 118,
 
-  CXCursor_InitListExpr                  = 119,
+  CXCursor_InitListExpr = 119,
 
-  CXCursor_AddrLabelExpr                 = 120,
+  CXCursor_AddrLabelExpr = 120,
 
-  CXCursor_StmtExpr                      = 121,
+  CXCursor_StmtExpr = 121,
 
-  CXCursor_GenericSelectionExpr          = 122,
+  CXCursor_GenericSelectionExpr = 122,
 
-  CXCursor_GNUNullExpr                   = 123,
+  CXCursor_GNUNullExpr = 123,
 
-  CXCursor_CXXStaticCastExpr             = 124,
+  CXCursor_CXXStaticCastExpr = 124,
 
-  CXCursor_CXXDynamicCastExpr            = 125,
+  CXCursor_CXXDynamicCastExpr = 125,
 
-  CXCursor_CXXReinterpretCastExpr        = 126,
+  CXCursor_CXXReinterpretCastExpr = 126,
 
-  CXCursor_CXXConstCastExpr              = 127,
+  CXCursor_CXXConstCastExpr = 127,
 
-  CXCursor_CXXFunctionalCastExpr         = 128,
+  CXCursor_CXXFunctionalCastExpr = 128,
 
-  CXCursor_CXXTypeidExpr                 = 129,
+  CXCursor_CXXAddrspaceCastExpr = 129,
 
-  CXCursor_CXXBoolLiteralExpr            = 130,
+  CXCursor_CXXTypeidExpr = 130,
 
-  CXCursor_CXXNullPtrLiteralExpr         = 131,
+  CXCursor_CXXBoolLiteralExpr = 131,
 
-  CXCursor_CXXThisExpr                   = 132,
+  CXCursor_CXXNullPtrLiteralExpr = 132,
 
-  CXCursor_CXXThrowExpr                  = 133,
+  CXCursor_CXXThisExpr = 133,
 
-  CXCursor_CXXNewExpr                    = 134,
+  CXCursor_CXXThrowExpr = 134,
 
-  CXCursor_CXXDeleteExpr                 = 135,
+  CXCursor_CXXNewExpr = 135,
 
-  CXCursor_UnaryExpr                     = 136,
+  CXCursor_CXXDeleteExpr = 136,
 
-  CXCursor_ObjCStringLiteral             = 137,
+  CXCursor_UnaryExpr = 137,
 
-  CXCursor_ObjCEncodeExpr                = 138,
+  CXCursor_ObjCStringLiteral = 138,
 
-  CXCursor_ObjCSelectorExpr              = 139,
+  CXCursor_ObjCEncodeExpr = 139,
 
-  CXCursor_ObjCProtocolExpr              = 140,
+  CXCursor_ObjCSelectorExpr = 140,
 
-  CXCursor_ObjCBridgedCastExpr           = 141,
+  CXCursor_ObjCProtocolExpr = 141,
 
-  CXCursor_PackExpansionExpr             = 142,
+  CXCursor_ObjCBridgedCastExpr = 142,
 
-  CXCursor_SizeOfPackExpr                = 143,
+  CXCursor_PackExpansionExpr = 143,
+
+  CXCursor_SizeOfPackExpr = 144,
   /* Represents a C++ lambda expression that produces a local function
    * object.
    *
@@ -700,153 +680,157 @@ enum CXCursorKind {
    * }
    * \endcode
    */
-  CXCursor_LambdaExpr                    = 144,
+  CXCursor_LambdaExpr = 145,
 
-  CXCursor_ObjCBoolLiteralExpr           = 145,
+  CXCursor_ObjCBoolLiteralExpr = 146,
 
-  CXCursor_ObjCSelfExpr                  = 146,
+  CXCursor_ObjCSelfExpr = 147,
 
-  CXCursor_OMPArraySectionExpr           = 147,
+  CXCursor_OMPArraySectionExpr = 148,
 
-  CXCursor_ObjCAvailabilityCheckExpr     = 148,
+  CXCursor_ObjCAvailabilityCheckExpr = 149,
 
-  CXCursor_FixedPointLiteral             = 149,
-  CXCursor_LastExpr                      = CXCursor_FixedPointLiteral,
+  CXCursor_FixedPointLiteral = 150,
+
+  CXCursor_OMPArrayShapingExpr = 151,
+
+  CXCursor_OMPIteratorExpr = 152,
+  CXCursor_LastExpr = CXCursor_OMPIteratorExpr,
   /* Statements */
-  CXCursor_FirstStmt                     = 200,
+  CXCursor_FirstStmt = 200,
 
-  CXCursor_UnexposedStmt                 = 200,
+  CXCursor_UnexposedStmt = 200,
 
-  CXCursor_LabelStmt                     = 201,
+  CXCursor_LabelStmt = 201,
 
-  CXCursor_CompoundStmt                  = 202,
+  CXCursor_CompoundStmt = 202,
 
-  CXCursor_CaseStmt                      = 203,
+  CXCursor_CaseStmt = 203,
 
-  CXCursor_DefaultStmt                   = 204,
+  CXCursor_DefaultStmt = 204,
 
-  CXCursor_IfStmt                        = 205,
+  CXCursor_IfStmt = 205,
 
-  CXCursor_SwitchStmt                    = 206,
+  CXCursor_SwitchStmt = 206,
 
-  CXCursor_WhileStmt                     = 207,
+  CXCursor_WhileStmt = 207,
 
-  CXCursor_DoStmt                        = 208,
+  CXCursor_DoStmt = 208,
 
-  CXCursor_ForStmt                       = 209,
+  CXCursor_ForStmt = 209,
 
-  CXCursor_GotoStmt                      = 210,
+  CXCursor_GotoStmt = 210,
 
-  CXCursor_IndirectGotoStmt              = 211,
+  CXCursor_IndirectGotoStmt = 211,
 
-  CXCursor_ContinueStmt                  = 212,
+  CXCursor_ContinueStmt = 212,
 
-  CXCursor_BreakStmt                     = 213,
+  CXCursor_BreakStmt = 213,
 
-  CXCursor_ReturnStmt                    = 214,
+  CXCursor_ReturnStmt = 214,
 
-  CXCursor_GCCAsmStmt                    = 215,
-  CXCursor_AsmStmt                       = CXCursor_GCCAsmStmt,
+  CXCursor_GCCAsmStmt = 215,
+  CXCursor_AsmStmt = CXCursor_GCCAsmStmt,
 
-  CXCursor_ObjCAtTryStmt                 = 216,
+  CXCursor_ObjCAtTryStmt = 216,
 
-  CXCursor_ObjCAtCatchStmt               = 217,
+  CXCursor_ObjCAtCatchStmt = 217,
 
-  CXCursor_ObjCAtFinallyStmt             = 218,
+  CXCursor_ObjCAtFinallyStmt = 218,
 
-  CXCursor_ObjCAtThrowStmt               = 219,
+  CXCursor_ObjCAtThrowStmt = 219,
 
-  CXCursor_ObjCAtSynchronizedStmt        = 220,
+  CXCursor_ObjCAtSynchronizedStmt = 220,
 
-  CXCursor_ObjCAutoreleasePoolStmt       = 221,
+  CXCursor_ObjCAutoreleasePoolStmt = 221,
 
-  CXCursor_ObjCForCollectionStmt         = 222,
+  CXCursor_ObjCForCollectionStmt = 222,
 
-  CXCursor_CXXCatchStmt                  = 223,
+  CXCursor_CXXCatchStmt = 223,
 
-  CXCursor_CXXTryStmt                    = 224,
+  CXCursor_CXXTryStmt = 224,
 
-  CXCursor_CXXForRangeStmt               = 225,
+  CXCursor_CXXForRangeStmt = 225,
 
-  CXCursor_SEHTryStmt                    = 226,
+  CXCursor_SEHTryStmt = 226,
 
-  CXCursor_SEHExceptStmt                 = 227,
+  CXCursor_SEHExceptStmt = 227,
 
-  CXCursor_SEHFinallyStmt                = 228,
+  CXCursor_SEHFinallyStmt = 228,
 
-  CXCursor_MSAsmStmt                     = 229,
+  CXCursor_MSAsmStmt = 229,
 
-  CXCursor_NullStmt                      = 230,
+  CXCursor_NullStmt = 230,
 
-  CXCursor_DeclStmt                      = 231,
+  CXCursor_DeclStmt = 231,
 
-  CXCursor_OMPParallelDirective          = 232,
+  CXCursor_OMPParallelDirective = 232,
 
-  CXCursor_OMPSimdDirective              = 233,
+  CXCursor_OMPSimdDirective = 233,
 
-  CXCursor_OMPForDirective               = 234,
+  CXCursor_OMPForDirective = 234,
 
-  CXCursor_OMPSectionsDirective          = 235,
+  CXCursor_OMPSectionsDirective = 235,
 
-  CXCursor_OMPSectionDirective           = 236,
+  CXCursor_OMPSectionDirective = 236,
 
-  CXCursor_OMPSingleDirective            = 237,
+  CXCursor_OMPSingleDirective = 237,
 
-  CXCursor_OMPParallelForDirective       = 238,
+  CXCursor_OMPParallelForDirective = 238,
 
-  CXCursor_OMPParallelSectionsDirective  = 239,
+  CXCursor_OMPParallelSectionsDirective = 239,
 
-  CXCursor_OMPTaskDirective              = 240,
+  CXCursor_OMPTaskDirective = 240,
 
-  CXCursor_OMPMasterDirective            = 241,
+  CXCursor_OMPMasterDirective = 241,
 
-  CXCursor_OMPCriticalDirective          = 242,
+  CXCursor_OMPCriticalDirective = 242,
 
-  CXCursor_OMPTaskyieldDirective         = 243,
+  CXCursor_OMPTaskyieldDirective = 243,
 
-  CXCursor_OMPBarrierDirective           = 244,
+  CXCursor_OMPBarrierDirective = 244,
 
-  CXCursor_OMPTaskwaitDirective          = 245,
+  CXCursor_OMPTaskwaitDirective = 245,
 
-  CXCursor_OMPFlushDirective             = 246,
+  CXCursor_OMPFlushDirective = 246,
 
-  CXCursor_SEHLeaveStmt                  = 247,
+  CXCursor_SEHLeaveStmt = 247,
 
-  CXCursor_OMPOrderedDirective           = 248,
+  CXCursor_OMPOrderedDirective = 248,
 
-  CXCursor_OMPAtomicDirective            = 249,
+  CXCursor_OMPAtomicDirective = 249,
 
-  CXCursor_OMPForSimdDirective           = 250,
+  CXCursor_OMPForSimdDirective = 250,
 
-  CXCursor_OMPParallelForSimdDirective   = 251,
+  CXCursor_OMPParallelForSimdDirective = 251,
 
-  CXCursor_OMPTargetDirective            = 252,
+  CXCursor_OMPTargetDirective = 252,
 
-  CXCursor_OMPTeamsDirective             = 253,
+  CXCursor_OMPTeamsDirective = 253,
 
-  CXCursor_OMPTaskgroupDirective         = 254,
+  CXCursor_OMPTaskgroupDirective = 254,
 
   CXCursor_OMPCancellationPointDirective = 255,
 
-  CXCursor_OMPCancelDirective            = 256,
+  CXCursor_OMPCancelDirective = 256,
 
-  CXCursor_OMPTargetDataDirective        = 257,
+  CXCursor_OMPTargetDataDirective = 257,
 
-  CXCursor_OMPTaskLoopDirective          = 258,
+  CXCursor_OMPTaskLoopDirective = 258,
 
-  CXCursor_OMPTaskLoopSimdDirective      = 259,
+  CXCursor_OMPTaskLoopSimdDirective = 259,
 
-  CXCursor_OMPDistributeDirective        = 260,
+  CXCursor_OMPDistributeDirective = 260,
 
-  CXCursor_OMPTargetEnterDataDirective   = 261,
+  CXCursor_OMPTargetEnterDataDirective = 261,
 
-  CXCursor_OMPTargetExitDataDirective    = 262,
+  CXCursor_OMPTargetExitDataDirective = 262,
 
-  CXCursor_OMPTargetParallelDirective    = 263,
+  CXCursor_OMPTargetParallelDirective = 263,
 
   CXCursor_OMPTargetParallelForDirective = 264,
 
-  CXCursor_OMPTargetUpdateDirective      = 265,
+  CXCursor_OMPTargetUpdateDirective = 265,
 
   CXCursor_OMPDistributeParallelForDirective = 266,
 
@@ -882,80 +866,84 @@ enum CXCursorKind {
 
   CXCursor_OMPParallelMasterTaskLoopDirective = 282,
 
-  CXCursor_OMPMasterTaskLoopSimdDirective      = 283,
+  CXCursor_OMPMasterTaskLoopSimdDirective = 283,
 
-  CXCursor_OMPParallelMasterTaskLoopSimdDirective      = 284,
+  CXCursor_OMPParallelMasterTaskLoopSimdDirective = 284,
 
-  CXCursor_OMPParallelMasterDirective      = 285,
-  CXCursor_LastStmt = CXCursor_OMPParallelMasterDirective,
+  CXCursor_OMPParallelMasterDirective = 285,
 
-  CXCursor_TranslationUnit               = 300,
+  CXCursor_OMPDepobjDirective = 286,
+
+  CXCursor_OMPScanDirective = 287,
+  CXCursor_LastStmt = CXCursor_OMPScanDirective,
+
+  CXCursor_TranslationUnit = 300,
   /* Attributes */
-  CXCursor_FirstAttr                     = 400,
+  CXCursor_FirstAttr = 400,
 
-  CXCursor_UnexposedAttr                 = 400,
-  CXCursor_IBActionAttr                  = 401,
-  CXCursor_IBOutletAttr                  = 402,
-  CXCursor_IBOutletCollectionAttr        = 403,
-  CXCursor_CXXFinalAttr                  = 404,
-  CXCursor_CXXOverrideAttr               = 405,
-  CXCursor_AnnotateAttr                  = 406,
-  CXCursor_AsmLabelAttr                  = 407,
-  CXCursor_PackedAttr                    = 408,
-  CXCursor_PureAttr                      = 409,
-  CXCursor_ConstAttr                     = 410,
-  CXCursor_NoDuplicateAttr               = 411,
-  CXCursor_CUDAConstantAttr              = 412,
-  CXCursor_CUDADeviceAttr                = 413,
-  CXCursor_CUDAGlobalAttr                = 414,
-  CXCursor_CUDAHostAttr                  = 415,
-  CXCursor_CUDASharedAttr                = 416,
-  CXCursor_VisibilityAttr                = 417,
-  CXCursor_DLLExport                     = 418,
-  CXCursor_DLLImport                     = 419,
-  CXCursor_NSReturnsRetained             = 420,
-  CXCursor_NSReturnsNotRetained          = 421,
-  CXCursor_NSReturnsAutoreleased         = 422,
-  CXCursor_NSConsumesSelf                = 423,
-  CXCursor_NSConsumed                    = 424,
-  CXCursor_ObjCException                 = 425,
-  CXCursor_ObjCNSObject                  = 426,
-  CXCursor_ObjCIndependentClass          = 427,
-  CXCursor_ObjCPreciseLifetime           = 428,
-  CXCursor_ObjCReturnsInnerPointer       = 429,
-  CXCursor_ObjCRequiresSuper             = 430,
-  CXCursor_ObjCRootClass                 = 431,
-  CXCursor_ObjCSubclassingRestricted     = 432,
-  CXCursor_ObjCExplicitProtocolImpl      = 433,
-  CXCursor_ObjCDesignatedInitializer     = 434,
-  CXCursor_ObjCRuntimeVisible            = 435,
-  CXCursor_ObjCBoxable                   = 436,
-  CXCursor_FlagEnum                      = 437,
-  CXCursor_ConvergentAttr                = 438,
-  CXCursor_WarnUnusedAttr                = 439,
-  CXCursor_WarnUnusedResultAttr          = 440,
-  CXCursor_AlignedAttr                   = 441,
-  CXCursor_LastAttr                      = CXCursor_AlignedAttr,
+  CXCursor_UnexposedAttr = 400,
+  CXCursor_IBActionAttr = 401,
+  CXCursor_IBOutletAttr = 402,
+  CXCursor_IBOutletCollectionAttr = 403,
+  CXCursor_CXXFinalAttr = 404,
+  CXCursor_CXXOverrideAttr = 405,
+  CXCursor_AnnotateAttr = 406,
+  CXCursor_AsmLabelAttr = 407,
+  CXCursor_PackedAttr = 408,
+  CXCursor_PureAttr = 409,
+  CXCursor_ConstAttr = 410,
+  CXCursor_NoDuplicateAttr = 411,
+  CXCursor_CUDAConstantAttr = 412,
+  CXCursor_CUDADeviceAttr = 413,
+  CXCursor_CUDAGlobalAttr = 414,
+  CXCursor_CUDAHostAttr = 415,
+  CXCursor_CUDASharedAttr = 416,
+  CXCursor_VisibilityAttr = 417,
+  CXCursor_DLLExport = 418,
+  CXCursor_DLLImport = 419,
+  CXCursor_NSReturnsRetained = 420,
+  CXCursor_NSReturnsNotRetained = 421,
+  CXCursor_NSReturnsAutoreleased = 422,
+  CXCursor_NSConsumesSelf = 423,
+  CXCursor_NSConsumed = 424,
+  CXCursor_ObjCException = 425,
+  CXCursor_ObjCNSObject = 426,
+  CXCursor_ObjCIndependentClass = 427,
+  CXCursor_ObjCPreciseLifetime = 428,
+  CXCursor_ObjCReturnsInnerPointer = 429,
+  CXCursor_ObjCRequiresSuper = 430,
+  CXCursor_ObjCRootClass = 431,
+  CXCursor_ObjCSubclassingRestricted = 432,
+  CXCursor_ObjCExplicitProtocolImpl = 433,
+  CXCursor_ObjCDesignatedInitializer = 434,
+  CXCursor_ObjCRuntimeVisible = 435,
+  CXCursor_ObjCBoxable = 436,
+  CXCursor_FlagEnum = 437,
+  CXCursor_ConvergentAttr = 438,
+  CXCursor_WarnUnusedAttr = 439,
+  CXCursor_WarnUnusedResultAttr = 440,
+  CXCursor_AlignedAttr = 441,
+  CXCursor_LastAttr = CXCursor_AlignedAttr,
   /* Preprocessing */
-  CXCursor_PreprocessingDirective        = 500,
-  CXCursor_MacroDefinition               = 501,
-  CXCursor_MacroExpansion                = 502,
-  CXCursor_MacroInstantiation            = CXCursor_MacroExpansion,
-  CXCursor_InclusionDirective            = 503,
-  CXCursor_FirstPreprocessing            = CXCursor_PreprocessingDirective,
-  CXCursor_LastPreprocessing             = CXCursor_InclusionDirective,
+  CXCursor_PreprocessingDirective = 500,
+  CXCursor_MacroDefinition = 501,
+  CXCursor_MacroExpansion = 502,
+  CXCursor_MacroInstantiation = CXCursor_MacroExpansion,
+  CXCursor_InclusionDirective = 503,
+  CXCursor_FirstPreprocessing = CXCursor_PreprocessingDirective,
+  CXCursor_LastPreprocessing = CXCursor_InclusionDirective,
   /* Extra Declarations */
 
-  CXCursor_ModuleImportDecl              = 600,
-  CXCursor_TypeAliasTemplateDecl         = 601,
+  CXCursor_ModuleImportDecl = 600,
+  CXCursor_TypeAliasTemplateDecl = 601,
 
-  CXCursor_StaticAssert                  = 602,
+  CXCursor_StaticAssert = 602,
 
-  CXCursor_FriendDecl                    = 603,
-  CXCursor_FirstExtraDecl                = CXCursor_ModuleImportDecl,
-  CXCursor_LastExtraDecl                 = CXCursor_FriendDecl,
+  CXCursor_FriendDecl = 603,
+  CXCursor_FirstExtraDecl = CXCursor_ModuleImportDecl,
+  CXCursor_LastExtraDecl = CXCursor_FriendDecl,
 
-  CXCursor_OverloadCandidate             = 700
+  CXCursor_OverloadCandidate = 700
 };
 typedef struct {
   enum CXCursorKind kind;
@@ -1019,14 +1007,10 @@ typedef struct CXPlatformAvailability {
 
   CXString Message;
 } CXPlatformAvailability;
- int
-clang_getCursorPlatformAvailability(CXCursor cursor,
-                                    int *always_deprecated,
-                                    CXString *deprecated_message,
-                                    int *always_unavailable,
-                                    CXString *unavailable_message,
-                                    CXPlatformAvailability *availability,
-                                    int availability_size);
+ int clang_getCursorPlatformAvailability(
+    CXCursor cursor, int *always_deprecated, CXString *deprecated_message,
+    int *always_unavailable, CXString *unavailable_message,
+    CXPlatformAvailability *availability, int availability_size);
  void
 clang_disposeCXPlatformAvailability(CXPlatformAvailability *availability);
 enum CXLanguageKind {
@@ -1036,11 +1020,7 @@ enum CXLanguageKind {
   CXLanguage_CPlusPlus
 };
  enum CXLanguageKind clang_getCursorLanguage(CXCursor cursor);
-enum CXTLSKind {
-  CXTLS_None = 0,
-  CXTLS_Dynamic,
-  CXTLS_Static
-};
+enum CXTLSKind { CXTLS_None = 0, CXTLS_Dynamic, CXTLS_Static };
  enum CXTLSKind clang_getCursorTLSKind(CXCursor cursor);
  CXTranslationUnit clang_Cursor_getTranslationUnit(CXCursor);
 typedef struct CXCursorSetImpl *CXCursorSet;
@@ -1103,8 +1083,9 @@ enum CXTypeKind {
   CXType_UShortAccum = 36,
   CXType_UAccum = 37,
   CXType_ULongAccum = 38,
+  CXType_BFloat16 = 39,
   CXType_FirstBuiltin = CXType_Void,
-  CXType_LastBuiltin = CXType_ULongAccum,
+  CXType_LastBuiltin = CXType_BFloat16,
   CXType_Complex = 100,
   CXType_Pointer = 101,
   CXType_BlockPointer = 102,
@@ -1184,7 +1165,8 @@ enum CXTypeKind {
   CXType_OCLIntelSubgroupAVCImeResultDualRefStreamout = 173,
   CXType_OCLIntelSubgroupAVCImeSingleRefStreamin = 174,
   CXType_OCLIntelSubgroupAVCImeDualRefStreamin = 175,
-  CXType_ExtVector = 176
+  CXType_ExtVector = 176,
+  CXType_Atomic = 177
 };
 enum CXCallingConv {
   CXCallingConv_Default = 0,
@@ -1218,7 +1200,8 @@ typedef struct {
  CXType clang_getTypedefDeclUnderlyingType(CXCursor C);
  CXType clang_getEnumDeclIntegerType(CXCursor C);
  long long clang_getEnumConstantDeclValue(CXCursor C);
- unsigned long long clang_getEnumConstantDeclUnsignedValue(CXCursor C);
+ unsigned long long
+clang_getEnumConstantDeclUnsignedValue(CXCursor C);
  int clang_getFieldDeclBitWidth(CXCursor C);
  int clang_Cursor_getNumArguments(CXCursor C);
  CXCursor clang_Cursor_getArgument(CXCursor C, unsigned i);
@@ -1236,14 +1219,14 @@ enum CXTemplateArgumentKind {
   CXTemplateArgumentKind_Invalid
 };
  int clang_Cursor_getNumTemplateArguments(CXCursor C);
- enum CXTemplateArgumentKind clang_Cursor_getTemplateArgumentKind(
-    CXCursor C, unsigned I);
+ enum CXTemplateArgumentKind
+clang_Cursor_getTemplateArgumentKind(CXCursor C, unsigned I);
  CXType clang_Cursor_getTemplateArgumentType(CXCursor C,
                                                            unsigned I);
  long long clang_Cursor_getTemplateArgumentValue(CXCursor C,
                                                                unsigned I);
- unsigned long long clang_Cursor_getTemplateArgumentUnsignedValue(
-    CXCursor C, unsigned I);
+ unsigned long long
+clang_Cursor_getTemplateArgumentUnsignedValue(CXCursor C, unsigned I);
  unsigned clang_equalTypes(CXType A, CXType B);
  CXType clang_getCanonicalType(CXType T);
  unsigned clang_isConstQualifiedType(CXType T);
@@ -1309,6 +1292,7 @@ enum CXTypeLayoutError {
  long long clang_Type_getSizeOf(CXType T);
  long long clang_Type_getOffsetOf(CXType T, const char *S);
  CXType clang_Type_getModifiedType(CXType T);
+ CXType clang_Type_getValueType(CXType CT);
  long long clang_Cursor_getOffsetOfField(CXCursor C);
  unsigned clang_Cursor_isAnonymous(CXCursor C);
  unsigned clang_Cursor_isAnonymousRecordDecl(CXCursor C);
@@ -1322,7 +1306,8 @@ enum CXRefQualifierKind {
   CXRefQualifier_RValue
 };
  int clang_Type_getNumTemplateArguments(CXType T);
- CXType clang_Type_getTemplateArgumentAsType(CXType T, unsigned i);
+ CXType clang_Type_getTemplateArgumentAsType(CXType T,
+                                                           unsigned i);
  enum CXRefQualifierKind clang_Type_getCXXRefQualifier(CXType T);
  unsigned clang_Cursor_isBitField(CXCursor C);
  unsigned clang_isVirtualBase(CXCursor);
@@ -1364,11 +1349,10 @@ typedef enum CXChildVisitResult (*CXCursorVisitor)(CXCursor cursor,
                                             CXClientData client_data);
  CXString clang_getCursorUSR(CXCursor);
  CXString clang_constructUSR_ObjCClass(const char *class_name);
+ CXString clang_constructUSR_ObjCCategory(
+    const char *class_name, const char *category_name);
  CXString
-  clang_constructUSR_ObjCCategory(const char *class_name,
-                                 const char *category_name);
- CXString
-  clang_constructUSR_ObjCProtocol(const char *protocol_name);
+clang_constructUSR_ObjCProtocol(const char *protocol_name);
  CXString clang_constructUSR_ObjCIvar(const char *name,
                                                     CXString classUSR);
  CXString clang_constructUSR_ObjCMethod(const char *name,
@@ -1377,9 +1361,8 @@ typedef enum CXChildVisitResult (*CXCursorVisitor)(CXCursor cursor,
  CXString clang_constructUSR_ObjCProperty(const char *property,
                                                         CXString classUSR);
  CXString clang_getCursorSpelling(CXCursor);
- CXSourceRange clang_Cursor_getSpellingNameRange(CXCursor,
-                                                          unsigned pieceIndex,
-                                                          unsigned options);
+ CXSourceRange clang_Cursor_getSpellingNameRange(
+    CXCursor, unsigned pieceIndex, unsigned options);
 typedef void *CXPrintingPolicy;
 enum CXPrintingPolicyProperty {
   CXPrintingPolicy_Indentation,
@@ -1413,9 +1396,10 @@ enum CXPrintingPolicyProperty {
  unsigned
 clang_PrintingPolicy_getProperty(CXPrintingPolicy Policy,
                                  enum CXPrintingPolicyProperty Property);
- void clang_PrintingPolicy_setProperty(CXPrintingPolicy Policy,
-                                                     enum CXPrintingPolicyProperty Property,
-                                                     unsigned Value);
+ void
+clang_PrintingPolicy_setProperty(CXPrintingPolicy Policy,
+                                 enum CXPrintingPolicyProperty Property,
+                                 unsigned Value);
  CXPrintingPolicy clang_getCursorPrintingPolicy(CXCursor);
  void clang_PrintingPolicy_dispose(CXPrintingPolicy Policy);
  CXString clang_getCursorPrettyPrinted(CXCursor Cursor,
@@ -1429,23 +1413,23 @@ clang_PrintingPolicy_getProperty(CXPrintingPolicy Policy,
  int clang_Cursor_isDynamicCall(CXCursor C);
  CXType clang_Cursor_getReceiverType(CXCursor C);
 typedef enum {
-  CXObjCPropertyAttr_noattr    = 0x00,
-  CXObjCPropertyAttr_readonly  = 0x01,
-  CXObjCPropertyAttr_getter    = 0x02,
-  CXObjCPropertyAttr_assign    = 0x04,
+  CXObjCPropertyAttr_noattr = 0x00,
+  CXObjCPropertyAttr_readonly = 0x01,
+  CXObjCPropertyAttr_getter = 0x02,
+  CXObjCPropertyAttr_assign = 0x04,
   CXObjCPropertyAttr_readwrite = 0x08,
-  CXObjCPropertyAttr_retain    = 0x10,
-  CXObjCPropertyAttr_copy      = 0x20,
+  CXObjCPropertyAttr_retain = 0x10,
+  CXObjCPropertyAttr_copy = 0x20,
   CXObjCPropertyAttr_nonatomic = 0x40,
-  CXObjCPropertyAttr_setter    = 0x80,
-  CXObjCPropertyAttr_atomic    = 0x100,
-  CXObjCPropertyAttr_weak      = 0x200,
-  CXObjCPropertyAttr_strong    = 0x400,
+  CXObjCPropertyAttr_setter = 0x80,
+  CXObjCPropertyAttr_atomic = 0x100,
+  CXObjCPropertyAttr_weak = 0x200,
+  CXObjCPropertyAttr_strong = 0x400,
   CXObjCPropertyAttr_unsafe_unretained = 0x800,
   CXObjCPropertyAttr_class = 0x1000
 } CXObjCPropertyAttrKind;
- unsigned clang_Cursor_getObjCPropertyAttributes(CXCursor C,
-                                                             unsigned reserved);
+ unsigned
+clang_Cursor_getObjCPropertyAttributes(CXCursor C, unsigned reserved);
  CXString clang_Cursor_getObjCPropertyGetterName(CXCursor C);
  CXString clang_Cursor_getObjCPropertySetterName(CXCursor C);
 typedef enum {
@@ -1461,8 +1445,9 @@ typedef enum {
  unsigned clang_Cursor_isObjCOptional(CXCursor C);
  unsigned clang_Cursor_isVariadic(CXCursor C);
  unsigned clang_Cursor_isExternalSymbol(CXCursor C,
-                                       CXString *language, CXString *definedIn,
-                                       unsigned *isGenerated);
+                                                      CXString *language,
+                                                      CXString *definedIn,
+                                                      unsigned *isGenerated);
  CXSourceRange clang_Cursor_getCommentRange(CXCursor C);
  CXString clang_Cursor_getRawCommentText(CXCursor C);
  CXString clang_Cursor_getBriefCommentText(CXCursor C);
@@ -1479,9 +1464,10 @@ typedef void *CXModule;
  int clang_Module_isSystem(CXModule Module);
  unsigned clang_Module_getNumTopLevelHeaders(CXTranslationUnit,
                                                            CXModule Module);
-CXFile clang_Module_getTopLevelHeader(CXTranslationUnit,
-                                      CXModule Module, unsigned Index);
- unsigned clang_CXXConstructor_isConvertingConstructor(CXCursor C);
+CXFile clang_Module_getTopLevelHeader(CXTranslationUnit, CXModule Module,
+                                      unsigned Index);
+ unsigned
+clang_CXXConstructor_isConvertingConstructor(CXCursor C);
  unsigned clang_CXXConstructor_isCopyConstructor(CXCursor C);
  unsigned clang_CXXConstructor_isDefaultConstructor(CXCursor C);
  unsigned clang_CXXConstructor_isMoveConstructor(CXCursor C);
@@ -1495,9 +1481,8 @@ CXFile clang_Module_getTopLevelHeader(CXTranslationUnit,
  unsigned clang_CXXMethod_isConst(CXCursor C);
  enum CXCursorKind clang_getTemplateCursorKind(CXCursor C);
  CXCursor clang_getSpecializedCursorTemplate(CXCursor C);
- CXSourceRange clang_getCursorReferenceNameRange(CXCursor C,
-                                                unsigned NameFlags,
-                                                unsigned PieceIndex);
+ CXSourceRange clang_getCursorReferenceNameRange(
+    CXCursor C, unsigned NameFlags, unsigned PieceIndex);
 enum CXNameRefFlags {
 
   CXNameRange_WantQualifier = 0x1,
@@ -1531,22 +1516,17 @@ typedef struct {
  CXSourceRange clang_getTokenExtent(CXTranslationUnit, CXToken);
  void clang_tokenize(CXTranslationUnit TU, CXSourceRange Range,
                                    CXToken **Tokens, unsigned *NumTokens);
- void clang_annotateTokens(CXTranslationUnit TU,
-                                         CXToken *Tokens, unsigned NumTokens,
-                                         CXCursor *Cursors);
- void clang_disposeTokens(CXTranslationUnit TU,
-                                        CXToken *Tokens, unsigned NumTokens);
+ void clang_annotateTokens(CXTranslationUnit TU, CXToken *Tokens,
+                                         unsigned NumTokens, CXCursor *Cursors);
+ void clang_disposeTokens(CXTranslationUnit TU, CXToken *Tokens,
+                                        unsigned NumTokens);
 /* for debug/testing */
  CXString clang_getCursorKindSpelling(enum CXCursorKind Kind);
- void clang_getDefinitionSpellingAndExtent(CXCursor,
-                                          const char **startBuf,
-                                          const char **endBuf,
-                                          unsigned *startLine,
-                                          unsigned *startColumn,
-                                          unsigned *endLine,
-                                          unsigned *endColumn);
+ void clang_getDefinitionSpellingAndExtent(
+    CXCursor, const char **startBuf, const char **endBuf, unsigned *startLine,
+    unsigned *startColumn, unsigned *endLine, unsigned *endColumn);
  void clang_enableStackTraces(void);
- void clang_executeOnThread(void (*fn)(void*), void *user_data,
+ void clang_executeOnThread(void (*fn)(void *), void *user_data,
                                           unsigned stack_size);
 typedef void *CXCompletionString;
 typedef struct {
@@ -1602,12 +1582,10 @@ enum CXCompletionChunkKind {
  enum CXCompletionChunkKind
 clang_getCompletionChunkKind(CXCompletionString completion_string,
                              unsigned chunk_number);
- CXString
-clang_getCompletionChunkText(CXCompletionString completion_string,
-                             unsigned chunk_number);
- CXCompletionString
-clang_getCompletionChunkCompletionString(CXCompletionString completion_string,
-                                         unsigned chunk_number);
+ CXString clang_getCompletionChunkText(
+    CXCompletionString completion_string, unsigned chunk_number);
+ CXCompletionString clang_getCompletionChunkCompletionString(
+    CXCompletionString completion_string, unsigned chunk_number);
  unsigned
 clang_getNumCompletionChunks(CXCompletionString completion_string);
  unsigned
@@ -1616,12 +1594,10 @@ clang_getCompletionPriority(CXCompletionString completion_string);
 clang_getCompletionAvailability(CXCompletionString completion_string);
  unsigned
 clang_getCompletionNumAnnotations(CXCompletionString completion_string);
- CXString
-clang_getCompletionAnnotation(CXCompletionString completion_string,
-                              unsigned annotation_number);
- CXString
-clang_getCompletionParent(CXCompletionString completion_string,
-                          enum CXCursorKind *kind);
+ CXString clang_getCompletionAnnotation(
+    CXCompletionString completion_string, unsigned annotation_number);
+ CXString clang_getCompletionParent(
+    CXCompletionString completion_string, enum CXCursorKind *kind);
  CXString
 clang_getCompletionBriefComment(CXCompletionString completion_string);
  CXCompletionString
@@ -1703,54 +1679,52 @@ enum CXCompletionContext {
   CXCompletionContext_Unknown = ((1 << 23) - 1)
 };
  unsigned clang_defaultCodeCompleteOptions(void);
-CXCodeCompleteResults *clang_codeCompleteAt(CXTranslationUnit TU,
-                                            const char *complete_filename,
-                                            unsigned complete_line,
-                                            unsigned complete_column,
-                                            struct CXUnsavedFile *unsaved_files,
-                                            unsigned num_unsaved_files,
-                                            unsigned options);
+CXCodeCompleteResults *
+clang_codeCompleteAt(CXTranslationUnit TU, const char *complete_filename,
+                     unsigned complete_line, unsigned complete_column,
+                     struct CXUnsavedFile *unsaved_files,
+                     unsigned num_unsaved_files, unsigned options);
 void clang_sortCodeCompletionResults(CXCompletionResult *Results,
                                      unsigned NumResults);
 void clang_disposeCodeCompleteResults(CXCodeCompleteResults *Results);
 unsigned clang_codeCompleteGetNumDiagnostics(CXCodeCompleteResults *Results);
 CXDiagnostic clang_codeCompleteGetDiagnostic(CXCodeCompleteResults *Results,
                                              unsigned Index);
-unsigned long long clang_codeCompleteGetContexts(
-                                                CXCodeCompleteResults *Results);
-enum CXCursorKind clang_codeCompleteGetContainerKind(
-                                                 CXCodeCompleteResults *Results,
-                                                     unsigned *IsIncomplete);
+unsigned long long
+clang_codeCompleteGetContexts(CXCodeCompleteResults *Results);
+enum CXCursorKind
+clang_codeCompleteGetContainerKind(CXCodeCompleteResults *Results,
+                                   unsigned *IsIncomplete);
 CXString clang_codeCompleteGetContainerUSR(CXCodeCompleteResults *Results);
 CXString clang_codeCompleteGetObjCSelector(CXCodeCompleteResults *Results);
  CXString clang_getClangVersion(void);
  void clang_toggleCrashRecovery(unsigned isEnabled);
-
 typedef void (*CXInclusionVisitor)(CXFile included_file,
-                                   CXSourceLocation* inclusion_stack,
+                                   CXSourceLocation *inclusion_stack,
                                    unsigned include_len,
                                    CXClientData client_data);
  void clang_getInclusions(CXTranslationUnit tu,
                                         CXInclusionVisitor visitor,
                                         CXClientData client_data);
 typedef enum {
-  CXEval_Int = 1 ,
+  CXEval_Int = 1,
   CXEval_Float = 2,
   CXEval_ObjCStrLiteral = 3,
   CXEval_StrLiteral = 4,
   CXEval_CFStr = 5,
   CXEval_Other = 6,
   CXEval_UnExposed = 0
-} CXEvalResultKind ;
-typedef void * CXEvalResult;
+} CXEvalResultKind;
+typedef void *CXEvalResult;
  CXEvalResult clang_Cursor_Evaluate(CXCursor C);
  CXEvalResultKind clang_EvalResult_getKind(CXEvalResult E);
  int clang_EvalResult_getAsInt(CXEvalResult E);
  long long clang_EvalResult_getAsLongLong(CXEvalResult E);
  unsigned clang_EvalResult_isUnsignedInt(CXEvalResult E);
- unsigned long long clang_EvalResult_getAsUnsigned(CXEvalResult E);
+ unsigned long long
+clang_EvalResult_getAsUnsigned(CXEvalResult E);
  double clang_EvalResult_getAsDouble(CXEvalResult E);
- const char* clang_EvalResult_getAsStr(CXEvalResult E);
+ const char *clang_EvalResult_getAsStr(CXEvalResult E);
  void clang_EvalResult_dispose(CXEvalResult E);
 typedef void *CXRemapping;
  CXRemapping clang_getRemappings(const char *path);
@@ -1758,12 +1732,10 @@ CXRemapping clang_getRemappingsFromFileList(const char **filePaths,
                                             unsigned numFiles);
  unsigned clang_remap_getNumFiles(CXRemapping);
  void clang_remap_getFilenames(CXRemapping, unsigned index,
-                                     CXString *original, CXString *transformed);
+                                             CXString *original,
+                                             CXString *transformed);
  void clang_remap_dispose(CXRemapping);
-enum CXVisitorResult {
-  CXVisit_Break,
-  CXVisit_Continue
-};
+enum CXVisitorResult { CXVisit_Break, CXVisit_Continue };
 typedef struct CXCursorAndRangeVisitor {
   void *context;
   enum CXVisitorResult (*visit)(void *context, CXCursor, CXSourceRange);
@@ -1776,11 +1748,10 @@ typedef enum {
 
   CXResult_VisitBreak = 2
 } CXResult;
- CXResult clang_findReferencesInFile(CXCursor cursor, CXFile file,
-                                               CXCursorAndRangeVisitor visitor);
- CXResult clang_findIncludesInFile(CXTranslationUnit TU,
-                                                 CXFile file,
-                                              CXCursorAndRangeVisitor visitor);
+ CXResult clang_findReferencesInFile(
+    CXCursor cursor, CXFile file, CXCursorAndRangeVisitor visitor);
+ CXResult clang_findIncludesInFile(
+    CXTranslationUnit TU, CXFile file, CXCursorAndRangeVisitor visitor);
 typedef void *CXIdxClientFile;
 typedef void *CXIdxClientEntity;
 typedef void *CXIdxClientContainer;
@@ -1812,51 +1783,51 @@ typedef struct {
   int isImplicit;
 } CXIdxImportedASTFileInfo;
 typedef enum {
-  CXIdxEntity_Unexposed     = 0,
-  CXIdxEntity_Typedef       = 1,
-  CXIdxEntity_Function      = 2,
-  CXIdxEntity_Variable      = 3,
-  CXIdxEntity_Field         = 4,
-  CXIdxEntity_EnumConstant  = 5,
-  CXIdxEntity_ObjCClass     = 6,
-  CXIdxEntity_ObjCProtocol  = 7,
-  CXIdxEntity_ObjCCategory  = 8,
+  CXIdxEntity_Unexposed = 0,
+  CXIdxEntity_Typedef = 1,
+  CXIdxEntity_Function = 2,
+  CXIdxEntity_Variable = 3,
+  CXIdxEntity_Field = 4,
+  CXIdxEntity_EnumConstant = 5,
+  CXIdxEntity_ObjCClass = 6,
+  CXIdxEntity_ObjCProtocol = 7,
+  CXIdxEntity_ObjCCategory = 8,
   CXIdxEntity_ObjCInstanceMethod = 9,
-  CXIdxEntity_ObjCClassMethod    = 10,
-  CXIdxEntity_ObjCProperty  = 11,
-  CXIdxEntity_ObjCIvar      = 12,
-  CXIdxEntity_Enum          = 13,
-  CXIdxEntity_Struct        = 14,
-  CXIdxEntity_Union         = 15,
-  CXIdxEntity_CXXClass              = 16,
-  CXIdxEntity_CXXNamespace          = 17,
-  CXIdxEntity_CXXNamespaceAlias     = 18,
-  CXIdxEntity_CXXStaticVariable     = 19,
-  CXIdxEntity_CXXStaticMethod       = 20,
-  CXIdxEntity_CXXInstanceMethod     = 21,
-  CXIdxEntity_CXXConstructor        = 22,
-  CXIdxEntity_CXXDestructor         = 23,
+  CXIdxEntity_ObjCClassMethod = 10,
+  CXIdxEntity_ObjCProperty = 11,
+  CXIdxEntity_ObjCIvar = 12,
+  CXIdxEntity_Enum = 13,
+  CXIdxEntity_Struct = 14,
+  CXIdxEntity_Union = 15,
+  CXIdxEntity_CXXClass = 16,
+  CXIdxEntity_CXXNamespace = 17,
+  CXIdxEntity_CXXNamespaceAlias = 18,
+  CXIdxEntity_CXXStaticVariable = 19,
+  CXIdxEntity_CXXStaticMethod = 20,
+  CXIdxEntity_CXXInstanceMethod = 21,
+  CXIdxEntity_CXXConstructor = 22,
+  CXIdxEntity_CXXDestructor = 23,
   CXIdxEntity_CXXConversionFunction = 24,
-  CXIdxEntity_CXXTypeAlias          = 25,
-  CXIdxEntity_CXXInterface          = 26
+  CXIdxEntity_CXXTypeAlias = 25,
+  CXIdxEntity_CXXInterface = 26
 } CXIdxEntityKind;
 typedef enum {
   CXIdxEntityLang_None = 0,
-  CXIdxEntityLang_C    = 1,
+  CXIdxEntityLang_C = 1,
   CXIdxEntityLang_ObjC = 2,
-  CXIdxEntityLang_CXX  = 3,
-  CXIdxEntityLang_Swift  = 4
+  CXIdxEntityLang_CXX = 3,
+  CXIdxEntityLang_Swift = 4
 } CXIdxEntityLanguage;
 typedef enum {
-  CXIdxEntity_NonTemplate   = 0,
-  CXIdxEntity_Template      = 1,
+  CXIdxEntity_NonTemplate = 0,
+  CXIdxEntity_Template = 1,
   CXIdxEntity_TemplatePartialSpecialization = 2,
   CXIdxEntity_TemplateSpecialization = 3
 } CXIdxEntityCXXTemplateKind;
 typedef enum {
-  CXIdxAttr_Unexposed     = 0,
-  CXIdxAttr_IBAction      = 1,
-  CXIdxAttr_IBOutlet      = 2,
+  CXIdxAttr_Unexposed = 0,
+  CXIdxAttr_IBAction = 1,
+  CXIdxAttr_IBOutlet = 2,
   CXIdxAttr_IBOutletCollection = 3
 } CXIdxAttrKind;
 typedef struct {
@@ -1883,9 +1854,7 @@ typedef struct {
   CXCursor classCursor;
   CXIdxLoc classLoc;
 } CXIdxIBOutletCollectionAttrInfo;
-typedef enum {
-  CXIdxDeclFlag_Skipped = 0x1
-} CXIdxDeclInfoFlags;
+typedef enum { CXIdxDeclFlag_Skipped = 0x1 } CXIdxDeclInfoFlags;
 typedef struct {
   const CXIdxEntityInfo *entityInfo;
   CXCursor cursor;
@@ -1984,10 +1953,9 @@ typedef struct {
 
   int (*abortQuery)(CXClientData client_data, void *reserved);
 
-  void (*diagnostic)(CXClientData client_data,
-                     CXDiagnosticSet, void *reserved);
-  CXIdxClientFile (*enteredMainFile)(CXClientData client_data,
-                                     CXFile mainFile, void *reserved);
+  void (*diagnostic)(CXClientData client_data, CXDiagnosticSet, void *reserved);
+  CXIdxClientFile (*enteredMainFile)(CXClientData client_data, CXFile mainFile,
+                                     void *reserved);
 
   CXIdxClientFile (*ppIncludedFile)(CXClientData client_data,
                                     const CXIdxIncludedFileInfo *);
@@ -1997,8 +1965,7 @@ typedef struct {
 
   CXIdxClientContainer (*startedTranslationUnit)(CXClientData client_data,
                                                  void *reserved);
-  void (*indexDeclaration)(CXClientData client_data,
-                           const CXIdxDeclInfo *);
+  void (*indexDeclaration)(CXClientData client_data, const CXIdxDeclInfo *);
 
   void (*indexEntityReference)(CXClientData client_data,
                                const CXIdxEntityRefInfo *);
@@ -2020,12 +1987,12 @@ clang_index_getIBOutletCollectionAttrInfo(const CXIdxAttrInfo *);
 clang_index_getCXXClassDeclInfo(const CXIdxDeclInfo *);
  CXIdxClientContainer
 clang_index_getClientContainer(const CXIdxContainerInfo *);
- void
-clang_index_setClientContainer(const CXIdxContainerInfo *,CXIdxClientContainer);
+ void clang_index_setClientContainer(const CXIdxContainerInfo *,
+                                                   CXIdxClientContainer);
  CXIdxClientEntity
 clang_index_getClientEntity(const CXIdxEntityInfo *);
- void
-clang_index_setClientEntity(const CXIdxEntityInfo *, CXIdxClientEntity);
+ void clang_index_setClientEntity(const CXIdxEntityInfo *,
+                                                CXIdxClientEntity);
 typedef void *CXIndexAction;
  CXIndexAction clang_IndexAction_create(CXIndex CIdx);
  void clang_IndexAction_dispose(CXIndexAction);
@@ -2043,41 +2010,30 @@ typedef enum {
 
   CXIndexOpt_SkipParsedBodiesInSession = 0x10
 } CXIndexOptFlags;
- int clang_indexSourceFile(CXIndexAction,
-                                         CXClientData client_data,
-                                         IndexerCallbacks *index_callbacks,
-                                         unsigned index_callbacks_size,
-                                         unsigned index_options,
-                                         const char *source_filename,
-                                         const char * const *command_line_args,
-                                         int num_command_line_args,
-                                         struct CXUnsavedFile *unsaved_files,
-                                         unsigned num_unsaved_files,
-                                         CXTranslationUnit *out_TU,
-                                         unsigned TU_options);
+ int clang_indexSourceFile(
+    CXIndexAction, CXClientData client_data, IndexerCallbacks *index_callbacks,
+    unsigned index_callbacks_size, unsigned index_options,
+    const char *source_filename, const char *const *command_line_args,
+    int num_command_line_args, struct CXUnsavedFile *unsaved_files,
+    unsigned num_unsaved_files, CXTranslationUnit *out_TU, unsigned TU_options);
  int clang_indexSourceFileFullArgv(
     CXIndexAction, CXClientData client_data, IndexerCallbacks *index_callbacks,
     unsigned index_callbacks_size, unsigned index_options,
     const char *source_filename, const char *const *command_line_args,
     int num_command_line_args, struct CXUnsavedFile *unsaved_files,
     unsigned num_unsaved_files, CXTranslationUnit *out_TU, unsigned TU_options);
- int clang_indexTranslationUnit(CXIndexAction,
-                                              CXClientData client_data,
-                                              IndexerCallbacks *index_callbacks,
-                                              unsigned index_callbacks_size,
-                                              unsigned index_options,
-                                              CXTranslationUnit);
+ int clang_indexTranslationUnit(
+    CXIndexAction, CXClientData client_data, IndexerCallbacks *index_callbacks,
+    unsigned index_callbacks_size, unsigned index_options, CXTranslationUnit);
  void clang_indexLoc_getFileLocation(CXIdxLoc loc,
                                                    CXIdxClientFile *indexFile,
-                                                   CXFile *file,
-                                                   unsigned *line,
+                                                   CXFile *file, unsigned *line,
                                                    unsigned *column,
                                                    unsigned *offset);
 CXSourceLocation clang_indexLoc_getCXSourceLocation(CXIdxLoc loc);
 typedef enum CXVisitorResult (*CXFieldVisitor)(CXCursor C,
                                                CXClientData client_data);
- unsigned clang_Type_visitFields(CXType T,
-                                               CXFieldVisitor visitor,
+ unsigned clang_Type_visitFields(CXType T, CXFieldVisitor visitor,
                                                CXClientData client_data);
 	]==========]
 return {}
