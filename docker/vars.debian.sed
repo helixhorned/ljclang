@@ -5,6 +5,7 @@ s/@install@/DEBIAN_FRONTEND=noninteractive apt install -y/g
 s/@luarocks@/luarocks/g
 s/$pkg_libc_dev/libc6-dev/g
 s/$pkg_libclang_dev/libclang-7-dev/g;  # Ancient, but let's give it a try
+s/$pkg_linux_headers//g;  # for ljremarkable; /usr/include/linux/fb.h comes with 'linux-libc-dev'
 s/$pkg_luarocks/luarocks/g
 s/$pkg_liblua51_dev/liblua5.1-0-dev/g
 s/@llvm_version@/7.0.1/g
