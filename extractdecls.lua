@@ -4,6 +4,8 @@ local arg = arg
 
 local require = require
 
+local ffi = require("ffi")
+
 local io = require("io")
 local os = require("os")
 local math = require("math")
@@ -218,7 +220,10 @@ elseif (moduleName) then
     --    it appears that *from within the C function implementing Lua print()*, there is an
     --    access to the global environment which then is not fulfilled.
     local env = getfenv(0)
-    setfenv(0, { check=assert, concat=table.concat, printf=printfMatch, type=type })
+    setfenv(0, {
+        check=assert, concat=table.concat, printf=printfMatch, type=type,
+        ffi = { os = ffi.os, arch = ffi.arch, abi = ffi.abi },
+    })
     moduleFunc = require(moduleName)
     setfenv(0, env)
 

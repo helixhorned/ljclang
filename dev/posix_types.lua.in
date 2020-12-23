@@ -47,6 +47,19 @@ struct pollfd {
 };
 ]]
 
+-- TODO: also check glibc vs musl?
+local buildFingerprint = ([[
+@@ -m dev.exdecl_system_fingerprint ./dev/sys.h
+]]):sub(1, -2)
+-- KEEPINSYNC exdecl_system_fingerprint.lua:
+local runFingerprint = ffi.os.."-"..ffi.arch
+if (buildFingerprint ~= runFingerprint) then
+    assert(false, [[
+Platform mismatch:
+  build=]]..buildFingerprint..[[ but
+    run=]]..runFingerprint)
+end
+
 -- Check that on our system, the structs we want to expose include *only* the members
 -- specified by POSIX.
 assert(ffi.sizeof("struct timeval") ==
