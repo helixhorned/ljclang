@@ -8,6 +8,7 @@ s/$pkg_libclang_dev/clang-dev/g
 s/$pkg_linux_headers/linux-headers/g;  # for ljremarkable: /usr/include/linux/fb.h
 s/$pkg_luarocks/luarocks5.1/g
 s/$pkg_liblua51_dev/lua5.1-dev/g
+s/$pkg_libxtst/libxtst/g
 s/@llvm_version@/10.0.0/g
 s|@llvm_incdir@|/usr/include|g
 s|@llvm_libdir@|/does-not-exist-and-not-relevant-here|g
