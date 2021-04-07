@@ -1,9 +1,6 @@
 #!/bin/false
 -- Usage: luajit -l mkapp <program>.lua [<args...>]
 
--- NOTE: relies on package.searchpath for its core functionality which is undocumented by
---  Lua 5.1 (and neither by LuaJIT, it seems)
-
 local assert = assert
 local print = print
 local require = require
@@ -144,12 +141,33 @@ end
 local haveBuiltinModule = {}
 local lastModuleWasBuiltin = false
 
+-- Roughly corresponds to the file searching part of the second loader described in Lua 5.1
+-- Reference Manual's `package.loaders` [1] and also the undocumented LuaJIT function
+-- package.searchpath() implemented in 'lj_cf_package_searchpath()' in 'src/lib_package.c'.
+--
+-- [1] https://www.lua.org/manual/5.1/manual.html#pdf-package.loaders
+local function searchpath(module, searchPath)
+    assert(type(module) == "string")
+    assert(type(searchPath) == "string")
+
+    module = module:gsub('%.', '/')
+
+    for template in searchPath:gmatch("[^;]+") do
+        local fileName = template:gsub("%?", module)
+        local f = open(fileName)
+        if (f ~= nil) then
+            f:close()
+            return fileName
+        end
+    end
+end
+
 _G.require = function(module)
     assert(type(module) == "string")
 
     level = level + 1
 
-    local fileName = package.searchpath(module, package.path)
+    local fileName = searchpath(module, package.path)
     local wasLoaded = (package.loaded[module] ~= nil)
 
     -- TODO: error/warn/have-option if not in current directory or beneath?
