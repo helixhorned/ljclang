@@ -86,9 +86,13 @@ _G.io.output = function(file)
     return (file ~= nil) and abortDisallowedFunction() or io_output(file)
 end
 
--- Be strict and disallowed a few other things.
+-- Be strict and disallow a few other functions.
 _G.io.popen = abortDisallowedFunction
 _G.os.execute = abortDisallowedFunction
+
+-- Also disallow loading C modules.
+package.loaders[3] = nil
+package.loaders[4] = nil
 
 ----------
 
