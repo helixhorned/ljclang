@@ -637,37 +637,35 @@ enum CXCursorKind {
 
   CXCursor_CXXFunctionalCastExpr = 128,
 
-  CXCursor_CXXAddrspaceCastExpr = 129,
+  CXCursor_CXXTypeidExpr = 129,
 
-  CXCursor_CXXTypeidExpr = 130,
+  CXCursor_CXXBoolLiteralExpr = 130,
 
-  CXCursor_CXXBoolLiteralExpr = 131,
+  CXCursor_CXXNullPtrLiteralExpr = 131,
 
-  CXCursor_CXXNullPtrLiteralExpr = 132,
+  CXCursor_CXXThisExpr = 132,
 
-  CXCursor_CXXThisExpr = 133,
+  CXCursor_CXXThrowExpr = 133,
 
-  CXCursor_CXXThrowExpr = 134,
+  CXCursor_CXXNewExpr = 134,
 
-  CXCursor_CXXNewExpr = 135,
+  CXCursor_CXXDeleteExpr = 135,
 
-  CXCursor_CXXDeleteExpr = 136,
+  CXCursor_UnaryExpr = 136,
 
-  CXCursor_UnaryExpr = 137,
+  CXCursor_ObjCStringLiteral = 137,
 
-  CXCursor_ObjCStringLiteral = 138,
+  CXCursor_ObjCEncodeExpr = 138,
 
-  CXCursor_ObjCEncodeExpr = 139,
+  CXCursor_ObjCSelectorExpr = 139,
 
-  CXCursor_ObjCSelectorExpr = 140,
+  CXCursor_ObjCProtocolExpr = 140,
 
-  CXCursor_ObjCProtocolExpr = 141,
+  CXCursor_ObjCBridgedCastExpr = 141,
 
-  CXCursor_ObjCBridgedCastExpr = 142,
+  CXCursor_PackExpansionExpr = 142,
 
-  CXCursor_PackExpansionExpr = 143,
-
-  CXCursor_SizeOfPackExpr = 144,
+  CXCursor_SizeOfPackExpr = 143,
   /* Represents a C++ lambda expression that produces a local function
    * object.
    *
@@ -680,22 +678,24 @@ enum CXCursorKind {
    * }
    * \endcode
    */
-  CXCursor_LambdaExpr = 145,
+  CXCursor_LambdaExpr = 144,
 
-  CXCursor_ObjCBoolLiteralExpr = 146,
+  CXCursor_ObjCBoolLiteralExpr = 145,
 
-  CXCursor_ObjCSelfExpr = 147,
+  CXCursor_ObjCSelfExpr = 146,
 
-  CXCursor_OMPArraySectionExpr = 148,
+  CXCursor_OMPArraySectionExpr = 147,
 
-  CXCursor_ObjCAvailabilityCheckExpr = 149,
+  CXCursor_ObjCAvailabilityCheckExpr = 148,
 
-  CXCursor_FixedPointLiteral = 150,
+  CXCursor_FixedPointLiteral = 149,
 
-  CXCursor_OMPArrayShapingExpr = 151,
+  CXCursor_OMPArrayShapingExpr = 150,
 
-  CXCursor_OMPIteratorExpr = 152,
-  CXCursor_LastExpr = CXCursor_OMPIteratorExpr,
+  CXCursor_OMPIteratorExpr = 151,
+
+  CXCursor_CXXAddrspaceCastExpr = 152,
+  CXCursor_LastExpr = CXCursor_CXXAddrspaceCastExpr,
   /* Statements */
   CXCursor_FirstStmt = 200,
 
@@ -1013,6 +1013,9 @@ typedef struct CXPlatformAvailability {
     CXPlatformAvailability *availability, int availability_size);
  void
 clang_disposeCXPlatformAvailability(CXPlatformAvailability *availability);
+ CXCursor clang_Cursor_getVarDeclInitializer(CXCursor cursor);
+ int clang_Cursor_hasVarDeclGlobalStorage(CXCursor cursor);
+ int clang_Cursor_hasVarDeclExternalStorage(CXCursor cursor);
 enum CXLanguageKind {
   CXLanguage_Invalid = 0,
   CXLanguage_C,
@@ -1270,7 +1273,9 @@ enum CXTypeNullabilityKind {
 
   CXTypeNullability_Unspecified = 2,
 
-  CXTypeNullability_Invalid = 3
+  CXTypeNullability_Invalid = 3,
+
+  CXTypeNullability_NullableResult = 4
 };
  enum CXTypeNullabilityKind clang_Type_getNullability(CXType T);
 enum CXTypeLayoutError {
