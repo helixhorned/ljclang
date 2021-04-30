@@ -78,10 +78,15 @@ various kinds of C declarations from (usually) headers and print them in
 various forms usable as FFI C declarations or descriptive tables with LuaJIT.
 
 ~~~~~~~~~~
-Usage: extractdecls.lua [our options...] <file.h> [-- [Clang command line args ...]]
+Usage:
+   extractdecls.lua [our options...] <file.h> [-- [Clang command line args ...]]
+
+(Our options may also come after the file name.)
+
 Exits with a non-zero code if there were errors or no match, or if filter
 patterns (-p) were provided and not all of them produced matches.
- (Our options may also come after the file name.)
+
+Options:
   -e <enumNameFilterPattern> (enums only)
   -p <filterPattern1> [-p <filterPattern2>] ... (logically OR'd)
   -x <excludePattern1> [-x <excludePattern2>] ...  (logically OR'd)
