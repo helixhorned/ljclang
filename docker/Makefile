@@ -290,7 +290,7 @@ ljclang-dev-ALL/ALL: ljclang-dev-arm32v7/ALL
 
 ljclang-dev-arm32v7/alpine:
 	+arch=arm32v7 distro=alpine && \
-	lj_sha256=d7ea745b7cf18e540ed48109f55a282d7958d7b295fd1d130aea65796e78a630 && \
+	lj_sha256=e59cbf6bc90c42bde7c6e550e89dc99cbbca7b3ae54be2a5f86538cd7478315a && \
 	$(check_or_make_image)
 
 ljclang-dev-arm32v7/debian:
@@ -321,7 +321,7 @@ ljclang-dev-ALL/ALL: ljclang-dev-arm64v8/ALL
 
 ljclang-dev-arm64v8/alpine:
 	+arch=arm64v8 distro=alpine && \
-	lj_sha256=ca2082d38a7f644e0b6a4405b038520f6915445ccd1f3e7c319bda72c697f77f && \
+	lj_sha256=5ecb4b3e408f70b4dd24df8c4434d1060978b6b5bf76e20f8eb40eab1bacce97 && \
 	$(check_or_make_image)
 
 ljclang-dev-arm64v8/debian:
@@ -341,7 +341,7 @@ ljclang-dev-ALL/ALL: ljclang-dev-amd64/ALL
 
 ljclang-dev-amd64/alpine:
 	+arch=amd64 distro=alpine && \
-	lj_sha256=4503b42c497a2a7b27a441585fe953610010791e9270a15927f9f51e5e17f375 && \
+	lj_sha256=34318accdea4fe7bc2904c297a528574646d830464fb63ac59f051d71da47eda && \
 	$(check_or_make_image)
 
 ljclang-dev-amd64/debian:
