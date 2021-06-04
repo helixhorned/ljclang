@@ -214,7 +214,8 @@ run:
 run-lj-sha-only:
 	@images=`$(get_sha_only_images_repo-tag)` && \
 	(test -n "$$images" || (echo "ERROR: no LJ_SHA-tagged images." 1>&2 && false)) && \
-	for i in $$images; do echo "$$i" && docker run --rm --entrypoint sha256sum "$$i" src/luajit; done
+	for i in $$images; do echo "$$i" && docker run --rm --entrypoint sha256sum "$$i" src/luajit 2>&1 | \
+	grep -v "WARNING: The requested image's platform "; done
 
 # For manual invocation when no other build is running:
 clean-all-temp:
