@@ -25,8 +25,12 @@ NOCACHE ?=
 # foreign-architecture images, see below.)
 LJ_SHA_ONLY ?=
 
-## Semi-private
+## Protected: for derivatives only
 
+# Prefix for files named '*.<distro>.arg', each required to contain lines
+# completely matching BUILD_ARGS_LINE_EREGEX below, after having comments
+# (whitespace followed by '#' until the end of a line) stripped.
+BUILD_ARGS_FILE_PREFIX ?=
 SUFFIX_DOCKERFILE_IN ?=
 OVERRIDE_IMAGE_NAME ?=
 OVERRIDE_IMAGE_TAG ?=
@@ -46,6 +50,27 @@ ifneq ($(SUFFIX_DOCKERFILE_IN),)
 endif
 
 ## Private
+
+BUILD_ARGS_LINE_EREGEX := '--build-arg [A-Za-z_-][A-Za-z_0-9-]*=[A-Za-z_0-9-]*'
+
+# For '(eval $(call ...))'.
+#  Argument: <distro>
+#  Effects: if $(BUILD_ARGS_FILE_PREFIX) is non-empty,
+#   1. Sets variable 'build_args_file_<distro>'.
+#   2. Reads contents of the so named file into variable 'build_args_<distro>',
+#    sanitizing its contents so that they are suitable as args to 'docker build'.
+#   (Otherwise, the two variables are set to the empty string.)
+define do_build_args =
+  build_args_file_$(1) := $$(if $$(BUILD_ARGS_FILE_PREFIX),$$(BUILD_ARGS_FILE_PREFIX).$(1).arg)
+  build_args_$(1) := $$(if $$(BUILD_ARGS_FILE_PREFIX),$$(shell \
+    sed 's/[[:space:]]*#.*//g' < $$(build_args_file_$(1)) | \
+    grep -E --line-regexp -- $(BUILD_ARGS_LINE_EREGEX)))
+endef
+
+$(eval $(call do_build_args,alpine))
+$(eval $(call do_build_args,debian))
+$(eval $(call do_build_args,ubuntu))
+$(eval $(call do_build_args,ubuntu-bionic))
 
 commit := $(shell git rev-parse --short=12 HEAD)
 tmproot := /dev/shm
@@ -260,7 +285,7 @@ _image_name = $(subst ljclang-dev,$(image_name_prefix),$@)
 _opts := $(if $(NOCACHE),--no-cache)
 #
 define _docker_build =
-  DOCKER_BUILDKIT=1 docker build $(_opts) --tag $(_image_name):$(image_tag) \
+  DOCKER_BUILDKIT=1 docker build $(_opts) $(call build_args_$(1)) --tag $(_image_name):$(image_tag) \
     -f "$$tmpdir/Dockerfile" "$$tmpdir/context"
 endef
 
@@ -275,14 +300,14 @@ endef
 #  short form for the internal variable) as well as a plain option without argument.
 define invoke_docker_build
   if expr match '$(MAKEFLAGS)' '[[:space:]]-j[0-9]*\>' > /dev/null; then \
-    $(_docker_build) > $$tmpdir/docker-build.log 2>&1; else $(_docker_build); \
+    $(call _docker_build,$(1)) > $$tmpdir/docker-build.log 2>&1; else $(call _docker_build,$(1)); \
   fi
 endef
 
 define check_or_make_image =
   test x`$(MAKE) --silent _get-exists ARCH=$(1) DISTRO=$(2)` = x'yes' || ( \
   tmpdir=`$(MAKE) --silent _get-tmpdir ARCH=$(1) DISTRO=$(2) LJ_SHA256=$(3)` && \
-  $(invoke_docker_build))
+  $(call invoke_docker_build,$(2)))
 endef
 
 ifneq ($(canRunArm32),)
