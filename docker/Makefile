@@ -280,8 +280,8 @@ define invoke_docker_build
 endef
 
 define check_or_make_image =
-  test x`$(MAKE) --silent _get-exists ARCH=$$arch DISTRO=$$distro` = x'yes' || ( \
-  tmpdir=`$(MAKE) --silent _get-tmpdir ARCH=$$arch DISTRO=$$distro LJ_SHA256=$$lj_sha256` && \
+  test x`$(MAKE) --silent _get-exists ARCH=$(1) DISTRO=$(2)` = x'yes' || ( \
+  tmpdir=`$(MAKE) --silent _get-tmpdir ARCH=$(1) DISTRO=$(2) LJ_SHA256=$(3)` && \
   $(invoke_docker_build))
 endef
 
@@ -290,14 +290,10 @@ ljclang-dev-arm32v7/ALL: ljclang-dev-arm32v7/alpine ljclang-dev-arm32v7/debian l
 ljclang-dev-ALL/ALL: ljclang-dev-arm32v7/ALL
 
 ljclang-dev-arm32v7/alpine:
-	+arch=arm32v7 distro=alpine && \
-	lj_sha256=210a29ec58ea1106d9b7ce5c1e7119765f37efe2083597a0d9a3b93826c0df2f && \
-	$(check_or_make_image)
+	+$(call check_or_make_image,arm32v7,alpine,210a29ec58ea1106d9b7ce5c1e7119765f37efe2083597a0d9a3b93826c0df2f)
 
 ljclang-dev-arm32v7/debian:
-	+arch=arm32v7 distro=debian && \
-	lj_sha256=997e43f97bd60567f48a9a79b8bb36b100f0140bf38f315424ff12aade8295a7 && \
-	$(check_or_make_image)
+	+$(call check_or_make_image,arm32v7,debian,997e43f97bd60567f48a9a79b8bb36b100f0140bf38f315424ff12aade8295a7)
 
 # NOTE: when building the Docker on an RPi OS (32-bit) host, can get
 #  "GPG error (...) invalid signature" / "repository (...) not signed".
@@ -305,15 +301,11 @@ ljclang-dev-arm32v7/debian:
 #   https://askubuntu.com/questions/1263284/apt-update-throws-signature-error-in-ubuntu-20-04-container-on-arm
 #   https://github.com/moby/moby/issues/40734
 ljclang-dev-arm32v7/ubuntu:
-	+arch=arm32v7 distro=ubuntu && \
-	lj_sha256=5e63d39a0cf552eced82493b5867fe167b88fd88eb73ab08b9b3223d64eee097 && \
-	$(check_or_make_image)
+	+$(call check_or_make_image,arm32v7,ubuntu,5e63d39a0cf552eced82493b5867fe167b88fd88eb73ab08b9b3223d64eee097)
 #
 # Docker image of Ubuntu 18.04 as a workaround for the above issue.
 ljclang-dev-arm32v7/ubuntu-bionic:
-	+arch=arm32v7 distro=ubuntu-bionic && \
-	lj_sha256=59a68aad64cd95aac7ae8228a41c40d205ddfddbd17ebedea0e4881f9182d106 && \
-	$(check_or_make_image)
+	+$(call check_or_make_image,arm32v7,ubuntu-bionic,59a68aad64cd95aac7ae8228a41c40d205ddfddbd17ebedea0e4881f9182d106)
 endif
 
 ifneq ($(canRunArm64),)
@@ -321,19 +313,13 @@ ljclang-dev-arm64v8/ALL: ljclang-dev-arm64v8/alpine ljclang-dev-arm64v8/debian l
 ljclang-dev-ALL/ALL: ljclang-dev-arm64v8/ALL
 
 ljclang-dev-arm64v8/alpine:
-	+arch=arm64v8 distro=alpine && \
-	lj_sha256=0ec015988537bdace4e156692b779860eba80b224b9981863d345e765d89e67e && \
-	$(check_or_make_image)
+	+$(call check_or_make_image,arm64v8,alpine,0ec015988537bdace4e156692b779860eba80b224b9981863d345e765d89e67e)
 
 ljclang-dev-arm64v8/debian:
-	+arch=arm64v8 distro=debian && \
-	lj_sha256=495b384acc1ddf7782c7def1a810aa2a4f8cb1584dd5075f69eca3fd342ee669 && \
-	$(check_or_make_image)
+	+$(call check_or_make_image,arm64v8,debian,495b384acc1ddf7782c7def1a810aa2a4f8cb1584dd5075f69eca3fd342ee669)
 
 ljclang-dev-arm64v8/ubuntu:
-	+arch=arm64v8 distro=ubuntu && \
-	lj_sha256=7e2e82e1cff0a1a1e09e1bcd468a607a2125a55c8aabdfe0a57b1e78766a8648 && \
-	$(check_or_make_image)
+	+$(call check_or_make_image,arm64v8,ubuntu,7e2e82e1cff0a1a1e09e1bcd468a607a2125a55c8aabdfe0a57b1e78766a8648)
 endif
 
 ifneq ($(canRunAmd64),)
@@ -341,17 +327,11 @@ ljclang-dev-amd64/ALL: ljclang-dev-amd64/alpine ljclang-dev-amd64/debian ljclang
 ljclang-dev-ALL/ALL: ljclang-dev-amd64/ALL
 
 ljclang-dev-amd64/alpine:
-	+arch=amd64 distro=alpine && \
-	lj_sha256=59e00011107b8e9493431a4f743a52f57375a98da7488f4afa3160ab388b8cd4 && \
-	$(check_or_make_image)
+	+$(call check_or_make_image,amd64,alpine,59e00011107b8e9493431a4f743a52f57375a98da7488f4afa3160ab388b8cd4)
 
 ljclang-dev-amd64/debian:
-	+arch=amd64 distro=debian && \
-	lj_sha256=1eff527fb0c19539be4d45b880647f5c33783a9249ef64089a7d6e4dba1f6a95 && \
-	$(check_or_make_image)
+	+$(call check_or_make_image,amd64,debian,1eff527fb0c19539be4d45b880647f5c33783a9249ef64089a7d6e4dba1f6a95)
 
 ljclang-dev-amd64/ubuntu:
-	+arch=amd64 distro=ubuntu && \
-	lj_sha256=ca52d60484ff3d1c0804bff83c0a605adc562ea16ad13fe3458672e5b098cea7 && \
-	$(check_or_make_image)
+	+$(call check_or_make_image,amd64,ubuntu,ca52d60484ff3d1c0804bff83c0a605adc562ea16ad13fe3458672e5b098cea7)
 endif
