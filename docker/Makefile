@@ -51,7 +51,8 @@ endif
 
 ## Private
 
-BUILD_ARGS_LINE_SEDCMD := 's/[[:space:]]*#.*//g'
+# NOTE: '\x23' is '#'. GNU Make 4.2.1 of Raspberry Pi OS has issues with the latter.
+BUILD_ARGS_LINE_SEDCMD := 's/[[:space:]]*\x23.*//g'
 BUILD_ARGS_LINE_EREGEX := '--build-arg [A-Za-z_-][A-Za-z_0-9-]*=[A-Za-z_0-9-]*'
 
 # For '(eval $(call ...))'.
