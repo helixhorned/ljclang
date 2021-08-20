@@ -51,6 +51,7 @@ endif
 
 ## Private
 
+BUILD_ARGS_LINE_SEDCMD := 's/[[:space:]]*#.*//g'
 BUILD_ARGS_LINE_EREGEX := '--build-arg [A-Za-z_-][A-Za-z_0-9-]*=[A-Za-z_0-9-]*'
 
 # For '(eval $(call ...))'.
@@ -63,7 +64,7 @@ BUILD_ARGS_LINE_EREGEX := '--build-arg [A-Za-z_-][A-Za-z_0-9-]*=[A-Za-z_0-9-]*'
 define do_build_args =
   build_args_file_$(1) := $$(if $$(BUILD_ARGS_FILE_PREFIX),$$(BUILD_ARGS_FILE_PREFIX).$(1).arg)
   build_args_$(1) := $$(if $$(BUILD_ARGS_FILE_PREFIX),$$(shell \
-    sed 's/[[:space:]]*#.*//g' < $$(build_args_file_$(1)) | \
+    sed $(BUILD_ARGS_LINE_SEDCMD) < $$(build_args_file_$(1)) | \
     grep -E --line-regexp -- $(BUILD_ARGS_LINE_EREGEX)))
 endef
 
