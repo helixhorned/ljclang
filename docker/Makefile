@@ -317,7 +317,7 @@ ljclang-dev-arm32v7/ALL: ljclang-dev-arm32v7/alpine ljclang-dev-arm32v7/debian l
 ljclang-dev-ALL/ALL: ljclang-dev-arm32v7/ALL
 
 ljclang-dev-arm32v7/alpine:
-	+$(call check_or_make_image,arm32v7,alpine,f836630aafcabd10de777c73f15feade25a1177bc26e0c2f6015020ba3ebb9ae)
+	+$(call check_or_make_image,arm32v7,alpine,89cb879e9bdff28cffb1f184c4760664b208c8045acfcf6a733d7e3162bab99a)
 
 ljclang-dev-arm32v7/debian:
 	+$(call check_or_make_image,arm32v7,debian,61643eefa47c897b5e8c8e9d193ddb4200a303dc7cecb548e8ff48e443ca780b)
@@ -340,7 +340,7 @@ ljclang-dev-arm64v8/ALL: ljclang-dev-arm64v8/alpine ljclang-dev-arm64v8/debian l
 ljclang-dev-ALL/ALL: ljclang-dev-arm64v8/ALL
 
 ljclang-dev-arm64v8/alpine:
-	+$(call check_or_make_image,arm64v8,alpine,23700e5dac531f99c159fb6856f2a6bd161730f06d35a73aa9b72772a91e8140)
+	+$(call check_or_make_image,arm64v8,alpine,363ee14f93615c1943d0485d9f8795ab8dbf4861ce0158146276e4f9fdab3377)
 
 ljclang-dev-arm64v8/debian:
 	+$(call check_or_make_image,arm64v8,debian,d163b0bc9abf725e6fddb0a6860e867b9dc3d2233ebc4dea38902d6d96a8bc3b)
@@ -354,7 +354,7 @@ ljclang-dev-amd64/ALL: ljclang-dev-amd64/alpine ljclang-dev-amd64/debian ljclang
 ljclang-dev-ALL/ALL: ljclang-dev-amd64/ALL
 
 ljclang-dev-amd64/alpine:
-	+$(call check_or_make_image,amd64,alpine,26c71ae76df54abddd3f0dd709e37a357d46efb3f271d1c3671d6dc097a3991f)
+	+$(call check_or_make_image,amd64,alpine,2f58f3cc2f03d4ca1142f9d6699057b355d5f542c81ab5e08f0ce4314ffbd624)
 
 ljclang-dev-amd64/debian:
 	+$(call check_or_make_image,amd64,debian,b7d5cddbef2165fe7b24a7d586f2e4f90bc5da8d8c93e85fd699a82523fb0751)
