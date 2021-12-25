@@ -320,7 +320,7 @@ ljclang-dev-arm32v7/alpine:
 	+$(call check_or_make_image,arm32v7,alpine,f836630aafcabd10de777c73f15feade25a1177bc26e0c2f6015020ba3ebb9ae)
 
 ljclang-dev-arm32v7/debian:
-	+$(call check_or_make_image,arm32v7,debian,997e43f97bd60567f48a9a79b8bb36b100f0140bf38f315424ff12aade8295a7)
+	+$(call check_or_make_image,arm32v7,debian,61643eefa47c897b5e8c8e9d193ddb4200a303dc7cecb548e8ff48e443ca780b)
 
 # NOTE: when building the Docker on an RPi OS (32-bit) host, can get
 #  "GPG error (...) invalid signature" / "repository (...) not signed".
@@ -343,7 +343,7 @@ ljclang-dev-arm64v8/alpine:
 	+$(call check_or_make_image,arm64v8,alpine,23700e5dac531f99c159fb6856f2a6bd161730f06d35a73aa9b72772a91e8140)
 
 ljclang-dev-arm64v8/debian:
-	+$(call check_or_make_image,arm64v8,debian,495b384acc1ddf7782c7def1a810aa2a4f8cb1584dd5075f69eca3fd342ee669)
+	+$(call check_or_make_image,arm64v8,debian,d163b0bc9abf725e6fddb0a6860e867b9dc3d2233ebc4dea38902d6d96a8bc3b)
 
 ljclang-dev-arm64v8/ubuntu:
 	+$(call check_or_make_image,arm64v8,ubuntu,7e2e82e1cff0a1a1e09e1bcd468a607a2125a55c8aabdfe0a57b1e78766a8648)
@@ -357,7 +357,7 @@ ljclang-dev-amd64/alpine:
 	+$(call check_or_make_image,amd64,alpine,26c71ae76df54abddd3f0dd709e37a357d46efb3f271d1c3671d6dc097a3991f)
 
 ljclang-dev-amd64/debian:
-	+$(call check_or_make_image,amd64,debian,1eff527fb0c19539be4d45b880647f5c33783a9249ef64089a7d6e4dba1f6a95)
+	+$(call check_or_make_image,amd64,debian,b7d5cddbef2165fe7b24a7d586f2e4f90bc5da8d8c93e85fd699a82523fb0751)
 
 ljclang-dev-amd64/ubuntu:
 	+$(call check_or_make_image,amd64,ubuntu,ca52d60484ff3d1c0804bff83c0a605adc562ea16ad13fe3458672e5b098cea7)
