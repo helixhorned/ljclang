@@ -127,8 +127,9 @@ canRun = $(or $(call canRunNatively,$(1)),$(call canRunEmulated,$(1)))
 ARCH ?= null
 DISTRO ?= null
 # Check out a specific LuaJIT commit:
-#  "Prevent compile of __concat with tailcall to fast function."
-LJ_GIT_HASH := 75ee3a6159f1831fa57992df3caf5a2c303c281a
+#  "Merge branch 'master' into v2.1" after
+#  "Prevent CSE of a REF_BASE operand across IR_RETF."
+LJ_GIT_HASH := a91d0d9d3bba1a936669cfac3244509a0f2ac0e3
 LJ_SHA256 ?= null
 #
 qemu_suffix :=
@@ -317,10 +318,10 @@ ljclang-dev-arm32v7/ALL: ljclang-dev-arm32v7/alpine ljclang-dev-arm32v7/debian l
 ljclang-dev-ALL/ALL: ljclang-dev-arm32v7/ALL
 
 ljclang-dev-arm32v7/alpine:
-	+$(call check_or_make_image,arm32v7,alpine,89cb879e9bdff28cffb1f184c4760664b208c8045acfcf6a733d7e3162bab99a)
+	+$(call check_or_make_image,arm32v7,alpine,1bdc6620c81ced7e45b9e9bc6ee7d3d0dbe57a7daa08006318b1442116b5aa94)
 
 ljclang-dev-arm32v7/debian:
-	+$(call check_or_make_image,arm32v7,debian,61643eefa47c897b5e8c8e9d193ddb4200a303dc7cecb548e8ff48e443ca780b)
+	+$(call check_or_make_image,arm32v7,debian,5e8f6a8dc1e75478b796ef1e8378a168cd8c5935e93f4af4d59af3d6c373c7b2)
 
 # NOTE: when building the Docker on an RPi OS (32-bit) host, can get
 #  "GPG error (...) invalid signature" / "repository (...) not signed".
@@ -328,11 +329,11 @@ ljclang-dev-arm32v7/debian:
 #   https://askubuntu.com/questions/1263284/apt-update-throws-signature-error-in-ubuntu-20-04-container-on-arm
 #   https://github.com/moby/moby/issues/40734
 ljclang-dev-arm32v7/ubuntu:
-	+$(call check_or_make_image,arm32v7,ubuntu,5e63d39a0cf552eced82493b5867fe167b88fd88eb73ab08b9b3223d64eee097)
+	+$(call check_or_make_image,arm32v7,ubuntu,986a80caf79e2839a78c693d5c6f3db52e120f3398b9d50cecfb8890560c055c)
 #
 # Docker image of Ubuntu 18.04 as a workaround for the above issue.
 ljclang-dev-arm32v7/ubuntu-bionic:
-	+$(call check_or_make_image,arm32v7,ubuntu-bionic,59a68aad64cd95aac7ae8228a41c40d205ddfddbd17ebedea0e4881f9182d106)
+	+$(call check_or_make_image,arm32v7,ubuntu-bionic,7b9faea3204fc08b7896f730dcf20a26ddb2d254e2a15d1ba47a0e8d370836e0)
 endif
 
 ifneq ($(canRunArm64),)
@@ -340,13 +341,13 @@ ljclang-dev-arm64v8/ALL: ljclang-dev-arm64v8/alpine ljclang-dev-arm64v8/debian l
 ljclang-dev-ALL/ALL: ljclang-dev-arm64v8/ALL
 
 ljclang-dev-arm64v8/alpine:
-	+$(call check_or_make_image,arm64v8,alpine,363ee14f93615c1943d0485d9f8795ab8dbf4861ce0158146276e4f9fdab3377)
+	+$(call check_or_make_image,arm64v8,alpine,2338dbcf2decd457ebc6a68d6b7ebcf636c864c3e5f0f65039afda062815de7a)
 
 ljclang-dev-arm64v8/debian:
-	+$(call check_or_make_image,arm64v8,debian,d163b0bc9abf725e6fddb0a6860e867b9dc3d2233ebc4dea38902d6d96a8bc3b)
+	+$(call check_or_make_image,arm64v8,debian,725ebe683e5041a75a7a540f7772fc1b0ecf62f70229d27eefa4d8df8a3ea2df)
 
 ljclang-dev-arm64v8/ubuntu:
-	+$(call check_or_make_image,arm64v8,ubuntu,7e2e82e1cff0a1a1e09e1bcd468a607a2125a55c8aabdfe0a57b1e78766a8648)
+	+$(call check_or_make_image,arm64v8,ubuntu,f9e17e8a94ed863fe02a2eaf6908ece89d0ff7271b7cf5d11bc16b726c1f2190)
 endif
 
 ifneq ($(canRunAmd64),)
@@ -354,11 +355,11 @@ ljclang-dev-amd64/ALL: ljclang-dev-amd64/alpine ljclang-dev-amd64/debian ljclang
 ljclang-dev-ALL/ALL: ljclang-dev-amd64/ALL
 
 ljclang-dev-amd64/alpine:
-	+$(call check_or_make_image,amd64,alpine,2f58f3cc2f03d4ca1142f9d6699057b355d5f542c81ab5e08f0ce4314ffbd624)
+	+$(call check_or_make_image,amd64,alpine,e497fdca4101def3ca64136d8d080423a871563da2a0179aaf6985275059d26a)
 
 ljclang-dev-amd64/debian:
-	+$(call check_or_make_image,amd64,debian,b7d5cddbef2165fe7b24a7d586f2e4f90bc5da8d8c93e85fd699a82523fb0751)
+	+$(call check_or_make_image,amd64,debian,e3dd74c4961e8127e8fc4f73ba0660087db9f498b2fe8fd232e5cf1ebdf0c847)
 
 ljclang-dev-amd64/ubuntu:
-	+$(call check_or_make_image,amd64,ubuntu,ca52d60484ff3d1c0804bff83c0a605adc562ea16ad13fe3458672e5b098cea7)
+	+$(call check_or_make_image,amd64,ubuntu,7a1ac895515c4bc3a0362b9ad88befede8d9079b3eb56cdc78984b2ff1b8cd44)
 endif
