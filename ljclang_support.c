@@ -1,5 +1,5 @@
 // Support library for LJClang.
-// Copyright (C) 2013-2020 Philipp Kutin
+// Copyright (C) 2013-2022 Philipp Kutin
 // See LICENSE for license information.
 
 #include <clang-c/Index.h>
