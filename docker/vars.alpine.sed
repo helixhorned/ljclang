@@ -1,4 +1,4 @@
-s/@DISTRO_IMAGE@/alpine:3.15.0/g
+s/@DISTRO_IMAGE@/alpine:3.15.6/g
 s/@DO_update_packages@//g
 s/@adduser@/adduser -D/g
 s/@install@/apk add/g

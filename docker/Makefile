@@ -329,7 +329,7 @@ ljclang-dev-arm32v7/debian:
 #   https://askubuntu.com/questions/1263284/apt-update-throws-signature-error-in-ubuntu-20-04-container-on-arm
 #   https://github.com/moby/moby/issues/40734
 ljclang-dev-arm32v7/ubuntu:
-	+$(call check_or_make_image,arm32v7,ubuntu,986a80caf79e2839a78c693d5c6f3db52e120f3398b9d50cecfb8890560c055c)
+	+$(call check_or_make_image,arm32v7,ubuntu,abcd6ead7a3fb37b405fac9d3a45dbfe0dda6f3d5d192e898f1db45e8f9f3158)
 #
 # Docker image of Ubuntu 18.04 as a workaround for the above issue.
 ljclang-dev-arm32v7/ubuntu-bionic:
@@ -347,7 +347,7 @@ ljclang-dev-arm64v8/debian:
 	+$(call check_or_make_image,arm64v8,debian,725ebe683e5041a75a7a540f7772fc1b0ecf62f70229d27eefa4d8df8a3ea2df)
 
 ljclang-dev-arm64v8/ubuntu:
-	+$(call check_or_make_image,arm64v8,ubuntu,f9e17e8a94ed863fe02a2eaf6908ece89d0ff7271b7cf5d11bc16b726c1f2190)
+	+$(call check_or_make_image,arm64v8,ubuntu,467e974202833ac92407701075004fe3078a28921f362bf016be7a32ea2c707f)
 endif
 
 ifneq ($(canRunAmd64),)
@@ -361,5 +361,5 @@ ljclang-dev-amd64/debian:
 	+$(call check_or_make_image,amd64,debian,e3dd74c4961e8127e8fc4f73ba0660087db9f498b2fe8fd232e5cf1ebdf0c847)
 
 ljclang-dev-amd64/ubuntu:
-	+$(call check_or_make_image,amd64,ubuntu,7a1ac895515c4bc3a0362b9ad88befede8d9079b3eb56cdc78984b2ff1b8cd44)
+	+$(call check_or_make_image,amd64,ubuntu,ec502ecc513a6f1f21d6ef6fe47c94769eac7b96b896b4f6d071a813d6433e8d)
 endif
