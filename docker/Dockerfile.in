@@ -21,7 +21,7 @@ WORKDIR /home/user
 # Make sure that a fast-forward re-clones the repo:
 RUN echo @LUAJIT_GIT_HASH@
 RUN git clone https://github.com/LuaJIT/LuaJIT.git \
-    --single-branch --branch=v2.1 --shallow-since=2020-08-01 \
+    --single-branch --branch=v2.1 --shallow-since=2022-08-01 \
     ./luajit-2.1
 RUN (cd luajit-2.1 && git checkout @LUAJIT_GIT_HASH@)
 
