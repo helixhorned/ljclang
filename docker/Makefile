@@ -320,7 +320,7 @@ ljclang-dev-arm32v7/alpine:
 	+$(call check_or_make_image,arm32v7,alpine,11319a15a4ad0e1d0586a2511bcd2cd3b0add690aba54e3bd1559f6c3ff15ed9)
 
 ljclang-dev-arm32v7/debian:
-	+$(call check_or_make_image,arm32v7,debian,64fa8c66291415f9fb8ce2a7ede15ce1c1c27a7fe53033e2a83b532a2e91e751)
+	+$(call check_or_make_image,arm32v7,debian,0c4d10fa88e6c2e78ead2ad2f92f5cdfed310f3e8e8c2de43c67d7a5ed4c46c5)
 
 # NOTE: when building the Docker on an RPi OS (32-bit) host, can get
 #  "GPG error (...) invalid signature" / "repository (...) not signed".
