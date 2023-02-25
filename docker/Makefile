@@ -318,7 +318,7 @@ ljclang-dev-arm32v7/ALL: ljclang-dev-arm32v7/alpine ljclang-dev-arm32v7/debian l
 ljclang-dev-ALL/ALL: ljclang-dev-arm32v7/ALL
 
 ljclang-dev-arm32v7/alpine:
-	+$(call check_or_make_image,arm32v7,alpine,fcaf58ac192f64f860ab790ff699473cc72b858a1a32cb533327a3dda1b2957b)
+	+$(call check_or_make_image,arm32v7,alpine,TODO)
 
 ljclang-dev-arm32v7/debian:
 	+$(call check_or_make_image,arm32v7,debian,a649bc28b5e5cbc1988c7b7bf33ec5450bd149bf00d4688edaaa6ccc048c31d2)
@@ -329,7 +329,7 @@ ljclang-dev-arm32v7/debian:
 #   https://askubuntu.com/questions/1263284/apt-update-throws-signature-error-in-ubuntu-20-04-container-on-arm
 #   https://github.com/moby/moby/issues/40734
 ljclang-dev-arm32v7/ubuntu:
-	+$(call check_or_make_image,arm32v7,ubuntu,2ddfa6edfbf8fe0b7c40f51d714bb671d92fb0256bacd4439ab9ec370d5e4b06)
+	+$(call check_or_make_image,arm32v7,ubuntu,TODO)
 #
 # Docker image of Ubuntu 18.04 as a workaround for the above issue.
 ljclang-dev-arm32v7/ubuntu-bionic:
@@ -341,13 +341,13 @@ ljclang-dev-arm64v8/ALL: ljclang-dev-arm64v8/alpine ljclang-dev-arm64v8/debian l
 ljclang-dev-ALL/ALL: ljclang-dev-arm64v8/ALL
 
 ljclang-dev-arm64v8/alpine:
-	+$(call check_or_make_image,arm64v8,alpine,d6111f801dd2a9fab68db79a7a0d1ab8b16744498ad6619a5b4cf875f1cc47ff)
+	+$(call check_or_make_image,arm64v8,alpine,TODO)
 
 ljclang-dev-arm64v8/debian:
 	+$(call check_or_make_image,arm64v8,debian,bdf473f287b8e20364b99c8ef374e487b67c1379ccefb0b699f308f6c795e05e)
 
 ljclang-dev-arm64v8/ubuntu:
-	+$(call check_or_make_image,arm64v8,ubuntu,65a1991f658060f485c0c0ae5453c4955a19d978924961cdb63b9dcf8685682c)
+	+$(call check_or_make_image,arm64v8,ubuntu,TODO)
 endif
 
 ifneq ($(canRunAmd64),)
@@ -355,11 +355,11 @@ ljclang-dev-amd64/ALL: ljclang-dev-amd64/alpine ljclang-dev-amd64/debian ljclang
 ljclang-dev-ALL/ALL: ljclang-dev-amd64/ALL
 
 ljclang-dev-amd64/alpine:
-	+$(call check_or_make_image,amd64,alpine,14615b356c1f15c77e73d3c0692ba1c9cfb7700b8ef4a19ddbd09c31e28747aa)
+	+$(call check_or_make_image,amd64,alpine,5cc6e02b81692c28e667e06f5977812ece1e0c84f8576486c04cbcc93c69879c)
 
 ljclang-dev-amd64/debian:
 	+$(call check_or_make_image,amd64,debian,7755777e17c41d4fbf00096537b46035a7447655fecd3f868b8ef965bc3bb88a)
 
 ljclang-dev-amd64/ubuntu:
-	+$(call check_or_make_image,amd64,ubuntu,dbb468e539f85ba012417dca9af8cf81c1767c7a0ab5cd44afda57f631091c80)
+	+$(call check_or_make_image,amd64,ubuntu,005a45d081440c3da3bb8751628e3c7b5b1490e0e3fe12fd726ec8c60d29970b)
 endif
