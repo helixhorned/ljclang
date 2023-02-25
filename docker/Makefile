@@ -128,8 +128,8 @@ ARCH ?= null
 DISTRO ?= null
 # Check out a specific LuaJIT commit:
 #  "Merge branch 'master' into v2.1" after
-#  "Correct fix for stack check when recording BC_VARG."
-LJ_GIT_HASH := 8625eee71f16a3a780ec92bc303c17456efc7fb3
+#  "Improve error reporting on stack overflow."
+LJ_GIT_HASH := 505e2c03de35e2718eef0d2d3660712e06dadf1f
 LJ_SHA256 ?= null
 #
 qemu_suffix :=
@@ -321,7 +321,7 @@ ljclang-dev-arm32v7/alpine:
 	+$(call check_or_make_image,arm32v7,alpine,TODO)
 
 ljclang-dev-arm32v7/debian:
-	+$(call check_or_make_image,arm32v7,debian,a649bc28b5e5cbc1988c7b7bf33ec5450bd149bf00d4688edaaa6ccc048c31d2)
+	+$(call check_or_make_image,arm32v7,debian,TODO)
 
 # NOTE: when building the Docker on an RPi OS (32-bit) host, can get
 #  "GPG error (...) invalid signature" / "repository (...) not signed".
@@ -333,7 +333,7 @@ ljclang-dev-arm32v7/ubuntu:
 #
 # Docker image of Ubuntu 18.04 as a workaround for the above issue.
 ljclang-dev-arm32v7/ubuntu-bionic:
-	+$(call check_or_make_image,arm32v7,ubuntu-bionic,adffbf7d30923e9d628db2e4486b3332fbb952f5ed751e72f52f8f7403007a52)
+	+$(call check_or_make_image,arm32v7,ubuntu-bionic,TODO)
 endif
 
 ifneq ($(canRunArm64),)
@@ -344,7 +344,7 @@ ljclang-dev-arm64v8/alpine:
 	+$(call check_or_make_image,arm64v8,alpine,TODO)
 
 ljclang-dev-arm64v8/debian:
-	+$(call check_or_make_image,arm64v8,debian,bdf473f287b8e20364b99c8ef374e487b67c1379ccefb0b699f308f6c795e05e)
+	+$(call check_or_make_image,arm64v8,debian,TODO)
 
 ljclang-dev-arm64v8/ubuntu:
 	+$(call check_or_make_image,arm64v8,ubuntu,TODO)
@@ -355,11 +355,11 @@ ljclang-dev-amd64/ALL: ljclang-dev-amd64/alpine ljclang-dev-amd64/debian ljclang
 ljclang-dev-ALL/ALL: ljclang-dev-amd64/ALL
 
 ljclang-dev-amd64/alpine:
-	+$(call check_or_make_image,amd64,alpine,5cc6e02b81692c28e667e06f5977812ece1e0c84f8576486c04cbcc93c69879c)
+	+$(call check_or_make_image,amd64,alpine,cfe248530ade3b997a6815f6382b569049b74b9a52af49d88f8ee0434351e273)
 
 ljclang-dev-amd64/debian:
-	+$(call check_or_make_image,amd64,debian,7755777e17c41d4fbf00096537b46035a7447655fecd3f868b8ef965bc3bb88a)
+	+$(call check_or_make_image,amd64,debian,e83864f559fa1e392b1891216e30be03ad842aaa37a696b474393bf5460e1c77)
 
 ljclang-dev-amd64/ubuntu:
-	+$(call check_or_make_image,amd64,ubuntu,005a45d081440c3da3bb8751628e3c7b5b1490e0e3fe12fd726ec8c60d29970b)
+	+$(call check_or_make_image,amd64,ubuntu,6fbe7d859d3f24199c6cc0f4ea84698532d3359a2f23e68f3e037bec0b1a886b)
 endif
