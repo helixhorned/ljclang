@@ -73,6 +73,7 @@ RUN sed -i 's|bindir :=.*|bindir := /does-not-exist-and-not-relevant-here|' ./Ma
 RUN sed -i 's|incdir :=.*|incdir := @llvm_incdir@|' ./Makefile
 RUN sed -i 's|libdir :=.*|libdir := @llvm_libdir@|' ./Makefile
 
+RUN touch ./dev/createheader.lua  # force re-generation of 'ljclang_Index_h.lua'
 RUN make apps
 
 # Run the LJClang tests.
