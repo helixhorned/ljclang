@@ -49,7 +49,7 @@ describe("posix.lua", function()
     it("tests Dir", function()
         local dir = posix.Dir("./test_data")
 
-        local ExpectedFileCount = 5
+        local ExpectedFileCount = 7
         local haveFile = {}
 
         for i = 1, ExpectedFileCount + 2 do
@@ -790,34 +790,26 @@ describe2("Cross-referencing", function(createTU)
 end)
 
 local function testMangling(createTU)
-    local tu = GetTU(createTU, "dev/empty.cpp", 0,
-                     {"-std=c++11", "-include", "thread",
-                      "-isystem", llvm_libdir_include},
+    local tu = GetTU(createTU, "test_data/mangling.cpp", 0,
+                     {"-std=c++17", "-isystem", llvm_libdir_include},
                      {"Incomplete", "SkipFunctionBodies"})
 
     local V = cl.ChildVisitResult
     local mangling = nil
 
     tu:cursor():children(function(cur)
-        if (cur:kind() == "Namespace" and cur:name() == "std") then
+        if (cur:kind() == "Namespace" and cur:name() == "LJClang") then
             return V.Recurse
-        elseif (cur:kind() == "ClassDecl" and cur:name() == "thread") then
+        elseif (cur:kind() == "ClassDecl" and cur:name() == "TestClass") then
             return V.Recurse
-        elseif (cur:kind() == "CXXMethod" and cur:name() == "hardware_concurrency") then
+        elseif (cur:kind() == "CXXMethod" and cur:name() == "testFunction") then
             mangling = cur:mangling()
         end
 
         return V.Continue
     end)
 
-    assert.is_true(type(mangling) == "string")
-
-    ffi.cdef(string.format("unsigned %s()", mangling))
-
-    local support = ffi.load("ljclang_support")
-    local func = support[mangling]
-
-    assert.is_true(type(func) == "cdata")
+    assert.is_equal(mangling, "_ZN7LJClang9TestClass12testFunctionERKNS_10TestStructE")
 end
 
 if (os.getenv("LJCLANG_TESTS_NO_CXX_STDLIB") ~= "1") then
