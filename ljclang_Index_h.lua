@@ -695,7 +695,11 @@ enum CXCursorKind {
   CXCursor_OMPIteratorExpr = 151,
 
   CXCursor_CXXAddrspaceCastExpr = 152,
-  CXCursor_LastExpr = CXCursor_CXXAddrspaceCastExpr,
+
+  CXCursor_ConceptSpecializationExpr = 153,
+
+  CXCursor_RequiresExpr = 154,
+  CXCursor_LastExpr = CXCursor_RequiresExpr,
   /* Statements */
   CXCursor_FirstStmt = 200,
 
@@ -875,9 +879,43 @@ enum CXCursorKind {
   CXCursor_OMPDepobjDirective = 286,
 
   CXCursor_OMPScanDirective = 287,
-  CXCursor_LastStmt = CXCursor_OMPScanDirective,
 
-  CXCursor_TranslationUnit = 300,
+  CXCursor_OMPTileDirective = 288,
+
+  CXCursor_OMPCanonicalLoop = 289,
+
+  CXCursor_OMPInteropDirective = 290,
+
+  CXCursor_OMPDispatchDirective = 291,
+
+  CXCursor_OMPMaskedDirective = 292,
+
+  CXCursor_OMPUnrollDirective = 293,
+
+  CXCursor_OMPMetaDirective = 294,
+
+  CXCursor_OMPGenericLoopDirective = 295,
+
+  CXCursor_OMPTeamsGenericLoopDirective = 296,
+
+  CXCursor_OMPTargetTeamsGenericLoopDirective = 297,
+
+  CXCursor_OMPParallelGenericLoopDirective = 298,
+
+  CXCursor_OMPTargetParallelGenericLoopDirective = 299,
+
+  CXCursor_OMPParallelMaskedDirective = 300,
+
+  CXCursor_OMPMaskedTaskLoopDirective = 301,
+
+  CXCursor_OMPMaskedTaskLoopSimdDirective = 302,
+
+  CXCursor_OMPParallelMaskedTaskLoopDirective = 303,
+
+  CXCursor_OMPParallelMaskedTaskLoopSimdDirective = 304,
+  CXCursor_LastStmt = CXCursor_OMPParallelMaskedTaskLoopSimdDirective,
+
+  CXCursor_TranslationUnit = 350,
   /* Attributes */
   CXCursor_FirstAttr = 400,
 
@@ -940,8 +978,10 @@ enum CXCursorKind {
   CXCursor_StaticAssert = 602,
 
   CXCursor_FriendDecl = 603,
+
+  CXCursor_ConceptDecl = 604,
   CXCursor_FirstExtraDecl = CXCursor_ModuleImportDecl,
-  CXCursor_LastExtraDecl = CXCursor_FriendDecl,
+  CXCursor_LastExtraDecl = CXCursor_ConceptDecl,
 
   CXCursor_OverloadCandidate = 700
 };
@@ -1087,8 +1127,9 @@ enum CXTypeKind {
   CXType_UAccum = 37,
   CXType_ULongAccum = 38,
   CXType_BFloat16 = 39,
+  CXType_Ibm128 = 40,
   CXType_FirstBuiltin = CXType_Void,
-  CXType_LastBuiltin = CXType_BFloat16,
+  CXType_LastBuiltin = CXType_Ibm128,
   CXType_Complex = 100,
   CXType_Pointer = 101,
   CXType_BlockPointer = 102,
@@ -1169,7 +1210,8 @@ enum CXTypeKind {
   CXType_OCLIntelSubgroupAVCImeSingleRefStreamin = 174,
   CXType_OCLIntelSubgroupAVCImeDualRefStreamin = 175,
   CXType_ExtVector = 176,
-  CXType_Atomic = 177
+  CXType_Atomic = 177,
+  CXType_BTFTagAttributed = 178
 };
 enum CXCallingConv {
   CXCallingConv_Default = 0,
@@ -1191,6 +1233,8 @@ enum CXCallingConv {
   CXCallingConv_PreserveMost = 14,
   CXCallingConv_PreserveAll = 15,
   CXCallingConv_AArch64VectorCall = 16,
+  CXCallingConv_SwiftAsync = 17,
+  CXCallingConv_AArch64SVEPCS = 18,
   CXCallingConv_Invalid = 100,
   CXCallingConv_Unexposed = 200
 };
@@ -1814,7 +1858,8 @@ typedef enum {
   CXIdxEntity_CXXDestructor = 23,
   CXIdxEntity_CXXConversionFunction = 24,
   CXIdxEntity_CXXTypeAlias = 25,
-  CXIdxEntity_CXXInterface = 26
+  CXIdxEntity_CXXInterface = 26,
+  CXIdxEntity_CXXConcept = 27
 } CXIdxEntityKind;
 typedef enum {
   CXIdxEntityLang_None = 0,
