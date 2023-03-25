@@ -282,4 +282,4 @@ values in `clang.ErrorCode`) can be examined.
 License
 -------
 
-Copyright (C) 2013-2022 Philipp Kutin. MIT licensed. See LICENSE for details.
+Copyright (C) 2013-2023 Philipp Kutin. MIT licensed. See LICENSE for details.
