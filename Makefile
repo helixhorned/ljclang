@@ -34,7 +34,7 @@ libdir := $(shell $(llvm-config) --libdir)
 lib := -L$(libdir) -lclang
 
 # TODO: error or warn if directory does not exist. Ideally, remove.
-llvm_libdir_include := $(libdir)/clang/$(llvm_version)/include
+llvm_libdir_include := $(libdir)/clang/$(LLVM_MAJOR_VERSION)/include
 
 ########## COMPILER OPTIONS ##########
 

@@ -22,6 +22,163 @@ typedef struct {
  const char *clang_getCString(CXString string);
  void clang_disposeString(CXString string);
  void clang_disposeStringSet(CXStringSet *set);
+	/*===-- clang-c/CXFile.h - C Index File ---------------------------*- C -*-===*\
+|*                                                                            *|
+|* Part of the LLVM Project, under the Apache License v2.0 with LLVM          *|
+|* Exceptions.                                                                *|
+|* See https://llvm.org/LICENSE.txt for license information.                  *|
+|* SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception                    *|
+|*                                                                            *|
+|*===----------------------------------------------------------------------===*|
+|*                                                                            *|
+|* This header provides the interface to C Index files.                       *|
+|*                                                                            *|
+\*===----------------------------------------------------------------------===*/
+typedef void *CXFile;
+ CXString clang_getFileName(CXFile SFile);
+ // REMOVED: clang_getFileTime
+typedef struct {
+  unsigned long long data[3];
+} CXFileUniqueID;
+ int clang_getFileUniqueID(CXFile file, CXFileUniqueID *outID);
+ int clang_File_isEqual(CXFile file1, CXFile file2);
+ CXString clang_File_tryGetRealPathName(CXFile file);
+	/*===-- clang-c/CXSourceLocation.h - C Index Source Location ------*- C -*-===*\
+|*                                                                            *|
+|* Part of the LLVM Project, under the Apache License v2.0 with LLVM          *|
+|* Exceptions.                                                                *|
+|* See https://llvm.org/LICENSE.txt for license information.                  *|
+|* SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception                    *|
+|*                                                                            *|
+|*===----------------------------------------------------------------------===*|
+|*                                                                            *|
+|* This header provides the interface to C Index source locations.            *|
+|*                                                                            *|
+\*===----------------------------------------------------------------------===*/
+typedef struct {
+  const void *ptr_data[2];
+  unsigned int_data;
+} CXSourceLocation;
+typedef struct {
+  const void *ptr_data[2];
+  unsigned begin_int_data;
+  unsigned end_int_data;
+} CXSourceRange;
+ CXSourceLocation clang_getNullLocation(void);
+ unsigned clang_equalLocations(CXSourceLocation loc1,
+                                             CXSourceLocation loc2);
+ int clang_Location_isInSystemHeader(CXSourceLocation location);
+ int clang_Location_isFromMainFile(CXSourceLocation location);
+ CXSourceRange clang_getNullRange(void);
+ CXSourceRange clang_getRange(CXSourceLocation begin,
+                                            CXSourceLocation end);
+ unsigned clang_equalRanges(CXSourceRange range1,
+                                          CXSourceRange range2);
+ int clang_Range_isNull(CXSourceRange range);
+ void clang_getExpansionLocation(CXSourceLocation location,
+                                               CXFile *file, unsigned *line,
+                                               unsigned *column,
+                                               unsigned *offset);
+ void clang_getPresumedLocation(CXSourceLocation location,
+                                              CXString *filename,
+                                              unsigned *line, unsigned *column);
+ void clang_getInstantiationLocation(CXSourceLocation location,
+                                                   CXFile *file, unsigned *line,
+                                                   unsigned *column,
+                                                   unsigned *offset);
+ void clang_getSpellingLocation(CXSourceLocation location,
+                                              CXFile *file, unsigned *line,
+                                              unsigned *column,
+                                              unsigned *offset);
+ void clang_getFileLocation(CXSourceLocation location,
+                                          CXFile *file, unsigned *line,
+                                          unsigned *column, unsigned *offset);
+ CXSourceLocation clang_getRangeStart(CXSourceRange range);
+ CXSourceLocation clang_getRangeEnd(CXSourceRange range);
+typedef struct {
+
+  unsigned count;
+
+  CXSourceRange *ranges;
+} CXSourceRangeList;
+ void clang_disposeSourceRangeList(CXSourceRangeList *ranges);
+	/*===-- clang-c/CXDiagnostic.h - C Index Diagnostics --------------*- C -*-===*\
+|*                                                                            *|
+|* Part of the LLVM Project, under the Apache License v2.0 with LLVM          *|
+|* Exceptions.                                                                *|
+|* See https://llvm.org/LICENSE.txt for license information.                  *|
+|* SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception                    *|
+|*                                                                            *|
+|*===----------------------------------------------------------------------===*|
+|*                                                                            *|
+|* This header provides the interface to C Index diagnostics.                 *|
+|*                                                                            *|
+\*===----------------------------------------------------------------------===*/
+enum CXDiagnosticSeverity {
+
+  CXDiagnostic_Ignored = 0,
+
+  CXDiagnostic_Note = 1,
+
+  CXDiagnostic_Warning = 2,
+
+  CXDiagnostic_Error = 3,
+
+  CXDiagnostic_Fatal = 4
+};
+typedef void *CXDiagnostic;
+typedef void *CXDiagnosticSet;
+ unsigned clang_getNumDiagnosticsInSet(CXDiagnosticSet Diags);
+ CXDiagnostic clang_getDiagnosticInSet(CXDiagnosticSet Diags,
+                                                     unsigned Index);
+enum CXLoadDiag_Error {
+
+  CXLoadDiag_None = 0,
+
+  CXLoadDiag_Unknown = 1,
+
+  CXLoadDiag_CannotLoad = 2,
+
+  CXLoadDiag_InvalidFile = 3
+};
+ CXDiagnosticSet clang_loadDiagnostics(
+    const char *file, enum CXLoadDiag_Error *error, CXString *errorString);
+ void clang_disposeDiagnosticSet(CXDiagnosticSet Diags);
+ CXDiagnosticSet clang_getChildDiagnostics(CXDiagnostic D);
+ void clang_disposeDiagnostic(CXDiagnostic Diagnostic);
+enum CXDiagnosticDisplayOptions {
+
+  CXDiagnostic_DisplaySourceLocation = 0x01,
+
+  CXDiagnostic_DisplayColumn = 0x02,
+
+  CXDiagnostic_DisplaySourceRanges = 0x04,
+
+  CXDiagnostic_DisplayOption = 0x08,
+
+  CXDiagnostic_DisplayCategoryId = 0x10,
+
+  CXDiagnostic_DisplayCategoryName = 0x20
+};
+ CXString clang_formatDiagnostic(CXDiagnostic Diagnostic,
+                                               unsigned Options);
+ unsigned clang_defaultDiagnosticDisplayOptions(void);
+ enum CXDiagnosticSeverity
+    clang_getDiagnosticSeverity(CXDiagnostic);
+ CXSourceLocation clang_getDiagnosticLocation(CXDiagnostic);
+ CXString clang_getDiagnosticSpelling(CXDiagnostic);
+ CXString clang_getDiagnosticOption(CXDiagnostic Diag,
+                                                  CXString *Disable);
+ unsigned clang_getDiagnosticCategory(CXDiagnostic);
+  CXString
+clang_getDiagnosticCategoryName(unsigned Category);
+ CXString clang_getDiagnosticCategoryText(CXDiagnostic);
+ unsigned clang_getDiagnosticNumRanges(CXDiagnostic);
+ CXSourceRange clang_getDiagnosticRange(CXDiagnostic Diagnostic,
+                                                      unsigned Range);
+ unsigned clang_getDiagnosticNumFixIts(CXDiagnostic Diagnostic);
+ CXString clang_getDiagnosticFixIt(
+    CXDiagnostic Diagnostic, unsigned FixIt, CXSourceRange *ReplacementRange);
 	/*===-- clang-c/CXCompilationDatabase.h - Compilation database  ---*- C -*-===*\
 |*                                                                            *|
 |* Part of the LLVM Project, under the Apache License v2.0 with LLVM          *|
@@ -186,148 +343,27 @@ typedef enum {
  unsigned clang_CXIndex_getGlobalOptions(CXIndex);
  void
 clang_CXIndex_setInvocationEmissionPathOption(CXIndex, const char *Path);
-typedef void *CXFile;
- CXString clang_getFileName(CXFile SFile);
- // REMOVED: clang_getFileTime
-typedef struct {
-  unsigned long long data[3];
-} CXFileUniqueID;
- int clang_getFileUniqueID(CXFile file, CXFileUniqueID *outID);
  unsigned clang_isFileMultipleIncludeGuarded(CXTranslationUnit tu,
                                                            CXFile file);
  CXFile clang_getFile(CXTranslationUnit tu,
                                     const char *file_name);
  const char *clang_getFileContents(CXTranslationUnit tu,
                                                  CXFile file, size_t *size);
- int clang_File_isEqual(CXFile file1, CXFile file2);
- CXString clang_File_tryGetRealPathName(CXFile file);
-typedef struct {
-  const void *ptr_data[2];
-  unsigned int_data;
-} CXSourceLocation;
-typedef struct {
-  const void *ptr_data[2];
-  unsigned begin_int_data;
-  unsigned end_int_data;
-} CXSourceRange;
- CXSourceLocation clang_getNullLocation(void);
- unsigned clang_equalLocations(CXSourceLocation loc1,
-                                             CXSourceLocation loc2);
  CXSourceLocation clang_getLocation(CXTranslationUnit tu,
                                                   CXFile file, unsigned line,
                                                   unsigned column);
  CXSourceLocation clang_getLocationForOffset(CXTranslationUnit tu,
                                                            CXFile file,
                                                            unsigned offset);
- int clang_Location_isInSystemHeader(CXSourceLocation location);
- int clang_Location_isFromMainFile(CXSourceLocation location);
- CXSourceRange clang_getNullRange(void);
- CXSourceRange clang_getRange(CXSourceLocation begin,
-                                            CXSourceLocation end);
- unsigned clang_equalRanges(CXSourceRange range1,
-                                          CXSourceRange range2);
- int clang_Range_isNull(CXSourceRange range);
- void clang_getExpansionLocation(CXSourceLocation location,
-                                               CXFile *file, unsigned *line,
-                                               unsigned *column,
-                                               unsigned *offset);
- void clang_getPresumedLocation(CXSourceLocation location,
-                                              CXString *filename,
-                                              unsigned *line, unsigned *column);
- void clang_getInstantiationLocation(CXSourceLocation location,
-                                                   CXFile *file, unsigned *line,
-                                                   unsigned *column,
-                                                   unsigned *offset);
- void clang_getSpellingLocation(CXSourceLocation location,
-                                              CXFile *file, unsigned *line,
-                                              unsigned *column,
-                                              unsigned *offset);
- void clang_getFileLocation(CXSourceLocation location,
-                                          CXFile *file, unsigned *line,
-                                          unsigned *column, unsigned *offset);
- CXSourceLocation clang_getRangeStart(CXSourceRange range);
- CXSourceLocation clang_getRangeEnd(CXSourceRange range);
-typedef struct {
-
-  unsigned count;
-
-  CXSourceRange *ranges;
-} CXSourceRangeList;
  CXSourceRangeList *clang_getSkippedRanges(CXTranslationUnit tu,
                                                          CXFile file);
  CXSourceRangeList *
 clang_getAllSkippedRanges(CXTranslationUnit tu);
- void clang_disposeSourceRangeList(CXSourceRangeList *ranges);
-enum CXDiagnosticSeverity {
-
-  CXDiagnostic_Ignored = 0,
-
-  CXDiagnostic_Note = 1,
-
-  CXDiagnostic_Warning = 2,
-
-  CXDiagnostic_Error = 3,
-
-  CXDiagnostic_Fatal = 4
-};
-typedef void *CXDiagnostic;
-typedef void *CXDiagnosticSet;
- unsigned clang_getNumDiagnosticsInSet(CXDiagnosticSet Diags);
- CXDiagnostic clang_getDiagnosticInSet(CXDiagnosticSet Diags,
-                                                     unsigned Index);
-enum CXLoadDiag_Error {
-
-  CXLoadDiag_None = 0,
-
-  CXLoadDiag_Unknown = 1,
-
-  CXLoadDiag_CannotLoad = 2,
-
-  CXLoadDiag_InvalidFile = 3
-};
- CXDiagnosticSet clang_loadDiagnostics(
-    const char *file, enum CXLoadDiag_Error *error, CXString *errorString);
- void clang_disposeDiagnosticSet(CXDiagnosticSet Diags);
- CXDiagnosticSet clang_getChildDiagnostics(CXDiagnostic D);
  unsigned clang_getNumDiagnostics(CXTranslationUnit Unit);
  CXDiagnostic clang_getDiagnostic(CXTranslationUnit Unit,
                                                 unsigned Index);
  CXDiagnosticSet
 clang_getDiagnosticSetFromTU(CXTranslationUnit Unit);
- void clang_disposeDiagnostic(CXDiagnostic Diagnostic);
-enum CXDiagnosticDisplayOptions {
-
-  CXDiagnostic_DisplaySourceLocation = 0x01,
-
-  CXDiagnostic_DisplayColumn = 0x02,
-
-  CXDiagnostic_DisplaySourceRanges = 0x04,
-
-  CXDiagnostic_DisplayOption = 0x08,
-
-  CXDiagnostic_DisplayCategoryId = 0x10,
-
-  CXDiagnostic_DisplayCategoryName = 0x20
-};
- CXString clang_formatDiagnostic(CXDiagnostic Diagnostic,
-                                               unsigned Options);
- unsigned clang_defaultDiagnosticDisplayOptions(void);
- enum CXDiagnosticSeverity
-    clang_getDiagnosticSeverity(CXDiagnostic);
- CXSourceLocation clang_getDiagnosticLocation(CXDiagnostic);
- CXString clang_getDiagnosticSpelling(CXDiagnostic);
- CXString clang_getDiagnosticOption(CXDiagnostic Diag,
-                                                  CXString *Disable);
- unsigned clang_getDiagnosticCategory(CXDiagnostic);
-  CXString
-clang_getDiagnosticCategoryName(unsigned Category);
- CXString clang_getDiagnosticCategoryText(CXDiagnostic);
- unsigned clang_getDiagnosticNumRanges(CXDiagnostic);
- CXSourceRange clang_getDiagnosticRange(CXDiagnostic Diagnostic,
-                                                      unsigned Range);
- unsigned clang_getDiagnosticNumFixIts(CXDiagnostic Diagnostic);
- CXString clang_getDiagnosticFixIt(
-    CXDiagnostic Diagnostic, unsigned FixIt, CXSourceRange *ReplacementRange);
  CXString
 clang_getTranslationUnitSpelling(CXTranslationUnit CTUnit);
  CXTranslationUnit clang_createTranslationUnitFromSourceFile(
@@ -699,7 +735,9 @@ enum CXCursorKind {
   CXCursor_ConceptSpecializationExpr = 153,
 
   CXCursor_RequiresExpr = 154,
-  CXCursor_LastExpr = CXCursor_RequiresExpr,
+
+  CXCursor_CXXParenListInitExpr = 155,
+  CXCursor_LastExpr = CXCursor_CXXParenListInitExpr,
   /* Statements */
   CXCursor_FirstStmt = 200,
 
@@ -913,7 +951,9 @@ enum CXCursorKind {
   CXCursor_OMPParallelMaskedTaskLoopDirective = 303,
 
   CXCursor_OMPParallelMaskedTaskLoopSimdDirective = 304,
-  CXCursor_LastStmt = CXCursor_OMPParallelMaskedTaskLoopSimdDirective,
+
+  CXCursor_OMPErrorDirective = 305,
+  CXCursor_LastStmt = CXCursor_OMPErrorDirective,
 
   CXCursor_TranslationUnit = 350,
   /* Attributes */
@@ -1285,6 +1325,8 @@ clang_Cursor_getTemplateArgumentUnsignedValue(CXCursor C, unsigned I);
  unsigned clang_getAddressSpace(CXType T);
  CXString clang_getTypedefName(CXType CT);
  CXType clang_getPointeeType(CXType T);
+ CXType clang_getUnqualifiedType(CXType CT);
+ CXType clang_getNonReferenceType(CXType CT);
  CXCursor clang_getTypeDeclaration(CXType T);
  CXString clang_getDeclObjCTypeEncoding(CXCursor C);
  CXString clang_Type_getObjCEncoding(CXType type);
@@ -1522,9 +1564,12 @@ clang_CXXConstructor_isConvertingConstructor(CXCursor C);
  unsigned clang_CXXConstructor_isMoveConstructor(CXCursor C);
  unsigned clang_CXXField_isMutable(CXCursor C);
  unsigned clang_CXXMethod_isDefaulted(CXCursor C);
+ unsigned clang_CXXMethod_isDeleted(CXCursor C);
  unsigned clang_CXXMethod_isPureVirtual(CXCursor C);
  unsigned clang_CXXMethod_isStatic(CXCursor C);
  unsigned clang_CXXMethod_isVirtual(CXCursor C);
+ unsigned clang_CXXMethod_isCopyAssignmentOperator(CXCursor C);
+ unsigned clang_CXXMethod_isMoveAssignmentOperator(CXCursor C);
  unsigned clang_CXXRecord_isAbstract(CXCursor C);
  unsigned clang_EnumDecl_isScoped(CXCursor C);
  unsigned clang_CXXMethod_isConst(CXCursor C);

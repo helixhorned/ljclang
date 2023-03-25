@@ -34,10 +34,13 @@ local function loadandstrip(filename)
 end
 
 local cxstring_h = loadandstrip("CXString.h")
+local cxfile_h = loadandstrip("CXFile.h")
+local cxsourcelocation_h = loadandstrip("CXSourceLocation.h")
+local cxdiagnostic_h = loadandstrip("CXDiagnostic.h")
 local cxcompdb_h = loadandstrip("CXCompilationDatabase.h")
 local cxerrorcode_h = loadandstrip("CXErrorCode.h")
 local index_h = loadandstrip("Index.h")
 
 print("require('ffi').cdef[==========[\n",
-      cxstring_h, cxcompdb_h, cxerrorcode_h, index_h, "]==========]")
+      cxstring_h, cxfile_h, cxsourcelocation_h, cxdiagnostic_h, cxcompdb_h, cxerrorcode_h, index_h, "]==========]")
 print("return {}")

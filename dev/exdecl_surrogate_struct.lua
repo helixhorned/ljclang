@@ -15,7 +15,7 @@ local TypeStrForByteCount = {
 local printed = false
 
 return function(cur)
-    if (not cur:isDefinition()) then
+    if (not (cur:haskind("TypedefDecl") and cur:isDefinition())) then
         return
     end
 

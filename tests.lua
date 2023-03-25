@@ -637,7 +637,7 @@ describe2("Enumerations", function(createTU)
               { "Trillion", 1000000000000, u }
             },
 
-            { Name = "",
+            { Name = "(unnamed enum at test_data/enums.hpp:15:1)",
               IntType = "short",
               { "Red", 0, s },
               { "Green", 1, s },
@@ -740,9 +740,9 @@ describe2("Virtual functions", function(createTU)
     it("tests Cursor:virtualBase()", function()
         assert.has_error(function() tuCursor:isVirtualBase() end,
                          "cursor must have kind CXXBaseSpecifier")
-        assert.is.equal(Dc[1]:displayName(), "class Base")
+        assert.is.equal(Dc[1]:displayName(), "Base")
         assert.is_false(Dc[1]:isVirtualBase())
-        assert.is.equal(Dc[2]:displayName(), "class Interface")
+        assert.is.equal(Dc[2]:displayName(), "Interface")
         assert.is_true(Dc[2]:isVirtualBase())
     end)
 
