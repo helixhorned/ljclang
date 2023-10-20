@@ -329,6 +329,14 @@ enum CXCursor_ExceptionSpecificationKind {
  void clang_disposeIndex(CXIndex index);
 typedef enum {
 
+  CXChoice_Default = 0,
+
+  CXChoice_Enabled = 1,
+
+  CXChoice_Disabled = 2
+} CXChoice;
+typedef enum {
+
   CXGlobalOpt_None = 0x0,
 
   CXGlobalOpt_ThreadBackgroundPriorityForIndexing = 0x1,
@@ -339,6 +347,27 @@ typedef enum {
       CXGlobalOpt_ThreadBackgroundPriorityForIndexing |
       CXGlobalOpt_ThreadBackgroundPriorityForEditing
 } CXGlobalOptFlags;
+typedef struct CXIndexOptions {
+
+  unsigned Size;
+
+  unsigned char ThreadBackgroundPriorityForIndexing;
+
+  unsigned char ThreadBackgroundPriorityForEditing;
+
+  unsigned ExcludeDeclarationsFromPCH : 1;
+
+  unsigned DisplayDiagnostics : 1;
+
+  unsigned StorePreamblesInMemory : 1;
+  unsigned /*Reserved*/ : 13;
+
+  const char *PreambleStoragePath;
+
+  const char *InvocationEmissionPath;
+} CXIndexOptions;
+ CXIndex
+clang_createIndexWithOptions(const CXIndexOptions *options);
  void clang_CXIndex_setGlobalOptions(CXIndex, unsigned options);
  unsigned clang_CXIndex_getGlobalOptions(CXIndex);
  void
@@ -1245,6 +1274,11 @@ enum CXTypeKind {
   CXType_OCLIntelSubgroupAVCImeResult = 169,
   CXType_OCLIntelSubgroupAVCRefResult = 170,
   CXType_OCLIntelSubgroupAVCSicResult = 171,
+  CXType_OCLIntelSubgroupAVCImeResultSingleReferenceStreamout = 172,
+  CXType_OCLIntelSubgroupAVCImeResultDualReferenceStreamout = 173,
+  CXType_OCLIntelSubgroupAVCImeSingleReferenceStreamin = 174,
+  CXType_OCLIntelSubgroupAVCImeDualReferenceStreamin = 175,
+  /* Old aliases for AVC OpenCL extension types. */
   CXType_OCLIntelSubgroupAVCImeResultSingleRefStreamout = 172,
   CXType_OCLIntelSubgroupAVCImeResultDualRefStreamout = 173,
   CXType_OCLIntelSubgroupAVCImeSingleRefStreamin = 174,
@@ -1289,6 +1323,7 @@ typedef struct {
  long long clang_getEnumConstantDeclValue(CXCursor C);
  unsigned long long
 clang_getEnumConstantDeclUnsignedValue(CXCursor C);
+ unsigned clang_Cursor_isBitField(CXCursor C);
  int clang_getFieldDeclBitWidth(CXCursor C);
  int clang_Cursor_getNumArguments(CXCursor C);
  CXCursor clang_Cursor_getArgument(CXCursor C, unsigned i);
@@ -1400,7 +1435,6 @@ enum CXRefQualifierKind {
  CXType clang_Type_getTemplateArgumentAsType(CXType T,
                                                            unsigned i);
  enum CXRefQualifierKind clang_Type_getCXXRefQualifier(CXType T);
- unsigned clang_Cursor_isBitField(CXCursor C);
  unsigned clang_isVirtualBase(CXCursor);
 enum CX_CXXAccessSpecifier {
   CX_CXXInvalidAccessSpecifier,
@@ -1438,6 +1472,9 @@ typedef enum CXChildVisitResult (*CXCursorVisitor)(CXCursor cursor,
  unsigned clang_visitChildren(CXCursor parent,
                                             CXCursorVisitor visitor,
                                             CXClientData client_data);
+typedef struct _CXChildVisitResult *CXCursorVisitorBlock;
+ unsigned
+clang_visitChildrenWithBlock(CXCursor parent, CXCursorVisitorBlock block);
  CXString clang_getCursorUSR(CXCursor);
  CXString clang_constructUSR_ObjCClass(const char *class_name);
  CXString clang_constructUSR_ObjCCategory(
@@ -1570,6 +1607,7 @@ clang_CXXConstructor_isConvertingConstructor(CXCursor C);
  unsigned clang_CXXMethod_isVirtual(CXCursor C);
  unsigned clang_CXXMethod_isCopyAssignmentOperator(CXCursor C);
  unsigned clang_CXXMethod_isMoveAssignmentOperator(CXCursor C);
+ unsigned clang_CXXMethod_isExplicit(CXCursor C);
  unsigned clang_CXXRecord_isAbstract(CXCursor C);
  unsigned clang_EnumDecl_isScoped(CXCursor C);
  unsigned clang_CXXMethod_isConst(CXCursor C);
@@ -1846,6 +1884,11 @@ typedef enum {
     CXCursor cursor, CXFile file, CXCursorAndRangeVisitor visitor);
  CXResult clang_findIncludesInFile(
     CXTranslationUnit TU, CXFile file, CXCursorAndRangeVisitor visitor);
+typedef struct _CXCursorAndRangeVisitorBlock *CXCursorAndRangeVisitorBlock;
+CXResult clang_findReferencesInFileWithBlock(CXCursor, CXFile,
+                                             CXCursorAndRangeVisitorBlock);
+CXResult clang_findIncludesInFileWithBlock(CXTranslationUnit, CXFile,
+                                           CXCursorAndRangeVisitorBlock);
 typedef void *CXIdxClientFile;
 typedef void *CXIdxClientEntity;
 typedef void *CXIdxClientContainer;
@@ -2130,5 +2173,115 @@ typedef enum CXVisitorResult (*CXFieldVisitor)(CXCursor C,
                                                CXClientData client_data);
  unsigned clang_Type_visitFields(CXType T, CXFieldVisitor visitor,
                                                CXClientData client_data);
+enum CXBinaryOperatorKind {
+
+  CXBinaryOperator_Invalid,
+
+  CXBinaryOperator_PtrMemD,
+
+  CXBinaryOperator_PtrMemI,
+
+  CXBinaryOperator_Mul,
+
+  CXBinaryOperator_Div,
+
+  CXBinaryOperator_Rem,
+
+  CXBinaryOperator_Add,
+
+  CXBinaryOperator_Sub,
+
+  CXBinaryOperator_Shl,
+
+  CXBinaryOperator_Shr,
+
+  CXBinaryOperator_Cmp,
+
+  CXBinaryOperator_LT,
+
+  CXBinaryOperator_GT,
+
+  CXBinaryOperator_LE,
+
+  CXBinaryOperator_GE,
+
+  CXBinaryOperator_EQ,
+
+  CXBinaryOperator_NE,
+
+  CXBinaryOperator_And,
+
+  CXBinaryOperator_Xor,
+
+  CXBinaryOperator_Or,
+
+  CXBinaryOperator_LAnd,
+
+  CXBinaryOperator_LOr,
+
+  CXBinaryOperator_Assign,
+
+  CXBinaryOperator_MulAssign,
+
+  CXBinaryOperator_DivAssign,
+
+  CXBinaryOperator_RemAssign,
+
+  CXBinaryOperator_AddAssign,
+
+  CXBinaryOperator_SubAssign,
+
+  CXBinaryOperator_ShlAssign,
+
+  CXBinaryOperator_ShrAssign,
+
+  CXBinaryOperator_AndAssign,
+
+  CXBinaryOperator_XorAssign,
+
+  CXBinaryOperator_OrAssign,
+
+  CXBinaryOperator_Comma
+};
+ CXString
+clang_getBinaryOperatorKindSpelling(enum CXBinaryOperatorKind kind);
+ enum CXBinaryOperatorKind
+clang_getCursorBinaryOperatorKind(CXCursor cursor);
+enum CXUnaryOperatorKind {
+
+  CXUnaryOperator_Invalid,
+
+  CXUnaryOperator_PostInc,
+
+  CXUnaryOperator_PostDec,
+
+  CXUnaryOperator_PreInc,
+
+  CXUnaryOperator_PreDec,
+
+  CXUnaryOperator_AddrOf,
+
+  CXUnaryOperator_Deref,
+
+  CXUnaryOperator_Plus,
+
+  CXUnaryOperator_Minus,
+
+  CXUnaryOperator_Not,
+
+  CXUnaryOperator_LNot,
+
+  CXUnaryOperator_Real,
+
+  CXUnaryOperator_Imag,
+
+  CXUnaryOperator_Extension,
+
+  CXUnaryOperator_Coawait
+};
+ CXString
+clang_getUnaryOperatorKindSpelling(enum CXUnaryOperatorKind kind);
+ enum CXUnaryOperatorKind
+clang_getCursorUnaryOperatorKind(CXCursor cursor);
 	]==========]
 return {}

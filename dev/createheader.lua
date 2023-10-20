@@ -21,7 +21,7 @@ local function loadandstrip(filename)
     f:close()
 
     -- Remove...
-    return str:gsub("#ifdef __.-#endif\n", "")  -- #ifdef __cplusplus/__have_feature ... #endif
+    return str:gsub("#if __has_feature%(blocks%).-#else", "#if 1")  -- code using Clang's Blocks extension
               :gsub("#define.-[^\\]\n", "")  -- multi-line #defines
               :gsub("/%*%*.-%*/", "")  -- comments, but keep headers with license ref
               :gsub("#[^\n]-\n", "")  -- single-line preprocessor directives
