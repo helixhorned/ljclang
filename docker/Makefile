@@ -127,9 +127,8 @@ canRun = $(or $(call canRunNatively,$(1)),$(call canRunEmulated,$(1)))
 ARCH ?= null
 DISTRO ?= null
 # Check out a specific LuaJIT commit:
-#  "Merge branch 'master' into v2.1" after
-#  "Improve error reporting on stack overflow."
-LJ_GIT_HASH := 505e2c03de35e2718eef0d2d3660712e06dadf1f
+#  "DynASM/ARM64: Support ldp/stp of q registers."
+LJ_GIT_HASH := 656ecbcf8f669feb94e0d0ec4b4f59190bcd2e48
 LJ_SHA256 ?= null
 #
 qemu_suffix :=
@@ -355,11 +354,11 @@ ljclang-dev-amd64/ALL: ljclang-dev-amd64/alpine ljclang-dev-amd64/debian ljclang
 ljclang-dev-ALL/ALL: ljclang-dev-amd64/ALL
 
 ljclang-dev-amd64/alpine:
-	+$(call check_or_make_image,amd64,alpine,cfe248530ade3b997a6815f6382b569049b74b9a52af49d88f8ee0434351e273)
+	+$(call check_or_make_image,amd64,alpine,TODO)
 
 ljclang-dev-amd64/debian:
-	+$(call check_or_make_image,amd64,debian,e83864f559fa1e392b1891216e30be03ad842aaa37a696b474393bf5460e1c77)
+	+$(call check_or_make_image,amd64,debian,TODO)
 
 ljclang-dev-amd64/ubuntu:
-	+$(call check_or_make_image,amd64,ubuntu,76e6073a14b8010c94c4457536588dfd7db5218a327a3c9ca09cc2508372627c)
+	+$(call check_or_make_image,amd64,ubuntu,9308ccb211b6a0481a851655d01435682f4da505f9261d37eb15fbe931652d64)
 endif

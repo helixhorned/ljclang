@@ -1,6 +1,6 @@
 FROM @ARCH@/@DISTRO_IMAGE@
 
-LABEL maintainer="Philipp Kutin <philipp.kutin@gmail.com>"
+LABEL maintainer="Philipp Kutin <philipp>"
 
 #@if-foreign:COPY /qemu-@qemu-suffix@ /usr/local/bin
 
@@ -21,7 +21,7 @@ WORKDIR /home/user
 # Make sure that a fast-forward re-clones the repo:
 RUN echo @LUAJIT_GIT_HASH@
 RUN git clone https://github.com/LuaJIT/LuaJIT.git \
-    --single-branch --branch=v2.1 --shallow-since=2022-08-01 \
+    --single-branch --branch=v2.1 --shallow-since=2023-08-01 \
     ./luajit-2.1
 RUN (cd luajit-2.1 && git checkout @LUAJIT_GIT_HASH@)
 
@@ -30,7 +30,7 @@ RUN make -j4
 RUN sha256sum src/luajit | grep -q @LUAJIT_SHA256@
 USER root
 RUN make install
-RUN ln -s /usr/local/bin/luajit-2.1.0-beta3 /usr/local/bin/luajit
+RUN test -f /usr/local/bin/luajit -a -x /usr/local/bin/luajit
 USER user
 
 WORKDIR /home/user
