@@ -323,7 +323,7 @@ ljclang-dev-arm32v7/alpine:
 ljclang-dev-arm32v7/debian:
 	+$(call check_or_make_image,arm32v7,debian,TODO)
 
-# NOTE: when building the Docker on an RPi OS (32-bit) host, can get
+# NOTE: when building the Docker image on an RPi OS (32-bit) host, can get
 #  "GPG error (...) invalid signature" / "repository (...) not signed".
 #  See:
 #   https://askubuntu.com/questions/1263284/apt-update-throws-signature-error-in-ubuntu-20-04-container-on-arm
@@ -361,5 +361,5 @@ ljclang-dev-amd64/debian:
 	+$(call check_or_make_image,amd64,debian,e83864f559fa1e392b1891216e30be03ad842aaa37a696b474393bf5460e1c77)
 
 ljclang-dev-amd64/ubuntu:
-	+$(call check_or_make_image,amd64,ubuntu,6fbe7d859d3f24199c6cc0f4ea84698532d3359a2f23e68f3e037bec0b1a886b)
+	+$(call check_or_make_image,amd64,ubuntu,76e6073a14b8010c94c4457536588dfd7db5218a327a3c9ca09cc2508372627c)
 endif
