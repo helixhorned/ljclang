@@ -110,6 +110,7 @@ $(if $(call equals,amd64,$(1)),x86_64))))
 # $ sudo mkdir /usr/local/share/binfmts && sudo cp <template-dir>/qemu-* /usr/local/share/binfmts
 # For each available architecture <arch>:
 #  $ sudo update-binfmts --importdir /usr/local/share/binfmts --import qemu-<arch>
+#
 # (See '<qemu-checkout>/scripts/qemu-binfmt-conf.sh --help'.)
 # (See '/proc/sys/fs/binfmt_misc/qemu-*' which are then created.)
 qemu_prefix := /usr/local/bin/qemu-
@@ -328,7 +329,7 @@ ljclang-dev-arm32v7/debian:
 #   https://askubuntu.com/questions/1263284/apt-update-throws-signature-error-in-ubuntu-20-04-container-on-arm
 #   https://github.com/moby/moby/issues/40734
 ljclang-dev-arm32v7/ubuntu:
-	+$(call check_or_make_image,arm32v7,ubuntu,TODO)
+	+$(call check_or_make_image,arm32v7,ubuntu,bad2d6c85fe7e5f80bbfb06316913b01a09aa87b4a3d3cb799db33e5364221b2)
 #
 # Docker image of Ubuntu 18.04 as a workaround for the above issue.
 ljclang-dev-arm32v7/ubuntu-bionic:
