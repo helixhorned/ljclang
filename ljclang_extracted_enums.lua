@@ -307,6 +307,7 @@ CursorKindName = {
 [303] = "OMPParallelMaskedTaskLoopDirective";
 [304] = "OMPParallelMaskedTaskLoopSimdDirective";
 [305] = "OMPErrorDirective";
+[306] = "OMPScopeDirective";
 [350] = "TranslationUnit";
 [400] = "UnexposedAttr";
 [401] = "IBActionAttr";

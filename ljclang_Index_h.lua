@@ -982,7 +982,9 @@ enum CXCursorKind {
   CXCursor_OMPParallelMaskedTaskLoopSimdDirective = 304,
 
   CXCursor_OMPErrorDirective = 305,
-  CXCursor_LastStmt = CXCursor_OMPErrorDirective,
+
+  CXCursor_OMPScopeDirective = 306,
+  CXCursor_LastStmt = CXCursor_OMPScopeDirective,
 
   CXCursor_TranslationUnit = 350,
   /* Attributes */
@@ -1309,6 +1311,7 @@ enum CXCallingConv {
   CXCallingConv_AArch64VectorCall = 16,
   CXCallingConv_SwiftAsync = 17,
   CXCallingConv_AArch64SVEPCS = 18,
+  CXCallingConv_M68kRTD = 19,
   CXCallingConv_Invalid = 100,
   CXCallingConv_Unexposed = 200
 };
