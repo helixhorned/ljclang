@@ -145,7 +145,13 @@ local function tweak_compile_commands_table(cmds, hasCommand)
         local matchCount = 0
 
         for ai, arg in ipairs(cmd.arguments) do
-            if (arg == compiledFileName) then
+            if (#arg == 0) then
+                return nil, PREFIX.."contains an entry with an element of 'arguments' being the empty string"
+            end
+
+            local isAbsolute = arg:sub(1,1) == '/'
+
+            if (arg == compiledFileName or (not isAbsolute and cmd.directory.."/"..arg == absoluteFileName)) then
                 cmd.arguments[ai] = absoluteFileName
                 matchCount = matchCount + 1
             end
