@@ -62,7 +62,7 @@ local outFileName = progName:match("%.lua$") and
 
 -- The generated .app.lua should be as stand-alone as possible, so disallow all Lua
 -- functions taking a file name at app generation time.
-local function abortDisallowedFunction(...)
+local function abortDisallowedFunction(...)  -- luacheck: ignore 212
     -- TODO: find out and print the name of the function?
     errprintfAndExit("Attempt to call disallowed function at app generation time")
 end
@@ -119,7 +119,9 @@ do
 
   require = function(m)
     local t=__LJClang_MkApp_Modules[m]
-    if t==nil then error("module '"..m.."' not included in .app.lua, please contact app and/or mkapp.lua maintainer") end
+    if t==nil then
+      error("module '"..m.."' not included in .app.lua, please contact app and/or mkapp.lua maintainer")
+    end
     return (t==true) and orig_require(m) or t
   end
 end

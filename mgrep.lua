@@ -26,7 +26,6 @@ local arg = arg
 local assert = assert
 local ipairs = ipairs
 local print = print
-local type = type
 
 ffi.cdef[[
 char *getcwd(char *buf, size_t size);
@@ -135,7 +134,7 @@ local g_cursorKind
 local V = cl.ChildVisitResult
 -- Visitor for finding the named structure declaration.
 local GetTypeVisitor = cl.regCursorVisitor(
-function(cur, parent)
+function(cur, _)
     local curKind = cur:kind()
 
     if (curKind == "ClassDecl" or curKind == "StructDecl") then
@@ -209,7 +208,7 @@ end
 
 -- Visitor for looking for the wanted member accesses.
 local SearchVisitor = cl.regCursorVisitor(
-function(cur, parent)
+function(cur, _)
     if (cur:haskind("MemberRefExpr")) then
         local membname = cur:name()
         if (membname == memberName) then
@@ -363,7 +362,7 @@ for fi=1,#files do
     local fn = files[fi]
 
     local index = cl.createIndex(true, false)
-    local opts = useCompDb and compArgs[fi] or clangOpts or {}
+    local usedOpts = useCompDb and compArgs[fi] or clangOpts or {}
 
     do
         local f, msg = io.open(fn)
@@ -374,7 +373,7 @@ for fi=1,#files do
         f:close()
     end
 
-    local tu, errorCode = index:parse(useCompDb and "" or fn, opts, {"KeepGoing"})
+    local tu, errorCode = index:parse(useCompDb and "" or fn, usedOpts, {"KeepGoing"})
 
     if (tu == nil) then
         errprintf("ERROR: Failed parsing %s: %s", fn, errorCode)

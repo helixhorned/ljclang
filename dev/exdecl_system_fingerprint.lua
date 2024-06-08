@@ -5,7 +5,7 @@ local printf = printf
 
 local printed = false
 
-return function(cur)
+return function(_)
     if (not printed) then
         printed = true
         -- KEEPINSYNC posix_types.lua.in

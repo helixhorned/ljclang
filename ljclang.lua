@@ -4,22 +4,19 @@
 -- See LICENSE for the Copyright Notice of LJClang.
 -- License for LLVM: https://llvm.org/LICENSE.txt
 
+-- luacheck: ignore 542
+
 local assert = assert
 local error = error
 local pairs = pairs
 local require = require
-local select = select
-local setmetatable = setmetatable
-local table = table
 local tonumber = tonumber
 local tostring = tostring
 local type = type
-local unpack = unpack
 
 local ffi = require("ffi")
 local C = ffi.C
 
-local bit = require("bit")
 local io = require("io")
 
 local function lib(basename)
@@ -204,8 +201,8 @@ local File
 local CXTypes = {
     {
         ffi.typeof("CXCursor"),
-        function (cxcur, parent)
-            -- CAUTION: 'parent' lost.
+        function (cxcur, _)
+            -- CAUTION: 'parent' (the second argument) lost.
             return Cursor_t(cxcur)
         end
     },
@@ -434,8 +431,8 @@ local IndexSession = class
     end,
 
     indexSourceFile = function(self, callbacks, indexOpts,
-                               srcfile, args, opts)
-        local srcfile, args, opts, argsptrs, tuAr = PrepareParse(srcfile, args, opts)
+                               srcfile_, args_, opts_)
+        local srcfile, args, opts, argsptrs, tuAr = PrepareParse(srcfile_, args_, opts_)
 
         indexOpts = HandleNumberOrStringTabOption(
             indexOpts, C.CXIndexOpt_None, "CXIndexOpt_")
@@ -508,8 +505,8 @@ local Index = class
     --
     -- On failure, `translationUnit` is `nil` and `errorCode` (comparable against
     -- values in `clang.ErrorCode`) can be examined.
-    parse = function(self, srcfile, args, opts)
-        local srcfile, args, opts, argsptrs, tuAr = PrepareParse(srcfile, args, opts)
+    parse = function(self, srcfile_, args_, opts_)
+        local srcfile, args, opts, argsptrs, tuAr = PrepareParse(srcfile_, args_, opts_)
 
         local errorCode = clang.clang_parseTranslationUnit2(
             self._idx, srcfile, argsptrs, #args, nil, 0, opts, tuAr)
@@ -1252,7 +1249,7 @@ class
         for i=0,numtoks-1 do
             if (clang.clang_getTokenKind(tokens[i]) ~= 'CXToken_Comment') then
                 local sourcerange = clang.clang_getTokenExtent(cxtu, tokens[i])
-                local Beg, End, filename = getBegEndFilename(sourcerange)
+                local Beg, End, _ = getBegEndFilename(sourcerange)
                 local tb, te = Beg.offset, End.offset
 
                 if (tb >= b and te <= e) then
@@ -1302,17 +1299,17 @@ class
 
     enumIntegerType = function(self)
         check(self:haskind("EnumDecl"), "cursor must have kind EnumDecl", 2)
-        local type = getType(clang.clang_getEnumDeclIntegerType(self._cur))
-        assert(type ~= nil)
-        return type
+        local typ = getType(clang.clang_getEnumDeclIntegerType(self._cur))
+        assert(typ ~= nil)
+        return typ
     end,
 
     enumValue = function(self)
         check(self:haskind("EnumConstantDecl"), "cursor must have kind EnumConstantDecl", 2)
 
-        local type = self:parent():enumIntegerType()
-        local obtainAsUnsigned = type:haskind("ULongLong")
-            or (ffi.sizeof("long") == 8 and type:haskind("ULong"))
+        local typ = self:parent():enumIntegerType()
+        local obtainAsUnsigned = typ:haskind("ULongLong")
+            or (ffi.sizeof("long") == 8 and typ:haskind("ULong"))
 
         if (obtainAsUnsigned) then
             return clang.clang_getEnumConstantDeclUnsignedValue(self._cur)

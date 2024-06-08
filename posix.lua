@@ -150,7 +150,7 @@ fd_set_t = class
     end,
 
 -- private:
-    maskIdxAndBit = function(self, fd)
+    maskIdxAndBit = function(_, fd)
         checkSetFd(fd)
         local maskIdx = uint32_t(fd / FD_MASK_BIT_COUNT)
         local theBit = bit.lshift(1ULL, fd % FD_MASK_BIT_COUNT)
@@ -301,7 +301,7 @@ api.Fd = class
         end)
     end,
 
-    _readIntoCommon = function(self, obj, allowPartial, _callFunc)  -- private
+    _readIntoCommon = function(self, obj, allowPartial, callFunc)  -- private
         checktype(obj, 1, "cdata", 3)
         checktype(allowPartial, 2, "boolean", 3)
 
@@ -314,9 +314,9 @@ api.Fd = class
 
         repeat
             local remainByteCount = length - bytesRead
-            local ret = _callFunc("read", self.fd, bytePtr, remainByteCount)
+            local ret = callFunc("read", self.fd, bytePtr, remainByteCount)
             if (ret == -1) then
-                assert(_callFunc ~= call)
+                assert(callFunc ~= call)
                 return nil
             end
 
@@ -384,6 +384,7 @@ api.Fd = class
 
     shutdown = function(self, how)
         local ret = call("shutdown", self.fd, how)
+        return ret
     end,
 
     close = function(self)

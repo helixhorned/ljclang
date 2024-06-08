@@ -174,10 +174,9 @@ local function tweak_compile_commands_table(cmds, hasCommand)
 end
 
 local function load_json_as_lua_string(str)
-    local func, errmsg = loadstring(str, "compile_commands.json as Lua table")
-
+    local func, errmsg1 = loadstring(str, "compile_commands.json as Lua table")
     if (func == nil) then
-        return nil, errmsg
+        return nil, errmsg1
     end
 
     -- Completely empty the function's environment as an additional safety measure,
@@ -188,9 +187,9 @@ local function load_json_as_lua_string(str)
         return nil, result
     end
 
-    local errmsg, hasCommand = validate_compile_commands_table(result)
-    if (errmsg ~= nil) then
-        return nil, errmsg
+    local errmsg2, hasCommand = validate_compile_commands_table(result)
+    if (errmsg2 ~= nil) then
+        return nil, errmsg2
     end
 
     return tweak_compile_commands_table(result, hasCommand)
@@ -235,17 +234,17 @@ end
 
 function api.read_compile_commands(filename)
     check(type(filename) == "string", "<filename> must be a string", 2)
-    local f, msg = io.open(filename)
+    local f, msg1 = io.open(filename)
 
     if (f == nil) then
-        return nil, msg
+        return nil, msg1
     end
 
-    local str, msg = f:read("*a")
+    local str, msg2 = f:read("*a")
     f:close()
 
     if (str == nil) then
-        return nil, msg
+        return nil, msg2
     end
 
     return api.parse_compile_commands(str)

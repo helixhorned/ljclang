@@ -78,8 +78,9 @@ local function dot_quote(str)
     -- Graphviz docs ("The DOT language") say:
     --  In quoted strings in DOT, the only escaped character is double-quote (").
     --  (...)
-    --  As another aid for readability, dot allows double-quoted strings to span multiple physical lines using the standard C
-    --  convention of a backslash immediately preceding a newline character^2.
+    --  As another aid for readability, dot allows double-quoted strings to span multiple
+    --  physical lines using the standard C convention of a backslash immediately preceding
+    --  a newline character^2.
     return str:gsub('"', '\\"'):gsub('\n', '\\\n')
 end
 
@@ -203,7 +204,7 @@ InclusionGraph = class
         end
 
         -- Nodes.
-        for i, filename in self:iFileNames() do
+        for _, filename in self:iFileNames() do
             printf('%s [shape=box];', qs(filename))
         end
 

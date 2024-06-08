@@ -185,7 +185,7 @@ local ArgToOptIdx = {}
 
 for i = 1, #LangOptions do
     local quad = LangOptions[i]
-    local carg, behavior = quad[2], quad[3]
+    local carg, _ = quad[2], quad[3]
     assert(type(carg) == "string")
     ArgToOptIdx[carg] = i
 end

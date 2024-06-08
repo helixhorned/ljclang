@@ -1,5 +1,8 @@
 #!/usr/bin/env luajit
 
+-- luacheck: ignore 542
+-- luacheck: ignore 581
+
 local bit = require("bit")
 local ffi = require("ffi")
 local io = require("io")
@@ -27,11 +30,9 @@ local assert = assert
 local collectgarbage = collectgarbage
 local format = string.format
 local ipairs = ipairs
-local pairs = pairs
 local pcall = pcall
 local print = print
 local require = require
-local tostring = tostring
 local tonumber = tonumber
 local type = type
 local unpack = unpack
@@ -167,7 +168,7 @@ local opts_meta = {
     x = false,
 }
 
-local opts, args = parsecmdline.getopts(opts_meta, arg, usage)
+local opts, cmdline_args = parsecmdline.getopts(opts_meta, arg, usage)
 
 local autoPch = opts.a
 local concurrencyOpt = opts.c or "auto"
@@ -356,7 +357,7 @@ if (progressSpec ~= nil) then
     end
 end
 
-local compileCommandsFile = args[1]
+local compileCommandsFile = cmdline_args[1]
 
 if (compileCommandsFile == nil) then
     usage()
@@ -366,7 +367,7 @@ end
 cl = require("ljclang")
 local posix = require("posix")
 local POLL = posix.POLL
-local linux_decls = require("ljclang_linux_decls")
+require("ljclang_linux_decls")
 local inotify = require("inotify")
 local IN = inotify.IN
 local SymbolIndex = require("symbol_index").SymbolIndex
@@ -755,7 +756,7 @@ function MI.HandleCommand_Diags(args, control, prioritizeCcFunc)
         table.insert(tab, 1, "INFO: one or more compile commands not yet processed.")
     end
 
-    return table.concat(tab, '\n')    
+    return table.concat(tab, '\n')
 end
 
 function MI.FileIsCompileCommandTU(fileName)
@@ -868,9 +869,9 @@ function MI.HandleClientRequest(request, crTab)
 
     do
         local ii = 0
-        for arg in request:gmatch("[^%s]+") do
+        for arg_ in request:gmatch("[^%s]+") do
             ii = ii+1
-            args[ii - 2] = arg
+            args[ii - 2] = arg_
         end
     end
 
@@ -1008,7 +1009,7 @@ if (autoPch ~= nil) then
     -- { [<PCH file basename>] = true }
     local isPchFileUsed = {}
     -- { [CC index] = <index into usedPchArgs> }
-    local ccUsedPchIdxs = {}
+--    local ccUsedPchIdxs = {}
 
     for _, cmd in ipairs(compileCommands) do
         local pchArgs = cmd.pchArguments
@@ -1061,8 +1062,8 @@ if (autoPch ~= nil) then
     local generatePch = function(pchArgs)
         local cmdArgs = {}
 
-        for _, arg in ipairs(pchArgs) do
-            cmdArgs[#cmdArgs + 1] = arg
+        for _, arg_ in ipairs(pchArgs) do
+            cmdArgs[#cmdArgs + 1] = arg_
         end
 
         local fullPchFileName = pchArgs.pchFileName
@@ -1169,7 +1170,7 @@ did not successfully pass test usage with an empty C++ source file.", fn)
 
     local pchEnabledCcCount = 0
 
-    for i, cmd in ipairs(compileCommands) do
+    for _, cmd in ipairs(compileCommands) do
         local pchArgs = cmd.pchArguments
         assert(cmd.pchFileName == nil)
 
@@ -1327,10 +1328,10 @@ local function ProcessCompileCommand(ccIndex, parseOptions)
     if (tu == nil) then
         formattedDiagSet = diagnostics_util.FormattedDiagSet(not plainMode)
         -- TODO: Extend in verbosity and/or handling?
-        local info = format("%s: index:parse() failed: %s",
+        local text = format("%s: index:parse() failed: %s",
                             colorize("ERROR", Col.Bold..Col.Red),
                             errorCodeOrString)
-        formattedDiagSet:setInfo(info)
+        formattedDiagSet:setInfo(text)
     else
         formattedDiagSet = diagnostics_util.GetDiags(
             tu:diagnosticSet(), not plainMode, printAllDiags)
@@ -1341,7 +1342,7 @@ local function ProcessCompileCommand(ccIndex, parseOptions)
         InclusionGraph()
 
     -- Make LuaJIT release libclang-allocated TU memory.
-    tu = nil
+    tu = nil  -- luacheck: ignore 311
     collectgarbage()
 
     assert(formattedDiagSet ~= nil and inclusionGraph ~= nil)
@@ -1371,7 +1372,7 @@ local OnDemandParser = class
         checktype(i, 1, "number", 2)
         check(i >= 1 and i <= self:getCount(), "argument #1 must be in [1, self:getCount()]", 2)
 
-        local tus, errorCodes = self.tus, self.errorCodes
+--        local tus, errorCodes = self.tus, self.errorCodes
 
         if (self.formattedDiagSets[i] == nil) then
             self.formattedDiagSets[i], self.inclusionGraphs[i] =
@@ -1600,7 +1601,6 @@ FormattedDiagSetPrinter = class
 
         local fDiags = formattedDiagSet:getDiags()
 
-        local IsErrorSeverity = { fatal=true, error=true }
         local IsTrackedSeverity = { fatal=true, error=true, warning=true }
 
         for i, fDiag in ipairs(fDiags) do
@@ -1625,9 +1625,9 @@ FormattedDiagSetPrinter = class
             self.seenDiags[newSeenDiag] = true
         end
 
-        local info = formattedDiagSet:getInfo()
-        if (info ~= nil and not omittedLastDiag) then
-            toPrint[#toPrint+1] = format("%s", info:getString(not plainMode))
+        local info_ = formattedDiagSet:getInfo()
+        if (info_ ~= nil and not omittedLastDiag) then
+            toPrint[#toPrint+1] = format("%s", info_:getString(not plainMode))
         end
 
         return toPrint
@@ -2032,7 +2032,7 @@ local Controller = class
         return self.notifier
     end,
 
-    checkCcIdxs_ = function(self, ccIdxs)
+    checkCcIdxs_ = function(_, ccIdxs)
         -- Assert strict monotonicity requirement.
         for i = 2, #ccIdxs do
             assert(ccIdxs[i - 1] < ccIdxs[i])
@@ -2202,7 +2202,7 @@ local Controller = class
 
         local iterationCount = 0
 
-        for i, ccIndex, fDiagSet, incGraph in self.parser:iterate() do
+        for i, _, fDiagSet, incGraph in self.parser:iterate() do
             iterationCount = iterationCount + 1
             assert((i == 1) == (iterationCount == 1))
 
@@ -2382,7 +2382,7 @@ local function main()
         startTime = os.time()
 
         -- Ensure that the memory obtained for the symbol index is munmap()'d.
-        control = nil
+        control = nil  -- luacheck: ignore 311
         collectgarbage()
 
         control = Controller(membersTakenOver, newCcIdxs, parserOpts)

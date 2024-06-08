@@ -10,7 +10,6 @@ local posix = require("posix")
 local assert = assert
 local error = error
 local tonumber = tonumber
-local tostring = tostring
 local type = type
 
 ----------

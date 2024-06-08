@@ -12,12 +12,11 @@ local SymbolIndex = symbol_index.SymbolIndex
 require 'busted.runner'()
 
 local assert = assert
-local describe = describe
-local it = it
+local describe = describe  -- luacheck: ignore 113
+local it = it  -- luacheck: ignore 113
 
 local collectgarbage = collectgarbage
 local ipairs = ipairs
-local rawequal = rawequal
 local type = type
 local tostring = tostring
 local unpack = unpack
@@ -29,7 +28,6 @@ local C = ffi.C
 local io = require("io")
 local os = require("os")
 local math = require("math")
-local string = require("string")
 local table = require("table")
 
 ffi.cdef[[
@@ -52,7 +50,7 @@ describe("posix.lua", function()
         local ExpectedFileCount = 7
         local haveFile = {}
 
-        for i = 1, ExpectedFileCount + 2 do
+        for _ = 1, ExpectedFileCount + 2 do
             local fileName = dir:read()
             assert.is_true(type(fileName) == "string")
             assert.is_nil(haveFile[fileName])
@@ -122,7 +120,7 @@ describe("posix.lua", function()
         until (#fds == 0)
 
         -- Close the files which did not happen to have their Fd objects garbage-collected.
-        fds = nil
+        fds = nil  -- luacheck: ignore 311
         collectgarbage()
     end)
 end)
@@ -136,9 +134,9 @@ describe("Memory mapping with padding", function()
 
         local PrefixSize = PageSize
         local TotalSize = 128 * 1024*1024
-        local PageCount = TotalSize / PageSize
+--        local PageCount = TotalSize / PageSize
 
-        for i = 1, CreateCount do
+        for _ = 1, CreateCount do
             local ptr = posix.memMapWithPadding(
                 TotalSize, PrefixSize, PROT.READ, MAP.PRIVATE + LMAP.ANONYMOUS, -1)
 
@@ -148,7 +146,7 @@ describe("Memory mapping with padding", function()
             assert.is_equal(uPtr[0], 0)
             assert.is_equal(uPtr[TotalSize - 1], 0)
 
-            ptr = nil
+            ptr = nil  -- luacheck: ignore 311
             collectgarbage()
         end
     end)
@@ -168,7 +166,7 @@ describe("Memory mapping with padding", function()
             assert.is_equal(uPtr[0], 0)
             assert.is_equal(uPtr[totalSize - 1], 0)
 
-            ptr = nil
+            ptr = nil  -- luacheck: ignore 311
             collectgarbage()
             end
     end)
@@ -176,7 +174,6 @@ describe("Memory mapping with padding", function()
     it("tests overlaying with a file-backed mapping", function()
         local fd = C.open(arg0, posix.O.RDONLY)
         assert(fd ~= -1, "Failed opening self (tests.lua) for reading")
-        local Fd = posix.Fd(fd)
 
         local ptr = posix.memMapWithPadding(
             2*PageSize, PageSize, PROT.READ, MAP.PRIVATE, fd)
@@ -187,7 +184,7 @@ describe("Memory mapping with padding", function()
         assert.is_equal(uPtr[0], ('#'):byte())  -- first char of '#!' at the beginning.
         assert.is_equal(uPtr[PageSize], 0)
 
-        ptr = nil
+        ptr = nil  -- luacheck: ignore 311
         collectgarbage()
     end)
 end)
@@ -196,8 +193,8 @@ local function testSymbolIndex()
     it("tests repeated creation and destruction", function()
         local CreateCount = 100
 
-        for i = 1, CreateCount do
-            local symIndex = SymbolIndex(4)
+        for _ = 1, CreateCount do
+            local symIndex = SymbolIndex(4)  -- luacheck: ignore 231
             symIndex = nil
             collectgarbage()
         end
@@ -250,7 +247,7 @@ local function testSymbolIndex()
         symIndex:remapLocalToGlobalPage(LocalPageArrayIdx, LocalPageIdx, GlobalPageIdx)
         assert.is_equal(gPage[EntryIdx].intFlags, RefNum)
 
-        symIndex = nil
+        symIndex = nil  -- luacheck: ignore 311
         collectgarbage()
     end)
 end
@@ -286,13 +283,14 @@ local function describe2(title, func)
     end
 end
 
-local clangOpts = { "-std=c++14", "-Wall", "-pedantic" }
+local g_clangOpts = { "-std=c++14", "-Wall", "-pedantic" }
 
 local function GetTU(createTU, fileName,
                      -- optional:
                      expectedDiagCount, opts)
     local tu = createTU(cl.createIndex(),
-                        fileName, (opts ~= nil) and opts or clangOpts)
+                        fileName, (opts ~= nil) and opts or g_clangOpts)
+    -- luacheck: ignore 143
     assert.is_not_nil(tu)
     local diags = tu:diagnosticSet()
     assert.are.equal(#diags, expectedDiagCount or 0)
@@ -302,11 +300,13 @@ end
 describe2("Attempting to parse a nonexistent file", function(createTU)
     local index = cl.createIndex()
     local tu, errorCode = createTU(index, nonExistentFileName, { "-std=c99" })
+    -- luacheck: ignore 143
     assert.is_nil(tu)
     assert.are.not_equal(errorCode, cl.ErrorCode.Success)
 end)
 
 local function assertParseWasSuccess(tu, errorCode)
+    -- luacheck: ignore 143
     assert.is_not_nil(tu)
     assert.are.equal(errorCode, cl.ErrorCode.Success)
 end
@@ -316,7 +316,7 @@ local ASTFileName = "/tmp/ljclang_test_simple.hpp.ast"
 describe2("Loading a cpp file without includes", function(createTU)
     local fileName = "test_data/simple.hpp"
 
-    local tu, errorCode = createTU(cl.createIndex(), fileName, clangOpts)
+    local tu, errorCode = createTU(cl.createIndex(), fileName, g_clangOpts)
 
     -- Test that we don't need to keep the index (from createIndex()) around:
     collectgarbage()
@@ -393,7 +393,7 @@ describe2("Loading a cpp file without includes", function(createTU)
             collectgarbage()
             local memInUseBefore = collectgarbage("count")
 
-            for i = 1, 1000 do
+            for _ = 1, 1000 do
                 tu:diagnosticSet()
             end
 
@@ -453,7 +453,7 @@ describe2("Loading a cpp file without includes", function(createTU)
             collectgarbage()
             local memInUseBefore = collectgarbage("count")
 
-            for i = 1, numLoops do
+            for _ = 1, numLoops do
                 local a, b = math.random(), math.random()
 
                 tuCursor:children(function()
@@ -575,7 +575,7 @@ describe2("Loading a file with includes", function(createTU)
     writeToFile(fileName2, '#include "enums.hpp"')
 
     local additionalOpts = {"-Itest_data/"}
-    local clangOpts = concatTables(clangOpts, additionalOpts)
+    local clangOpts = concatTables(g_clangOpts, additionalOpts)
 
     it("tests passing a single source file name", function()
         local tu, errorCode = createTU(cl.createIndex(), fileName1, clangOpts)
@@ -583,7 +583,7 @@ describe2("Loading a file with includes", function(createTU)
 
         local callCount = 0
 
-        local incs = tu:inclusions(function(includedFile, stack)
+        tu:inclusions(function(includedFile, stack)
             callCount = callCount + 1
 
             assert.is_false(includedFile:isSystemHeader())
@@ -602,15 +602,15 @@ describe2("Loading a file with includes", function(createTU)
         cl.ErrorCode.ASTReadError or cl.ErrorCode.Failure
 
     it("tests passing multiple source file names (1)", function()
-        local clangOpts = concatTables(clangOpts, {fileName1, fileName2})
-        local tu, errorCode = createTU(cl.createIndex(), "", clangOpts)
+        local clOpts = concatTables(clangOpts, {fileName1, fileName2})
+        local tu, errorCode = createTU(cl.createIndex(), "", clOpts)
         assert.is_nil(tu)
         assert.are.equal(errorCode, expectedError)
     end)
 
     it("tests passing multiple source file names (2)", function()
-        local clangOpts = concatTables(clangOpts, {fileName2})
-        local tu, errorCode = createTU(cl.createIndex(), fileName1, clangOpts)
+        local clOpts = concatTables(clangOpts, {fileName2})
+        local tu, errorCode = createTU(cl.createIndex(), fileName1, clOpts)
         assert.is_nil(tu)
         assert.are.equal(errorCode, expectedError)
     end)
@@ -682,7 +682,7 @@ describe2("Virtual functions", function(createTU)
     local tuCursor = tu:cursor()
 
     local classDefs = tuCursor:children()
-    assert.is.equal(#classDefs, 6)
+    assert.is.equal(#classDefs, 6)  -- luacheck: ignore 143
     classDefs[5] = nil  -- EnumDecl for another test case
     classDefs[6] = nil  -- namespace
 
@@ -809,6 +809,7 @@ local function testMangling(createTU)
         return V.Continue
     end)
 
+    -- luacheck: ignore 143
     assert.is_equal(mangling, "_ZN7LJClang9TestClass12testFunctionERKNS_10TestStructE")
 end
 
@@ -909,7 +910,7 @@ describe("Indexer callbacks", function()
         }
 
         local additionalOpts = {"-Itest_data/", "-include-pch", ASTFileName}
-        runIndexing(FileName, nil, callbacks, 2, concatTables(clangOpts, additionalOpts))
+        runIndexing(FileName, nil, callbacks, 2, concatTables(g_clangOpts, additionalOpts))
     end)
 
     it("tests indexing with declaration and entity reference callbacks", function()
@@ -1189,7 +1190,7 @@ MAKE_VAR(long long, Ninth, Green);
         }
 
         local additionalOpts = {"-Itest_data/"}
-        runIndexing(FileName, nil, callbacks, 0, concatTables(clangOpts, additionalOpts))
+        runIndexing(FileName, nil, callbacks, 0, concatTables(g_clangOpts, additionalOpts))
 
         assert.are.same(eventStrings, {
             "#inc T:2:1: enums.hpp",

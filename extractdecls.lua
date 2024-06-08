@@ -8,7 +8,6 @@ local ffi = require("ffi")
 
 local io = require("io")
 local os = require("os")
-local math = require("math")
 local string = require("string")
 local table = require("table")
 
@@ -19,7 +18,6 @@ local assert = assert
 local getfenv = getfenv
 local ipairs = ipairs
 local loadstring = loadstring
-local pcall = pcall
 local print = print
 local setfenv = setfenv
 local tonumber = tonumber
@@ -346,7 +344,7 @@ local function matchesFilterPattern(name)
 end
 
 local visitor = cl.regCursorVisitor(
-function(cur, parent)
+function(cur, _)
     if (extractEnum) then
         if (cur:haskind("EnumDecl")) then
             if (enumNameFilterPattern ~= nil and not cur:name():find(enumNameFilterPattern)) then

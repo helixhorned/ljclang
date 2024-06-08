@@ -1,3 +1,4 @@
+-- luacheck: ignore 542
 
 local string = require("string")
 local table = require("table")
@@ -6,8 +7,6 @@ local format = string.format
 
 local assert = assert
 local ipairs = ipairs
-local type = type
-local unpack = unpack
 
 local class = require("class").class
 local error_util = require("error_util")
@@ -102,6 +101,7 @@ local function patternFor(sep)
 end
 
 local function FormattedDiagSet_Serialize(self)
+    local L = Sep.Line
     local tab = {}
 
     for _, diag in ipairs(self.diags) do
@@ -112,10 +112,9 @@ local function FormattedDiagSet_Serialize(self)
             innerTab[#innerTab + 1] = line
         end
 
-        tab[#tab + 1] = table.concat(innerTab, Sep.Line)..Sep.Line
+        tab[#tab + 1] = table.concat(innerTab, L)..L
     end
 
-    local L = Sep.Line
     local info = self.info ~= nil and self.info[1] or Sep.EmptyInfo
 
     if (self.info ~= nil) then
@@ -123,7 +122,7 @@ local function FormattedDiagSet_Serialize(self)
         assert(not self.info[1]:find(SpecialCharsPattern))
     end
 
-    tab[#tab + 1] = DiagInfoSeverity..Sep.Line..info..Sep.Line
+    tab[#tab + 1] = DiagInfoSeverity..L..info..L
 
     return table.concat(tab, Sep.Diag.Value)..Sep.Diag.Value
 end

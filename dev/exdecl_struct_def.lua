@@ -1,6 +1,5 @@
 #!/bin/false extractdecls.lua modspec
 
-local check = check
 local concat = concat
 local printf = printf
 
