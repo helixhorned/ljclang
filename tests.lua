@@ -335,6 +335,7 @@ describe2("Loading a cpp file without includes", function(createTU)
 
             assert.is_true(file:isMainFile())
             assert.is_false(file:isSystemHeader())
+            assert.is_false(file:isMultipleIncludeGuarded())
 
             assert.is_true(obtainedFileName == fileName)
             assert.is_true(absoluteFileName:sub(1,1) == "/")

@@ -1276,7 +1276,7 @@ local function InclusionGraph_ProcessTU(graph, tu)
 
             -- NOTE: graph is constructed with edges going
             --  from the file being '#include'd
-            --  to the file containing the '#include'd
+            --  to the file containing the '#include'.
             -- That is, it models the "isIncludedBy" relation.
             -- KEEPINSYNC 'GlobalInclusionGraphRelation'.
             graph:addInclusion(toRealName, fromRealName)

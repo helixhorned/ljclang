@@ -781,6 +781,10 @@ File = class
         return (clang.clang_File_isEqual(self._cxfile, other._cxfile) ~= 0)
     end,
 
+    isMultipleIncludeGuarded = function(self)
+        return (clang.clang_isFileMultipleIncludeGuarded(self._parent._tu, self._cxfile) ~= 0)
+    end,
+
     name = function(self)
         return getString(clang.clang_getFileName(self._cxfile))
     end,
