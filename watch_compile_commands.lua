@@ -142,7 +142,10 @@ Options:
   where the integral <number> starts with a decimal digit distinct from zero:
     - '@<number>': single compile command, or
     - '@<number>..': range starting with the specified index, or
-    - '@<number>..<number>': inclusive range.]],
+    - '@<number>..<number>': inclusive range.
+
+  When immediate exit is requested (via '-g' or '-x'), the exit code is nonzero if there
+  were any diagnostic with severity 'error' or 'fatal'.]],
 CacheDirectory, GlobalInclusionGraphRelation)
     if (not IsMakingApp) then
         os.exit(ErrorCode.CommandLine)
@@ -1808,6 +1811,8 @@ local Notifier = class
     end,
 }
 
+local IsErrorSeverity = { error=true, fatal=true }
+
 local function HasMatchingDiag(fDiagSet, isSeverityRelevant)
     for _, fDiag in ipairs(fDiagSet:getDiags()) do
         if (isSeverityRelevant[fDiag:getSeverity()]) then
@@ -1839,6 +1844,7 @@ local Controller = class
             connection = nil,  -- Connection
 
             --== Parent will have:
+            isErrorDiagPresent = false,
             -- Table of Connection instances, with possible holes. Indexed by the 'connection index'.
             connections = nil,
             -- Table (read file descriptor -> index into self.connections[]).
@@ -2129,6 +2135,10 @@ local Controller = class
                     serializedDiags, not plainMode)
                 assert(fDiagSet ~= nil)
 
+                if (HasMatchingDiag(fDiagSet, IsErrorSeverity)) then
+                    self.isErrorDiagPresent = true
+                end
+
                 formattedDiagSets[ccIdx] = fDiagSet;
 
                 -- TODO: immediately add files to the include graph here? (We are already
@@ -2286,8 +2296,6 @@ local function main()
         if (printGraphMode ~= nil) then
             local graph = GetGlobalInclusionGraph(#compileCommands, ccInclusionGraphs)
             PrintInclusionGraphAsGraphvizDot(graph)
-            -- TODO: see if there were errors, actually. After all, there may have been
-            -- #include errors!
         end
 
         if (not exitImmediately) then
@@ -2310,7 +2318,7 @@ local function main()
         printf("")
 
         if (exitImmediately) then
-            break
+            return control.isErrorDiagPresent and 1 or 0
         end
 
         if (commandMode) then
@@ -2389,4 +2397,6 @@ local function main()
     until (false)
 end
 
-main()
+local exitCodeOpt = main()
+
+os.exit(exitCodeOpt)
