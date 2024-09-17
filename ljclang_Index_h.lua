@@ -749,7 +749,7 @@ enum CXCursorKind {
 
   CXCursor_ObjCSelfExpr = 146,
 
-  CXCursor_OMPArraySectionExpr = 147,
+  CXCursor_ArraySectionExpr = 147,
 
   CXCursor_ObjCAvailabilityCheckExpr = 148,
 
@@ -766,7 +766,9 @@ enum CXCursorKind {
   CXCursor_RequiresExpr = 154,
 
   CXCursor_CXXParenListInitExpr = 155,
-  CXCursor_LastExpr = CXCursor_CXXParenListInitExpr,
+
+  CXCursor_PackIndexingExpr = 156,
+  CXCursor_LastExpr = CXCursor_PackIndexingExpr,
   /* Statements */
   CXCursor_FirstStmt = 200,
 
@@ -984,7 +986,15 @@ enum CXCursorKind {
   CXCursor_OMPErrorDirective = 305,
 
   CXCursor_OMPScopeDirective = 306,
-  CXCursor_LastStmt = CXCursor_OMPScopeDirective,
+
+  CXCursor_OMPReverseDirective = 307,
+
+  CXCursor_OMPInterchangeDirective = 308,
+
+  CXCursor_OpenACCComputeConstruct = 320,
+
+  CXCursor_OpenACCLoopConstruct = 321,
+  CXCursor_LastStmt = CXCursor_OpenACCLoopConstruct,
 
   CXCursor_TranslationUnit = 350,
   /* Attributes */
@@ -1312,6 +1322,8 @@ enum CXCallingConv {
   CXCallingConv_SwiftAsync = 17,
   CXCallingConv_AArch64SVEPCS = 18,
   CXCallingConv_M68kRTD = 19,
+  CXCallingConv_PreserveNone = 20,
+  CXCallingConv_RISCVVectorCall = 21,
   CXCallingConv_Invalid = 100,
   CXCallingConv_Unexposed = 200
 };
@@ -1456,6 +1468,47 @@ enum CX_StorageClass {
   CX_SC_Auto,
   CX_SC_Register
 };
+enum CX_BinaryOperatorKind {
+  CX_BO_Invalid = 0,
+  CX_BO_PtrMemD = 1,
+  CX_BO_PtrMemI = 2,
+  CX_BO_Mul = 3,
+  CX_BO_Div = 4,
+  CX_BO_Rem = 5,
+  CX_BO_Add = 6,
+  CX_BO_Sub = 7,
+  CX_BO_Shl = 8,
+  CX_BO_Shr = 9,
+  CX_BO_Cmp = 10,
+  CX_BO_LT = 11,
+  CX_BO_GT = 12,
+  CX_BO_LE = 13,
+  CX_BO_GE = 14,
+  CX_BO_EQ = 15,
+  CX_BO_NE = 16,
+  CX_BO_And = 17,
+  CX_BO_Xor = 18,
+  CX_BO_Or = 19,
+  CX_BO_LAnd = 20,
+  CX_BO_LOr = 21,
+  CX_BO_Assign = 22,
+  CX_BO_MulAssign = 23,
+  CX_BO_DivAssign = 24,
+  CX_BO_RemAssign = 25,
+  CX_BO_AddAssign = 26,
+  CX_BO_SubAssign = 27,
+  CX_BO_ShlAssign = 28,
+  CX_BO_ShrAssign = 29,
+  CX_BO_AndAssign = 30,
+  CX_BO_XorAssign = 31,
+  CX_BO_OrAssign = 32,
+  CX_BO_Comma = 33,
+  CX_BO_LAST = CX_BO_Comma
+};
+ enum CX_BinaryOperatorKind
+clang_Cursor_getBinaryOpcode(CXCursor C);
+ CXString
+clang_Cursor_getBinaryOpcodeStr(enum CX_BinaryOperatorKind Op);
  enum CX_StorageClass clang_Cursor_getStorageClass(CXCursor);
  unsigned clang_getNumOverloadedDecls(CXCursor cursor);
  CXCursor clang_getOverloadedDecl(CXCursor cursor,
