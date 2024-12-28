@@ -1823,6 +1823,8 @@ end
 
 local INOTIFY_FD_MARKER = -math.huge
 
+local uint8_array_t = ffi.typeof("uint8_t [?]")
+
 local Controller = class
 {
     -- <members>: table of certain members that can be taken over from run to run.
@@ -1887,9 +1889,9 @@ local Controller = class
 
     receiveString = function(self, connIdx, length)
         local conn = self.connections[connIdx]
-        local str = conn.r:read(length)
-        assert(#str == length)
-        return str
+        local buf = uint8_array_t(length)
+        conn.r:readInto(buf, false)
+        return ffi.string(buf, length)
     end,
 
     receiveData = function(self, connIdx, cdata)
