@@ -3,7 +3,7 @@
 # development directory) if doing 'install-dev'.
 BINDIR ?= $(HOME)/bin
 
-LLVM_MAJOR_VERSION=19
+LLVM_MAJOR_VERSION=20
 LLVM_CONFIG ?= llvm-config-$(LLVM_MAJOR_VERSION)
 
 luajit := luajit

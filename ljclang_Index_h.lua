@@ -67,6 +67,8 @@ typedef struct {
  CXSourceLocation clang_getNullLocation(void);
  unsigned clang_equalLocations(CXSourceLocation loc1,
                                              CXSourceLocation loc2);
+ unsigned clang_isBeforeInTranslationUnit(CXSourceLocation loc1,
+                                                        CXSourceLocation loc2);
  int clang_Location_isInSystemHeader(CXSourceLocation location);
  int clang_Location_isFromMainFile(CXSourceLocation location);
  CXSourceRange clang_getNullRange(void);
@@ -991,10 +993,32 @@ enum CXCursorKind {
 
   CXCursor_OMPInterchangeDirective = 308,
 
+  CXCursor_OMPAssumeDirective = 309,
+
   CXCursor_OpenACCComputeConstruct = 320,
 
   CXCursor_OpenACCLoopConstruct = 321,
-  CXCursor_LastStmt = CXCursor_OpenACCLoopConstruct,
+
+  CXCursor_OpenACCCombinedConstruct = 322,
+
+  CXCursor_OpenACCDataConstruct = 323,
+
+  CXCursor_OpenACCEnterDataConstruct = 324,
+
+  CXCursor_OpenACCExitDataConstruct = 325,
+
+  CXCursor_OpenACCHostDataConstruct = 326,
+
+  CXCursor_OpenACCWaitConstruct = 327,
+
+  CXCursor_OpenACCInitConstruct = 328,
+
+  CXCursor_OpenACCShutdownConstruct = 329,
+
+  CXCursor_OpenACCSetConstruct = 330,
+
+  CXCursor_OpenACCUpdateConstruct = 331,
+  CXCursor_LastStmt = CXCursor_OpenACCUpdateConstruct,
 
   CXCursor_TranslationUnit = 350,
   /* Attributes */
@@ -1297,7 +1321,10 @@ enum CXTypeKind {
   CXType_OCLIntelSubgroupAVCImeDualRefStreamin = 175,
   CXType_ExtVector = 176,
   CXType_Atomic = 177,
-  CXType_BTFTagAttributed = 178
+  CXType_BTFTagAttributed = 178,
+  /* HLSL Types */
+  CXType_HLSLResource = 179,
+  CXType_HLSLAttributedResource = 180
 };
 enum CXCallingConv {
   CXCallingConv_Default = 0,
@@ -1451,6 +1478,7 @@ enum CXRefQualifierKind {
                                                            unsigned i);
  enum CXRefQualifierKind clang_Type_getCXXRefQualifier(CXType T);
  unsigned clang_isVirtualBase(CXCursor);
+ long long clang_getOffsetOfBase(CXCursor Parent, CXCursor Base);
 enum CX_CXXAccessSpecifier {
   CX_CXXInvalidAccessSpecifier,
   CX_CXXPublic,
@@ -1588,6 +1616,8 @@ clang_PrintingPolicy_setProperty(CXPrintingPolicy Policy,
  void clang_PrintingPolicy_dispose(CXPrintingPolicy Policy);
  CXString clang_getCursorPrettyPrinted(CXCursor Cursor,
                                                      CXPrintingPolicy Policy);
+ CXString clang_getTypePrettyPrinted(CXType CT,
+                                                   CXPrintingPolicy cxPolicy);
  CXString clang_getCursorDisplayName(CXCursor);
  CXCursor clang_getCursorReferenced(CXCursor);
  CXCursor clang_getCursorDefinition(CXCursor);
@@ -2229,6 +2259,9 @@ typedef enum CXVisitorResult (*CXFieldVisitor)(CXCursor C,
                                                CXClientData client_data);
  unsigned clang_Type_visitFields(CXType T, CXFieldVisitor visitor,
                                                CXClientData client_data);
+ unsigned clang_visitCXXBaseClasses(CXType T,
+                                                  CXFieldVisitor visitor,
+                                                  CXClientData client_data);
 enum CXBinaryOperatorKind {
 
   CXBinaryOperator_Invalid,
