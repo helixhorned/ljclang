@@ -40,7 +40,7 @@ llvm_libdir_include := $(libdir)/clang/$(LLVM_MAJOR_VERSION)/include
 
 common_flags := -I$(incdir) -fPIC -O2
 common_flags += -DLJCLANG_LLVM_VERSION='"$(llvm_version)"'
-common_flags += -Werror -Wall -Wextra -pedantic
+common_flags += -Werror -Wno-error=deprecated-declarations -Wall -Wextra -pedantic
 
 cflags := -std=c99 $(common_flags)
 

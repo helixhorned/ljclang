@@ -995,6 +995,8 @@ enum CXCursorKind {
 
   CXCursor_OMPAssumeDirective = 309,
 
+  CXCursor_OMPStripeDirective = 310,
+
   CXCursor_OpenACCComputeConstruct = 320,
 
   CXCursor_OpenACCLoopConstruct = 321,
@@ -1018,7 +1020,11 @@ enum CXCursorKind {
   CXCursor_OpenACCSetConstruct = 330,
 
   CXCursor_OpenACCUpdateConstruct = 331,
-  CXCursor_LastStmt = CXCursor_OpenACCUpdateConstruct,
+
+  CXCursor_OpenACCAtomicConstruct = 332,
+
+  CXCursor_OpenACCCacheConstruct = 333,
+  CXCursor_LastStmt = CXCursor_OpenACCCacheConstruct,
 
   CXCursor_TranslationUnit = 350,
   /* Attributes */
@@ -1324,7 +1330,8 @@ enum CXTypeKind {
   CXType_BTFTagAttributed = 178,
   /* HLSL Types */
   CXType_HLSLResource = 179,
-  CXType_HLSLAttributedResource = 180
+  CXType_HLSLAttributedResource = 180,
+  CXType_HLSLInlineSpirv = 181
 };
 enum CXCallingConv {
   CXCallingConv_Default = 0,
@@ -1351,6 +1358,18 @@ enum CXCallingConv {
   CXCallingConv_M68kRTD = 19,
   CXCallingConv_PreserveNone = 20,
   CXCallingConv_RISCVVectorCall = 21,
+  CXCallingConv_RISCVVLSCall_32 = 22,
+  CXCallingConv_RISCVVLSCall_64 = 23,
+  CXCallingConv_RISCVVLSCall_128 = 24,
+  CXCallingConv_RISCVVLSCall_256 = 25,
+  CXCallingConv_RISCVVLSCall_512 = 26,
+  CXCallingConv_RISCVVLSCall_1024 = 27,
+  CXCallingConv_RISCVVLSCall_2048 = 28,
+  CXCallingConv_RISCVVLSCall_4096 = 29,
+  CXCallingConv_RISCVVLSCall_8192 = 30,
+  CXCallingConv_RISCVVLSCall_16384 = 31,
+  CXCallingConv_RISCVVLSCall_32768 = 32,
+  CXCallingConv_RISCVVLSCall_65536 = 33,
   CXCallingConv_Invalid = 100,
   CXCallingConv_Unexposed = 200
 };
@@ -1618,6 +1637,8 @@ clang_PrintingPolicy_setProperty(CXPrintingPolicy Policy,
                                                      CXPrintingPolicy Policy);
  CXString clang_getTypePrettyPrinted(CXType CT,
                                                    CXPrintingPolicy cxPolicy);
+ CXString clang_getFullyQualifiedName(
+    CXType CT, CXPrintingPolicy Policy, unsigned WithGlobalNsPrefix);
  CXString clang_getCursorDisplayName(CXCursor);
  CXCursor clang_getCursorReferenced(CXCursor);
  CXCursor clang_getCursorDefinition(CXCursor);
@@ -1668,6 +1689,22 @@ typedef enum {
  CXString clang_Cursor_getMangling(CXCursor);
  CXStringSet *clang_Cursor_getCXXManglings(CXCursor);
  CXStringSet *clang_Cursor_getObjCManglings(CXCursor);
+ CXString clang_Cursor_getGCCAssemblyTemplate(CXCursor);
+ unsigned clang_Cursor_isGCCAssemblyHasGoto(CXCursor);
+ unsigned clang_Cursor_getGCCAssemblyNumOutputs(CXCursor);
+ unsigned clang_Cursor_getGCCAssemblyNumInputs(CXCursor);
+ unsigned clang_Cursor_getGCCAssemblyInput(CXCursor Cursor,
+                                                         unsigned Index,
+                                                         CXString *Constraint,
+                                                         CXCursor *Expr);
+ unsigned clang_Cursor_getGCCAssemblyOutput(CXCursor Cursor,
+                                                          unsigned Index,
+                                                          CXString *Constraint,
+                                                          CXCursor *Expr);
+ unsigned clang_Cursor_getGCCAssemblyNumClobbers(CXCursor Cursor);
+ CXString clang_Cursor_getGCCAssemblyClobber(CXCursor Cursor,
+                                                           unsigned Index);
+ unsigned clang_Cursor_isGCCAssemblyVolatile(CXCursor Cursor);
 typedef void *CXModule;
  CXModule clang_Cursor_getModule(CXCursor C);
  CXModule clang_getModuleForFile(CXTranslationUnit, CXFile);
@@ -1944,15 +1981,6 @@ clang_EvalResult_getAsUnsigned(CXEvalResult E);
  double clang_EvalResult_getAsDouble(CXEvalResult E);
  const char *clang_EvalResult_getAsStr(CXEvalResult E);
  void clang_EvalResult_dispose(CXEvalResult E);
-typedef void *CXRemapping;
- CXRemapping clang_getRemappings(const char *path);
-CXRemapping clang_getRemappingsFromFileList(const char **filePaths,
-                                            unsigned numFiles);
- unsigned clang_remap_getNumFiles(CXRemapping);
- void clang_remap_getFilenames(CXRemapping, unsigned index,
-                                             CXString *original,
-                                             CXString *transformed);
- void clang_remap_dispose(CXRemapping);
 enum CXVisitorResult { CXVisit_Break, CXVisit_Continue };
 typedef struct CXCursorAndRangeVisitor {
   void *context;
@@ -2262,75 +2290,78 @@ typedef enum CXVisitorResult (*CXFieldVisitor)(CXCursor C,
  unsigned clang_visitCXXBaseClasses(CXType T,
                                                   CXFieldVisitor visitor,
                                                   CXClientData client_data);
+ unsigned clang_visitCXXMethods(CXType T, CXFieldVisitor visitor,
+                                              CXClientData client_data);
 enum CXBinaryOperatorKind {
 
-  CXBinaryOperator_Invalid,
+  CXBinaryOperator_Invalid = 0,
 
-  CXBinaryOperator_PtrMemD,
+  CXBinaryOperator_PtrMemD = 1,
 
-  CXBinaryOperator_PtrMemI,
+  CXBinaryOperator_PtrMemI = 2,
 
-  CXBinaryOperator_Mul,
+  CXBinaryOperator_Mul = 3,
 
-  CXBinaryOperator_Div,
+  CXBinaryOperator_Div = 4,
 
-  CXBinaryOperator_Rem,
+  CXBinaryOperator_Rem = 5,
 
-  CXBinaryOperator_Add,
+  CXBinaryOperator_Add = 6,
 
-  CXBinaryOperator_Sub,
+  CXBinaryOperator_Sub = 7,
 
-  CXBinaryOperator_Shl,
+  CXBinaryOperator_Shl = 8,
 
-  CXBinaryOperator_Shr,
+  CXBinaryOperator_Shr = 9,
 
-  CXBinaryOperator_Cmp,
+  CXBinaryOperator_Cmp = 10,
 
-  CXBinaryOperator_LT,
+  CXBinaryOperator_LT = 11,
 
-  CXBinaryOperator_GT,
+  CXBinaryOperator_GT = 12,
 
-  CXBinaryOperator_LE,
+  CXBinaryOperator_LE = 13,
 
-  CXBinaryOperator_GE,
+  CXBinaryOperator_GE = 14,
 
-  CXBinaryOperator_EQ,
+  CXBinaryOperator_EQ = 15,
 
-  CXBinaryOperator_NE,
+  CXBinaryOperator_NE = 16,
 
-  CXBinaryOperator_And,
+  CXBinaryOperator_And = 17,
 
-  CXBinaryOperator_Xor,
+  CXBinaryOperator_Xor = 18,
 
-  CXBinaryOperator_Or,
+  CXBinaryOperator_Or = 19,
 
-  CXBinaryOperator_LAnd,
+  CXBinaryOperator_LAnd = 20,
 
-  CXBinaryOperator_LOr,
+  CXBinaryOperator_LOr = 21,
 
-  CXBinaryOperator_Assign,
+  CXBinaryOperator_Assign = 22,
 
-  CXBinaryOperator_MulAssign,
+  CXBinaryOperator_MulAssign = 23,
 
-  CXBinaryOperator_DivAssign,
+  CXBinaryOperator_DivAssign = 24,
 
-  CXBinaryOperator_RemAssign,
+  CXBinaryOperator_RemAssign = 25,
 
-  CXBinaryOperator_AddAssign,
+  CXBinaryOperator_AddAssign = 26,
 
-  CXBinaryOperator_SubAssign,
+  CXBinaryOperator_SubAssign = 27,
 
-  CXBinaryOperator_ShlAssign,
+  CXBinaryOperator_ShlAssign = 28,
 
-  CXBinaryOperator_ShrAssign,
+  CXBinaryOperator_ShrAssign = 29,
 
-  CXBinaryOperator_AndAssign,
+  CXBinaryOperator_AndAssign = 30,
 
-  CXBinaryOperator_XorAssign,
+  CXBinaryOperator_XorAssign = 31,
 
-  CXBinaryOperator_OrAssign,
+  CXBinaryOperator_OrAssign = 32,
 
-  CXBinaryOperator_Comma
+  CXBinaryOperator_Comma = 33,
+  CXBinaryOperator_Last = CXBinaryOperator_Comma
 };
  CXString
 clang_getBinaryOperatorKindSpelling(enum CXBinaryOperatorKind kind);
@@ -2372,5 +2403,13 @@ enum CXUnaryOperatorKind {
 clang_getUnaryOperatorKindSpelling(enum CXUnaryOperatorKind kind);
  enum CXUnaryOperatorKind
 clang_getCursorUnaryOperatorKind(CXCursor cursor);
+typedef void *CXRemapping;
+  CXRemapping clang_getRemappings(const char *);
+  CXRemapping
+clang_getRemappingsFromFileList(const char **, unsigned);
+  unsigned clang_remap_getNumFiles(CXRemapping);
+  void
+clang_remap_getFilenames(CXRemapping, unsigned, CXString *, CXString *);
+  void clang_remap_dispose(CXRemapping);
 	]==========]
 return {}
