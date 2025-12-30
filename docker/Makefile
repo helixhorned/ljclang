@@ -128,8 +128,8 @@ canRun = $(or $(call canRunNatively,$(1)),$(call canRunEmulated,$(1)))
 ARCH ?= null
 DISTRO ?= null
 # Check out a specific LuaJIT commit:
-#  "DynASM/ARM64: Support ldp/stp of q registers."
-LJ_GIT_HASH := 656ecbcf8f669feb94e0d0ec4b4f59190bcd2e48
+#  "Fix string.format for limited precision FP conversions."
+LJ_GIT_HASH := 7152e15489d2077cd299ee23e3d51a4c599ab14f
 LJ_SHA256 ?= null
 #
 qemu_suffix :=
@@ -329,7 +329,7 @@ ljclang-dev-arm32v7/debian:
 #   https://askubuntu.com/questions/1263284/apt-update-throws-signature-error-in-ubuntu-20-04-container-on-arm
 #   https://github.com/moby/moby/issues/40734
 ljclang-dev-arm32v7/ubuntu:
-	+$(call check_or_make_image,arm32v7,ubuntu,bad2d6c85fe7e5f80bbfb06316913b01a09aa87b4a3d3cb799db33e5364221b2)
+	+$(call check_or_make_image,arm32v7,ubuntu,TODO)
 #
 # Docker image of Ubuntu 18.04 as a workaround for the above issue.
 ljclang-dev-arm32v7/ubuntu-bionic:
@@ -355,11 +355,11 @@ ljclang-dev-amd64/ALL: ljclang-dev-amd64/alpine ljclang-dev-amd64/debian ljclang
 ljclang-dev-ALL/ALL: ljclang-dev-amd64/ALL
 
 ljclang-dev-amd64/alpine:
-	+$(call check_or_make_image,amd64,alpine,TODO)
+	+$(call check_or_make_image,amd64,alpine,fbb475928f18809ae5a59e09e976f1597364c9f6277af21079da5b0d4a5e3d94)
 
 ljclang-dev-amd64/debian:
 	+$(call check_or_make_image,amd64,debian,TODO)
 
 ljclang-dev-amd64/ubuntu:
-	+$(call check_or_make_image,amd64,ubuntu,9308ccb211b6a0481a851655d01435682f4da505f9261d37eb15fbe931652d64)
+	+$(call check_or_make_image,amd64,ubuntu,TODO)
 endif
