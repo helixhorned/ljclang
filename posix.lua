@@ -60,20 +60,25 @@ FILE *freopen(const char *pathname, const char *mode, FILE *stream);
 char *realpath(const char *path, char *resolved_path);
 ]]
 
--- NOTE: readdir64() is present in glibc and musl. We use it instead of readdir() because
---  with glibc, 'struct dirent' has #ifndef-conditional member definitions while 'struct
---  dirent64' does not.
---
---  In musl, 'dirent64' is simply #defined to 'dirent'. In Alpine Linux's /usr/lib/libc.a,
---  'dirent64' is present as 'W' symbol as shown by 'nm'.
+-- NOTE: readdir64() is present in only in glibc. We use it instead of readdir() because
+--  'struct dirent' has #ifndef-conditional member definitions while 'struct dirent64' does
+--  not.
 ffi.cdef[[
 struct _DIR;
 struct dirent64;
 typedef struct _DIR DIR;
 DIR *opendir(const char *name);
 int closedir(DIR *dirp);
-struct dirent64 *readdir64(DIR *dirp);
 ]]
+
+if (decls._isGlibc) then
+    ffi.cdef'struct dirent64 *readdir64(DIR *dirp);'
+else
+	--  In musl, 'dirent64' is #defined to 'dirent', however this is subject to removal
+	-- (see musl@25e6fee27f4a). In recent versions of Alpine Linux's '/usr/lib/libc.a',
+	--  'dirent64' is *not* present as 'W' symbol (as shown by 'nm') any more.
+    ffi.cdef'struct dirent64 *readdir64(DIR *dirp) __asm__("readdir");'
+end
 
 -- NOTE: leave type 'struct sockaddr' incomplete.
 ffi.cdef[[

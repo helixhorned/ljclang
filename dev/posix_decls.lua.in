@@ -20,6 +20,7 @@ local d_name_offsets = {
 @@ -m dev.exdecl_struct_property -A -D_LARGEFILE64_SOURCE=1 -p ^dirent6?4?$ -a offset:name=value -a d_name ./dev/posix.h
 }
 local dirent64_name_offset
+local g_isGlibc
 do
     local offset = d_name_offsets["struct dirent"]
     local offset64 = d_name_offsets["struct dirent64"]
@@ -38,12 +39,15 @@ do
     -- Ensure cross-build compatibility wrt this particular binary interface aspect.
     -- All the dance above just for that...
     assert(dirent64_name_offset == 19)
+    g_isGlibc = isGlibc
 end
 
 local uint8_ptr_t = ffi.typeof("const uint8_t *")
 local dirent64_ptr_t = ffi.typeof("struct dirent64 *")
 
 return {
+
+_isGlibc = g_isGlibc,
 
 getDirent64Name = function(dirent)
     assert(ffi.istype(dirent64_ptr_t, dirent))
