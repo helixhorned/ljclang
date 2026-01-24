@@ -50,6 +50,10 @@ Providing a value of zero is only useful for debugging."
   ;; NOTE: the Lua script also accepts `inf', but we don't allow that here.
   :type '(natnum))
 
+(defcustom watch-line-tuples-arg-tag-pattern ""
+  "Passed to `watch_line_tuples.lua' as `<tag-pattern>' argument if nonempty."
+  :type '(string))
+
 (defcustom watch-line-tuples-wait-for-output-timeout 0.1
   "Timeout (in seconds) for waiting for output after issuing a command to `watch_line_tuples.lua'.
 
@@ -212,6 +216,7 @@ Note: this is done from `post-command-hook'."
 		 (ctx-line-counts watch-line-tuples-arg-context-line-counts)
 		 (files-file watch-line-tuples-arg-files-file)
 		 (max-res-lines watch-line-tuples-arg-max-query-result-lines)
+		 (tag-pattern watch-line-tuples-arg-tag-pattern)
 		 (bail
 		  ;; TODO: is this correct? The documentation says that the mode variable *reflects*
 		  ;;  the state instead of being a switch. However, from the body of the mode
@@ -236,6 +241,8 @@ Note: this is done from `post-command-hook'."
 		(progn (message msg)
 			   (funcall bail))
 	  (let ((cmd-and-args (list exe-abs ctx-line-counts files-file (number-to-string max-res-lines))))
+		(when (not (string-empty-p tag-pattern))
+		  (nconc cmd-and-args (list tag-pattern)))
 		(if (not (y-or-n-p (format "Start %s?" cmd-and-args)))
 			(funcall bail)
 		  (setq watch-line-tuples--process

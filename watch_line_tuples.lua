@@ -53,9 +53,9 @@ local function usage(hline)
 		errprint("ERROR: "..hline)
 	end
 
-	errprint([[
+	errprint([===[
 Usage:
-  watch_line_tuples.lua <context-line-counts> <files-file> [<max-query-result-lines>]
+  watch_line_tuples.lua <context-line-counts> <files-file> [<max-query-result-lines> [<tag-pattern>]]
   watch_line_tuples.lua -h
 
   <context-line-counts> must be a comma-separated lines of
@@ -70,7 +70,7 @@ Usage:
 
   <max-query-result-lines> must be a nonnegative integer or 'inf' (no limit, default)
     - 0 means to exit immediately after indexing
-]])
+]===])
 	os.exit(1)
 end
 
@@ -78,13 +78,10 @@ if (arg[1] == "-h") then
 	usage()
 end
 
-local LineNumShift = 26
-local FileIdxMask = bit.lshift(1ull, LineNumShift) - 1
-local MaxFilesOrLines = math.ldexp(1, LineNumShift)
-
 local arg_contextLineCountsStr = arg[1]
 local arg_filesFileName = arg[2]
 local opt_maxQueryResultLines = arg[3]
+local opt_tagPattern = arg[4]
 
 if (arg_contextLineCountsStr == nil or arg_filesFileName == nil) then
 	usage "too few arguments"
@@ -92,9 +89,20 @@ elseif (opt_maxQueryResultLines and opt_maxQueryResultLines ~= "0" and
 		opt_maxQueryResultLines ~= "inf" and
 		not opt_maxQueryResultLines:match("^[1-9][0-9]*$")) then
 	usage "<max-query-result-lines> must be a nonnegative integer or 'inf'"
-elseif (arg[4]) then
+elseif (opt_tagPattern and opt_tagPattern == '') then
+	usage "<tag-line-pattern> must be nonempty"
+elseif (arg[5]) then
 	usage "too many arguments"
 end
+
+local TagIdxBits = opt_tagPattern and 16 or 0
+local LineNumShift = 26 - TagIdxBits / 2
+local FileIdxMask = bit.lshift(1ull, LineNumShift) - 1
+local LineNumMask = FileIdxMask
+local MaxTags = math.ldexp(1, TagIdxBits)
+local MaxFilesOrLines = math.ldexp(1, LineNumShift)
+local TwiceLineNumShift = 2 * LineNumShift
+local MaxFilesOrLinesSquared = MaxFilesOrLines * MaxFilesOrLines
 
 local g_contextLineCounts = {}
 
@@ -270,26 +278,32 @@ end
 
 ---------- Construction of the index ----------
 
--- Inputs: one-based indexes
-local function ToIndexValue(fileIdx, lineNum)
+-- Inputs:
+--  * the file index and line number are one-based
+--  * the tag index is one-based but may be zero
+local function ToIndexValue(fileIdx, lineNum, tagIdx)
 	assert(type(fileIdx) == "number")
 	assert(fileIdx >= 1 and fileIdx <= MaxFilesOrLines)
 	assert(type(lineNum) == "number")
 	assert(lineNum >= 1)
+	assert(type(tagIdx) == "number")
+	assert(tagIdx >= 0 and tagIdx < MaxTags)
 
 	if (lineNum > MaxFilesOrLines) then
 		abort("%s: too many lines (max = %d)", g_fileNames[fileIdx], MaxFilesOrLines)
 	end
 
-	return (fileIdx - 1) + MaxFilesOrLines * (lineNum - 1)
+	return (fileIdx - 1) + MaxFilesOrLines * (lineNum - 1) + MaxFilesOrLinesSquared * tagIdx
 end
 
 local function UnpackIndexValue(val)
 	assert(type(val) == "number")
-	assert(val >= 0 and val < MaxFilesOrLines * MaxFilesOrLines)
+	assert(val >= 0 and val < MaxFilesOrLines * MaxFilesOrLines * MaxTags)
 	local fileIdx = tonumber(bit.band(val, FileIdxMask))
-	local lineNum = tonumber(bit.rshift(val + 0ull, LineNumShift))
-	return fileIdx + 1, lineNum + 1
+	local preLNum = bit.rshift(val + 0ull, LineNumShift)
+	local lineNum = tonumber(bit.band(preLNum, LineNumMask))
+	local tag = tonumber(bit.rshift(val + 0ull, TwiceLineNumShift))
+	return fileIdx + 1, lineNum + 1, tag
 end
 
 local function New_Index()
@@ -349,8 +363,9 @@ local function New_StreamState(fileIdx, indexes)
 	end
 
 	return {
-		handleLine = function(_, lineNum, str, b, e)
+		handleLine = function(_, lineNum, str, b, e, tagIdx)
 			assert(lineNum >= 1)
+			assert(tagIdx >= 0)
 
 			for startLineNum = lineNum - 2 * maxContextLineCount, lineNum - 1 do
 				local hashState = partialStates[startLineNum]
@@ -372,13 +387,50 @@ local function New_StreamState(fileIdx, indexes)
 					assert(hashState ~= nil)
 
 					local key = hashState:toNumber()
-					local val = ToIndexValue(fileIdx, centerLineNum)
+					local val = ToIndexValue(fileIdx, centerLineNum, tagIdx)
 
+					-- NOTE: the tag is only accurate for 'contextLineCount == 0'.
 					indexes[contextLineCount]:add(key, val)
 				end
 			end
 
 			partialStates[lineNum - 2 * maxContextLineCount] = nil
+		end,
+	}
+end
+
+local function New_Tags()
+	local tags = { [0] = "" }
+
+	return {
+		-- static
+		_check = function(line)
+			return opt_tagPattern and line:match(opt_tagPattern)
+		end,
+
+		_add = function(_, tag)
+			assert(type(tag) == "string")
+			local idx = #tags + 1
+			if (idx >= MaxTags) then
+				abort("too many tags (max = %d)", MaxTags - 1)
+			end
+			tags[idx] = tag
+			return idx
+		end,
+
+		add = function(self, line)
+			local tag = self._check(line)
+			return tag and self:_add(tag)
+		end,
+
+		get = function(_, idx)
+			assert(type(idx) == "number")
+			assert(idx >= 0 and idx <= #tags)
+			return tags[idx]
+		end,
+
+		size = function(_)
+			return #tags
 		end,
 	}
 end
@@ -399,6 +451,7 @@ end
 
 local g_indexes = {}
 local g_contextLineCountsReverse = {}
+local g_tags = New_Tags()
 
 for i, contextLineCount in ipairs(g_contextLineCounts) do
 	g_indexes[contextLineCount] = New_Index()
@@ -414,12 +467,15 @@ do
 
 		local iter = New_LinesOf(fileName, ("%s:%d"):format(arg_filesFileName, fileIdx))
 		local state = New_StreamState(fileIdx, g_indexes)
+		local curTagIdx = 0
 		local lineNum = 0
 
 		for line in iter:iterate() do
 			lineNum = lineNum + 1
 			local b, e = GetRelevantBounds(line)
-			state:handleLine(lineNum, line, b, e)
+			local tagIdx = g_tags:add(line)
+			curTagIdx = tagIdx or curTagIdx
+			state:handleLine(lineNum, line, b, e, curTagIdx)
 		end
 
 		iter:close()
@@ -428,12 +484,12 @@ do
 
 		if (lineNum > 0) then
 			for offset = 1, maxContextLineCount do
-				state:handleLine(lineNum + offset, "")
+				state:handleLine(lineNum + offset, "", nil, nil, curTagIdx)
 			end
 		end
 	end
 
-	printf_later("total: %d lines in %d files", totalLineCount, #g_fileNames)
+	printf_later("total: %d lines in %d files; %d tags", totalLineCount, #g_fileNames, g_tags:size())
 	printf_later("unique")
 
 	for _, contextLineCount in ipairs(g_contextLineCountsReverse) do
@@ -521,10 +577,13 @@ while (true) do
 			for _, v in ipairs(newValues) do
 				if (not seen[v]) then
 					seen[v] = true
-					local fileIdx, lineNum = UnpackIndexValue(v)
+					local fileIdx, lineNum, tagIdx = UnpackIndexValue(v)
 					local fileName = g_fileNames[fileIdx]
 					assert(fileName ~= nil)
-					printf_later("%s:%d:", fileName, lineNum)
+					local tag = g_tags:get(tagIdx)
+					assert(tag ~= nil)
+					local spcOpt = (tag == "") and "" or " "
+					printf_later("%s:%d:%s%s", fileName, lineNum, spcOpt, tag)
 
 					seenCount = seenCount + 1
 
