@@ -47,6 +47,7 @@
   "Passed to `watch_line_tuples.lua' as `<max-query-result-lines>' argument. Must be nonnegative.
 
 Providing a value of zero is only useful for debugging."
+  ;; NOTE: the Lua script also accepts `inf', but we don't allow that here.
   :type '(natnum))
 
 (defcustom watch-line-tuples-wait-for-output-timeout 0.1

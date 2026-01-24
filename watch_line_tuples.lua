@@ -68,7 +68,7 @@ Usage:
     - not end in '/'
     - not contain '.' or '..' between two '/' or at the end
 
-  <max-query-result-lines> must be a nonnegative integer (default: no limit)
+  <max-query-result-lines> must be a nonnegative integer or 'inf' (no limit, default)
     - 0 means to exit immediately after indexing
 ]])
 	os.exit(1)
@@ -89,8 +89,9 @@ local opt_maxQueryResultLines = arg[3]
 if (arg_contextLineCountsStr == nil or arg_filesFileName == nil) then
 	usage "too few arguments"
 elseif (opt_maxQueryResultLines and opt_maxQueryResultLines ~= "0" and
+		opt_maxQueryResultLines ~= "inf" and
 		not opt_maxQueryResultLines:match("^[1-9][0-9]*$")) then
-	usage "<max-query-result-lines> must be a nonnegative integer"
+	usage "<max-query-result-lines> must be a nonnegative integer or 'inf'"
 elseif (arg[4]) then
 	usage "too many arguments"
 end
@@ -205,9 +206,7 @@ local function GetFileNames()
 end
 
 local g_fileNames = GetFileNames()
-local g_maxQueryResultLines = tonumber(opt_maxQueryResultLines)
-
-assert(opt_maxQueryResultLines == nil or g_maxQueryResultLines ~= nil)
+local g_maxQueryResultLines = tonumber(opt_maxQueryResultLines) or math.huge
 
 ----------
 
@@ -513,7 +512,7 @@ while (true) do
 			local values = (type(val) == "number") and {val} or val
 			assert(type(values) == "table")
 			local newValues = (clcrIdx == 1) and values or FilteredSequence(values, seen)
-			local toSeeCount = math.min(#newValues, g_maxQueryResultLines or math.huge)
+			local toSeeCount = math.min(#newValues, g_maxQueryResultLines)
 
 			printf_later(HeaderLineFormat, contextLineCount, #newValues, toSeeCount)
 
