@@ -97,9 +97,6 @@ local function usage(hline)
 Usage:
    watch_compile_commands.lua [options...] <compile_commands-file>
 
-In this help text, single quotes ("'") are for exposition purposes only.
-They are never to be spelled in actual option arguments.
-
 Options:
   -a: Enable automatic generation and usage of precompiled headers. For each PCH configuration
       (state of relevant compiler options) meeting a certain threshold of compile commands that
@@ -116,6 +113,7 @@ Options:
       2. a single severity suffixed by '+', meaning to select the specified severity
          and more serious ones.
      As a convenience, the specification can also be '-', meaning 'error+'.
+  -j <concurrency>: synonymous to and mutually exclusive with '-c'.
   -g [includes|isIncludedBy]: Print inclusion graph as a DOT (of Graphviz) file to stdout and exit.
      Argument specifies the relation between graph nodes (which are file names).
   -l <number>: edge count limit for the graph produced by -g %s.
@@ -160,6 +158,7 @@ local opts_meta = {
     a = false,
     c = true,
     i = true,
+    j = true,
     m = true,
     g = true,
     l = true,
@@ -174,7 +173,7 @@ local opts_meta = {
 local opts, cmdline_args = parsecmdline.getopts(opts_meta, arg, usage)
 
 local autoPch = opts.a
-local concurrencyOpt = opts.c or "auto"
+local concurrencyOpt = opts.c or opts.j or "auto"
 local requestFifoFileName = opts.m
 local commandMode = (requestFifoFileName ~= nil)
 local incrementalMode = opts.i
@@ -185,6 +184,10 @@ local selectionSpecs = opts.s
 local printAllDiags = opts.N or false
 local plainMode = opts.P
 local exitImmediately = opts.x or printGraphMode
+
+if (opts.c and opts.j) then
+    abort("Options -c and -j are mutually exclusive.")
+end
 
 local function colorize(...)
     if (plainMode) then
