@@ -3,7 +3,6 @@ local LangOptions = require("dev.PchRelevantLangOptions")
 
 local io = require("io")
 local os = require("os")
-local math = require("math")
 local table = require("table")
 
 local util = require("util")
@@ -266,7 +265,6 @@ function api.obtainSystemIncludes(clang, concurrency,
                                   compileCommands,  -- elements modified in-place
                                   cacheDirectory, F)
     local ccCount = #compileCommands
-    local localConcurrency = math.min(concurrency, ccCount)
 
     -- Second return value: argument list signature for caching results of computations on
     --  the argument list. Note that this caching only works as long as we do not process
