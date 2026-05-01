@@ -83,7 +83,7 @@ function api.handleTableOfOptionStrings(lib, prefix, opts)
 end
 
 function api.getCommonPrefix(getString, commonPrefix, ...)
-    checktype(getString, 1, "function", 2)
+    checktype(getString, 1, "function")
     check(commonPrefix == nil or type(commonPrefix) == "string",
           "argument #2 must be nil or a string")
 
@@ -126,8 +126,8 @@ local BimapTags = {
 api.Bimap = class
 {
     function(firstType, secondType)
-        checktype(firstType, 1, "string", 2)
-        checktype(secondType, 2, "string", 2)
+        checktype(firstType, 1, "string")
+        checktype(secondType, 2, "string")
         check(firstType ~= secondType, "arguments #1 and #2 must be distinct")
 
         return {
@@ -142,8 +142,8 @@ api.Bimap = class
 }
 
 function api.BimapAdd(self, first, second)
-    checktype(first, 1, self[BimapTags.FIRST_TYPE], 2)
-    checktype(second, 2, self[BimapTags.SECOND_TYPE], 2)
+    checktype(first, 1, self[BimapTags.FIRST_TYPE])
+    checktype(second, 2, self[BimapTags.SECOND_TYPE])
 
     -- NOTE: No checking of any kind (such as for one-to-oneness).
     self[first] = second
@@ -153,7 +153,7 @@ function api.BimapAdd(self, first, second)
 end
 
 function api.MakeBimap(tab)
-    checktype(tab, 1, "table", 2)
+    checktype(tab, 1, "table")
 
     local firstItem = tab[1]
     local bimap = api.Bimap(type(firstItem[1]), type(firstItem[2]))
@@ -172,14 +172,14 @@ end
 ---------- BoolArray ----------
 
 local function CheckIsFiniteInt(number, argIdx)
-    checktype(number, argIdx, "number", 3)
+    checktype(number, argIdx, "number", 1)
     check(number >= 1 and number < math.huge, "argument must be a finite number", -1)
     check(math.floor(number) == number, "argument must be an integral number", -1)
 end
 
 api.BoolArray = function(size, initialValue)
     CheckIsFiniteInt(size, 1)
-    checktype(initialValue, 2, "boolean", 2)
+    checktype(initialValue, 2, "boolean")
 
     local array = {}
     for i = 1,size do

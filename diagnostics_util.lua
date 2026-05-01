@@ -50,8 +50,8 @@ end
 local FormattedDiag = class
 {
     function(useColors, severity)
-        checktype(useColors, 1, "boolean", 2)
-        checktype(severity, 2, "string", 2)
+        checktype(useColors, 1, "boolean")
+        checktype(severity, 2, "string")
 
         -- self: sequence table of lines constituting the diagnostic
         return {
@@ -69,7 +69,7 @@ local FormattedDiag = class
     end,
 
     getString = function(self, keepColorsIfPresent)
-        checktype(keepColorsIfPresent, 1, "boolean", 2)
+        checktype(keepColorsIfPresent, 1, "boolean")
 
         local str = table.concat(self, '\n')
 
@@ -131,8 +131,8 @@ local FormattedDiagSet  -- "forward-declare"
 local InvalidStringMsg = "passed string that is not a formatted diagnostic serialization"
 
 function api.FormattedDiagSet_Deserialize(diagsStr, useColors)
-    checktype(diagsStr, 1, "string", 2)
-    checktype(useColors, 2, "boolean", 2)
+    checktype(diagsStr, 1, "string")
+    checktype(useColors, 2, "boolean")
 
     local fDiagSet = FormattedDiagSet(useColors)
 
@@ -195,14 +195,14 @@ FormattedDiagSet = class
     end,
 
     setInfo = function(self, info)
-        checktype(info, 1, "string", 2)
+        checktype(info, 1, "string")
 
         self.info = self:newDiag(DiagInfoSeverity)
         self.info:addIndentedLine(0, info)
     end,
 
     getString = function(self, keepColorsIfPresent)
-        checktype(keepColorsIfPresent, 1, "boolean", 2)
+        checktype(keepColorsIfPresent, 1, "boolean")
 
         local fDiags = {}
 
@@ -312,9 +312,9 @@ end
 api.FormattedDiagSet = FormattedDiagSet
 
 function api.GetDiags(diags, useColors, allDiags)
-    checktype(diags, 1, "table", 2)
-    checktype(useColors, 2, "boolean", 2)
-    checktype(allDiags, 3, "boolean", 2)
+    checktype(diags, 1, "table")
+    checktype(useColors, 2, "boolean")
+    checktype(allDiags, 3, "boolean")
 
     return PrintDiagsImpl(diags, useColors, allDiags)
 end

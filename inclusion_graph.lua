@@ -22,8 +22,8 @@ local api = {}
 -- Note: this cannot be a 'class' since the keys are strings. (So, a member function name
 -- may conflict with a key.)
 local function SVTableAddOrGet(tab, key, value)
-    checktype(tab, 1, "table", 2)
-    checktype(key, 1, "string", 2)
+    checktype(tab, 1, "table")
+    checktype(key, 1, "string")
     check(value ~= nil, "argument #3 must be non-nil")
 
     if (tab[key] == nil) then
@@ -42,7 +42,7 @@ end
 local Node = class
 {
     function(key)
-        checktype(key, 1, "string", 2)
+        checktype(key, 1, "string")
 
         return {
             key = key,
@@ -74,7 +74,7 @@ local function addOrGetNode(self, filename)
 end
 
 local function dot_quote(str)
-    checktype(str, 1, "string", 2)
+    checktype(str, 1, "string")
     -- Graphviz docs ("The DOT language") say:
     --  In quoted strings in DOT, the only escaped character is double-quote (").
     --  (...)
@@ -109,7 +109,7 @@ local InclusionGraph  -- "forward-declare"
 local InvalidStringMsg = "passed string that is not a graph serialization"
 
 api.Deserialize = function(graphStr)
-    checktype(graphStr, 1, "string", 2)
+    checktype(graphStr, 1, "string")
     check(#graphStr >= 2, "argument #1 must have length of at least two")
     check(graphStr:sub(-2) == "\0\0", InvalidStringMsg)
 
@@ -147,8 +147,8 @@ InclusionGraph = class
     -- Edge in the graph will point from a to b.
     -- Interpretation is up to the user.
     addInclusion = function(self, aFile, bFile)
-        checktype(aFile, 1, "string", 2)
-        checktype(bFile, 2, "string", 2)
+        checktype(aFile, 1, "string")
+        checktype(bFile, 2, "string")
 
         check(not aFile:find('%z'), "argument #1 must not contain NUL bytes")
         check(not bFile:find('%z'), "argument #2 must not contain NUL bytes")
@@ -182,13 +182,13 @@ InclusionGraph = class
     serialize = SerializeGraph,
 
     printAsGraphvizDot = function(self, title, reverse, commonPrefix, edgeCountLimit, printf)
-        checktype(title, 1, "string", 2)
+        checktype(title, 1, "string")
         reverse = (reverse ~= nil) and reverse or false
-        checktype(reverse, 2, "boolean", 2)
+        checktype(reverse, 2, "boolean")
         checktype(commonPrefix, 3, "string")
         edgeCountLimit = (edgeCountLimit ~= nil) and edgeCountLimit or math.huge
-        checktype(edgeCountLimit, 4, "number", 2)
-        checktype(printf, 5, "function", 2)
+        checktype(edgeCountLimit, 4, "number")
+        checktype(printf, 5, "function")
 
         local strip = function(fn)
             return (fn:sub(1, #commonPrefix) == commonPrefix) and

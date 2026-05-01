@@ -40,7 +40,7 @@ local MaxSymPages = {
 api.SymbolIndex = class
 {
     function(localPageArrayCount)
-        checktype(localPageArrayCount, 1, "number", 2)
+        checktype(localPageArrayCount, 1, "number")
 
         local PROT, MAP, LMAP = posix.PROT, posix.MAP, linux_decls.MAP
 
@@ -69,14 +69,14 @@ api.SymbolIndex = class
     end,
 
     remapLocalToGlobalPage = function(self, localPageArrayIdx, srcPageIdx, globalPageIdx)
-        checktype(localPageArrayIdx, 1, "number", 2)
+        checktype(localPageArrayIdx, 1, "number")
         check(localPageArrayIdx >= 1 and localPageArrayIdx <= #self.localPageArrays,
               "argument #1 must be a valid local page array index")
 
-        checktype(srcPageIdx, 2, "number", 2)
+        checktype(srcPageIdx, 2, "number")
         check(srcPageIdx >= 0 and srcPageIdx < MaxSymPages.Local,
               "argument #2 must be a valid local page index")
-        checktype(globalPageIdx, 3, "number", 2)
+        checktype(globalPageIdx, 3, "number")
         check(globalPageIdx >= 0 and globalPageIdx < MaxSymPages.Global,
               "argument #3 must be a valid global page index")
 

@@ -72,8 +72,8 @@ local ToTerminalCode = {
 }
 
 api.encode = function(str, modcolor)
-    checktype(str, 1, "string", 2)
-    checktype(modcolor, 2, "string", 2)
+    checktype(str, 1, "string")
+    checktype(modcolor, 2, "string")
 
     assert(not str:match(InternalCodePattern),
            "String to color-code contains lower control chars")
@@ -82,12 +82,12 @@ api.encode = function(str, modcolor)
 end
 
 api.colorize = function(coded_str)
-    checktype(coded_str, 1, "string", 2)
+    checktype(coded_str, 1, "string")
     return coded_str:gsub(InternalCodePattern, ToTerminalCode)
 end
 
 api.strip = function(coded_str)
-    checktype(coded_str, 1, "string", 2)
+    checktype(coded_str, 1, "string")
     return coded_str:gsub(InternalCodePattern, "")
 end
 

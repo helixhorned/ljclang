@@ -1358,8 +1358,8 @@ end
 local OnDemandParser = class
 {
     function(ccIndexes, parseOptions)
-        checktype(ccIndexes, 1, "table", 2)
-        checktype(parseOptions, 1, "table", 2)
+        checktype(ccIndexes, 1, "table")
+        checktype(parseOptions, 1, "table")
 
         return {
             ccIndexes = ccIndexes,
@@ -1375,7 +1375,7 @@ local OnDemandParser = class
     end,
 
     getResults = function(self, i)
-        checktype(i, 1, "number", 2)
+        checktype(i, 1, "number")
         check(i >= 1 and i <= self:getCount(), "argument #1 must be in [1, self:getCount()]")
 
 --        local tus, errorCodes = self.tus, self.errorCodes

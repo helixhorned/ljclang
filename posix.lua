@@ -131,7 +131,7 @@ local FD_SETSIZE = 8 * ffi.sizeof(fd_set_t)
 local FD_MASK_BIT_COUNT = 8 * ffi.sizeof(fd_mask_t)
 
 local function checkSetFd(fd)
-    checktype(fd, 1, "number", 4)
+    checktype(fd, 1, "number", 2)
     check(fd >= 0 and fd < FD_SETSIZE, "file descriptor value is too large", 1)
 end
 
@@ -268,7 +268,7 @@ api.STDERR_FILENO = 2
 api.Fd = class
 {
     function(fd)
-        checktype(fd, 1, "number", 2)
+        checktype(fd, 1, "number")
 
         return {
             fd = fd,
@@ -276,7 +276,7 @@ api.Fd = class
     end,
 
     read = function(self, byteCount)
-        checktype(byteCount, 1, "number", 2)
+        checktype(byteCount, 1, "number")
         check(byteCount >= 1, "argument must be at least 1")
         local buf = uint8_array_t(byteCount)
         local bytesRead = call("read", self.fd, buf, byteCount)
@@ -286,7 +286,7 @@ api.Fd = class
 
     -- Read from a file descriptor previously opened with O_NONBLOCK.
     readNonblocking = function(self, byteCount)
-        checktype(byteCount, 1, "number", 2)
+        checktype(byteCount, 1, "number")
         check(byteCount >= 1, "argument must be at least 1")
         local buf = uint8_array_t(byteCount)
         local bytesRead, errno = callAllowing(Allow_EAGAIN, "read", self.fd, buf, byteCount)
@@ -299,7 +299,7 @@ api.Fd = class
     end,
 
     readIntoAllowing = function(self, obj, allowPartial, errnoAllowTab)
-        checktype(errnoAllowTab, 3, "table", 4)
+        checktype(errnoAllowTab, 3, "table", 2)
 
         return self:_readIntoCommon(obj, allowPartial, function(...)
             return callAllowing(errnoAllowTab, ...)
@@ -307,8 +307,8 @@ api.Fd = class
     end,
 
     _readIntoCommon = function(self, obj, allowPartial, callFunc)  -- private
-        checktype(obj, 1, "cdata", 3)
-        checktype(allowPartial, 2, "boolean", 3)
+        checktype(obj, 1, "cdata", 1)
+        checktype(allowPartial, 2, "boolean", 1)
 
         local length = ffi.sizeof(obj)
         check(length ~= nil, "argument #1 must have ffi.sizeof() ~= nil", 1)
@@ -381,7 +381,7 @@ api.Fd = class
 
     -- Redirect 'fd' to us.
     capture = function(self, fd)
-        checktype(fd, 1, "number", 2)
+        checktype(fd, 1, "number")
         local ret = call("dup2", self.fd, fd)
         assert(ret == fd)
         return ret
@@ -423,7 +423,7 @@ local Directory = class{
 }
 
 api.Dir = function(name)
-    checktype(name, 1, "string", 2)
+    checktype(name, 1, "string")
 
     local dirPtr = C.opendir(name)
     if (dirPtr == nil) then
@@ -456,14 +456,14 @@ api.clock_nanosleep = function(nsec)
 end
 
 local function sysconf(name)
-    checktype(name, 2, "number", 2)
+    checktype(name, 2, "number")
     local ret = call("sysconf", name)
     assert(ret ~= -1)
     return ret
 end
 
 api.poll = function(tab, timeoutMs)
-    checktype(tab, 1, "table", 2)
+    checktype(tab, 1, "table")
     check(#tab > 0, "passed table must not be empty")
     check(timeoutMs == nil or type(timeoutMs) == "number",
           "argument #2 must be nil or a number")
@@ -515,11 +515,11 @@ api.getPageSize = getPageSize
 
 local function CheckCommonMemMapArgs(argIdxOffset, length, prot, flags, fd)
     local o = argIdxOffset
-    checktype(length, o+1, "number", 3)
+    checktype(length, o+1, "number", 1)
     check(length > 0, "'length' argument must be greater than zero", 1)
 
-    checktype(prot, o+2, "number", 3)
-    checktype(flags, o+3, "number", 3)
+    checktype(prot, o+2, "number", 1)
+    checktype(flags, o+3, "number", 1)
 
     do
         local MAP, PROT = decls.MAP, decls.PROT
@@ -532,13 +532,13 @@ local function CheckCommonMemMapArgs(argIdxOffset, length, prot, flags, fd)
               "'fd' argument must be -1 when 'flags' argument has MAP.ANONYMOUS set", 1)
     end
 
-    checktype(fd, o+4, "number", 3)
+    checktype(fd, o+4, "number", 1)
 end
 
 api.mmap = function(addr, length, prot, flags, fd, offset)
     check(addr == nil, "argument #1 must be nil")
     CheckCommonMemMapArgs(1, length, prot, flags, fd)
-    checktype(offset, 6, "number", 2)
+    checktype(offset, 6, "number")
 
     local ptr = C.mmap(addr, length, prot, flags, fd, offset)
     if (ptr == MAP_FAILED) then
@@ -554,7 +554,7 @@ api.mmap = function(addr, length, prot, flags, fd, offset)
 end
 
 function api.memMapWithPadding(totalLength, length, prot, flags, fd)
-    checktype(totalLength, 1, "number", 2)
+    checktype(totalLength, 1, "number")
     CheckCommonMemMapArgs(1, length, prot, flags, fd)
 
     check(totalLength >= length, "argument #1 must be greater than or equal to argument #2")
@@ -603,7 +603,7 @@ function api.memMapWithPadding(totalLength, length, prot, flags, fd)
 end
 
 local function checkMemRemapPtr(ptr, pageIdx)
-    checktype(ptr, 1, "cdata", 3)
+    checktype(ptr, 1, "cdata", 1)
 
     local memMapSize = activeMemMapSizes[ptr]
     -- NOTE: this check may wrongly pass, namely in case we are called with a pointer that
@@ -649,10 +649,10 @@ end
 
 -- Example: "/bin/ls", { "-la" }
 api.exec = function(fileName, args)
-    checktype(fileName, 1, "string", 2)
+    checktype(fileName, 1, "string")
     check(#fileName > 0 and fileName:sub(1,1) == '/',
           "argument #1 must be an absolute file name")
-    checktype(args, 2, "table", 2)
+    checktype(args, 2, "table")
     check(args[0] == nil, "argument #2 must not contain an entry at index 0")
 
     args[0] = fileName
@@ -663,8 +663,8 @@ api.exec = function(fileName, args)
 end
 
 api.freopen = function(pathname, mode, stream)
-    checktype(pathname, 1, "string", 2)
-    checktype(mode, 2, "string", 2)
+    checktype(pathname, 1, "string")
+    checktype(mode, 2, "string")
 
     check(ffi.istype("FILE *", stream), "argument #3 must be a FILE *")
     check(stream ~= nil, "argument #3 must be non-NULL")
@@ -678,7 +678,7 @@ api.freopen = function(pathname, mode, stream)
 end
 
 api.realpath = function(pathname)
-    checktype(pathname, 1, "string", 2)
+    checktype(pathname, 1, "string")
 
     local retPtr = C.realpath(pathname, nil)
 
@@ -701,7 +701,7 @@ api.waitpid = function(pid, options)
     check(isPid(pid), "argument #1 must be a pid")
     -- Exclude other conventions other than passing -1 or an exact PID:
     check(pid == -1 or pid > 0, "argument #1 must be -1 or strictly positive")
-    checktype(options, 2, "number", 2)
+    checktype(options, 2, "number")
     check(options == 0, "argument #2 must be 0 (not yet implemented)")
 
     local stat_loc = ffi.new("int [1]")

@@ -10,8 +10,8 @@ local check = error_util.check
 local api = {}
 
 function api.addSystemInclude(compilerArgs, language)
-    checktype(compilerArgs, 1, "table", 2)
-    checktype(language, 2, "string", 2)
+    checktype(compilerArgs, 1, "table")
+    checktype(language, 2, "string")
 
     check(language == "c", "argument #2 must be 'c'")
 
