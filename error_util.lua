@@ -31,7 +31,7 @@ function api.checktype(object, argIdx, typename, additional_level)
     assert(type(additional_level) == "number")
 
     if (type(object) ~= typename) then
-        local msg = "argument #"..argIdx.." must be a "..typename.." (got "..type(object)..")"
+        local msg = ("argument #%d must be a %s (got %s)"):format(argIdx, typename, type(object))
         error(msg, 3 + additional_level)
     end
 end
