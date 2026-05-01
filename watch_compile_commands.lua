@@ -1884,12 +1884,6 @@ local Controller = class
 
     --== Parent only ==--
 
-    sendTo = function(self, connIdx, str)
-        assert(#str == 1)
-        local conn = self.connections[connIdx]
-        return conn.w:write(str)
-    end,
-
     receiveString = function(self, connIdx, length)
         local conn = self.connections[connIdx]
         local buf = uint8_array_t(length)
@@ -2001,8 +1995,8 @@ local Controller = class
         local inotifyFd = self.notifier:getRawFd()
         local clientInotifyFd = commandMode and mi.clientInotifier:getRawFd() or nil
 
-        pendingFds[#pendingFds + 1] = inotifyFd
-        pendingFds[#pendingFds + 1] = clientInotifyFd
+        pendingFds[oldPendingFdCount + 1] = inotifyFd
+        pendingFds[oldPendingFdCount + 2] = clientInotifyFd
 
         local pollfds = posix.poll(pendingFds)
 
