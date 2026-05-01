@@ -130,7 +130,7 @@ end
 local function PrepareParse(srcfile, args, opts)
     check(type(srcfile)=="string", "<srcfile> must be a string", 1)
     check(type(args)=="string" or type(args)=="table", "<args> must be a string or table", 1)
-    util.check_iftab_iscellstr(args, "<args>", 3)
+    util.check_iftab_iscellstr(args, "<args>", 1)
 
     if (srcfile == "") then
         srcfile = nil

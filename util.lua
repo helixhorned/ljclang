@@ -42,10 +42,16 @@ local function iscellstr(tab)
     return (tab[0] == nil)
 end
 
-function api.check_iftab_iscellstr(tab, name, level)
+function api.check_iftab_iscellstr(tab, name, additional_level)
+    if (additional_level == nil) then
+        additional_level = 0
+    end
+	assert(type(name) == "string")
+    assert(type(additional_level) == "number")
+
     if (type(tab)=="table") then
         if (not iscellstr(tab)) then
-            error(name.." must be a string sequence when a table, with no element at [0]", level+1)
+            error(name.." must be a string sequence when a table, with no element at [0]", 3 + additional_level)
         end
     end
 end
@@ -56,7 +62,7 @@ function api.checkOptionsArgAndGetDefault(opts, defaultValue)
     else
         check(type(opts)=="number" or type(opts)=="table",
               "argument #1 must be a number or a table", 2)
-        api.check_iftab_iscellstr(opts, "<opts>", 4)
+        api.check_iftab_iscellstr(opts, "<opts>", 2)
     end
 
     return opts
