@@ -8,6 +8,12 @@ assert() {
 	test "$@" || (echo "assertion failed: $*" 1>&2 && false)
 }
 
+function labeled_assert() {
+	local label="$1"
+	shift
+	test "$@" || (echo "assertion failed: $label: $*" 1>&2 && false)
+}
+
 concurrency_arg=
 
 if [ "${1:0:2}" == '-j' ]; then
@@ -56,6 +62,12 @@ if [ -n "$concurrency_arg" ]; then
 	max_jobs=${concurrency_arg:2}
 fi
 
+if [[ "$max_jobs" -gt 1 && "${BASH_VERSINFO[0]}" -lt 5 ]]; then
+	# For 'wait -f':
+	echo "ERROR: for concurrent processing, need at least Bash 5.0" >&2
+	exit 1
+fi
+
 PREFIX_REGEX='^  "command": "'
 SUFFIX_REGEX='",$'
 REGEX="${PREFIX_REGEX}.*${SUFFIX_REGEX}"
@@ -71,6 +83,10 @@ command_count="${#commands[@]}"
 if [ "$command_count" -eq 0 ]; then
 	echo "WARNING: no compile commands." >&2
 	exit 0
+fi
+
+if [ "$max_jobs" -gt "$command_count" ]; then
+	max_jobs="$command_count"
 fi
 
 ### 1. Validate expectations on the command strings, then prepare array 'new_args_lists'.
@@ -190,3 +206,211 @@ if [ "$max_jobs" -eq 1 ]; then
 fi
 
 ## Concurrent processing
+
+# For 'wait' to also react to stopping of a process:
+set -m
+
+labeled_assert max_jobs "$max_jobs" -ge 2
+
+# Report string sizes in bytes:
+export LANG=C
+export LC_ALL=C
+
+# We are Linux-only for now. See 'man 7 pipe':
+#
+#  POSIX.1 says that writes of less than PIPE_BUF bytes must be atomic: (...).
+#  (On Linux, PIPE_BUF is 4096 bytes.)
+#
+# and in section "Pipe capacity"
+#
+#  Since Linux 2.6.11, the pipe capacity is 16 pages (...). Since Linux 4.5, the default
+#  pipe capacity is lower than 16 pages when the pipe-user-pages-soft limit is exceeded.
+#
+# Also, from Linux 'Documentation/admin-guide/sysctl/fs.rst':
+#
+#  pipe-user-pages-soft
+#  --------------------
+#
+#  Maximum total number of pages a non-privileged user may allocate for pipes
+#  before the pipe size gets limited to a single page. (...)
+
+PIPE_BUF=4096
+
+function process_tu() {
+	ci="$1"
+	read -r -N 8 my_pid
+
+	local result
+	if ! result=$(process_translation_unit "$ci"); then
+		local exit_code=$?
+		echo "ERROR: command $ci: compiler returned exit code $exit_code" >&2
+		kill -STOP "$my_pid"
+		exit "$exit_code"
+	fi
+
+	# Check if we can write "$result\n" (implicit newline via echo) without blocking.
+	result_size="${#result}"
+
+	if [ "$result_size" -ge "$PIPE_BUF" ]; then
+		echo "NYI: command $ci: result too large: $result_size" >&2
+		kill -STOP "$my_pid"
+		exit 100
+	fi
+
+	# The following should not block:
+	echo "$result"
+
+	kill -STOP "$my_pid"
+}
+
+pids=()
+fds=()
+
+function find_command_index() {
+	local pid="$1"
+	assert -n "$pid"
+	pid_count="${#pids[@]}"
+
+	for ((i=0; i < pid_count; i++)); do
+		if [ "${pids[i]}" -eq "$pid" ]; then
+			echo "$i"
+			return
+		fi
+	done
+
+	assert -z unreachable
+	exit 101
+}
+
+to_reap_count=0
+
+function spawn_coprocess() {
+	local ci="$1"
+	assert -n "$ci"
+	coproc COPROC { process_tu "$ci"; }
+	labeled_assert COPROC_PID "$COPROC_PID" -eq $!
+	to_reap_count=$((to_reap_count + 1))
+
+	# Apparently, the coprocess has no means to access its own PID. From the Bash
+	# documentation:
+	#
+	#  ($$) Expands to the process ID of the shell.  In a subshell, it
+	#       expands to the process ID of the parent shell, not the subshell.
+	#
+	# So, send it that information.
+	local fd_for_writing="${COPROC[1]}"
+	printf "% 8d" "$COPROC_PID" >&"$fd_for_writing"
+	# Not needed in the following, so close:
+	exec {fd_for_writing}>&-
+
+	fds[ci]="${COPROC[0]}"
+	pids[ci]="$COPROC_PID"
+	unset COPROC_PID
+	unset COPROC
+}
+
+for ((ci=0; ci < max_jobs; ci++)); do
+	spawn_coprocess "$ci"
+done
+
+labeled_assert to_reap_count "$to_reap_count" -eq "$max_jobs"
+
+max_exit_code=0
+ci="$max_jobs"
+
+function update_max_exit_code() {
+	local exit_code="$1"
+	assert -n "$exit_code"
+
+	if [ "$exit_code" -gt "$max_exit_code" ]; then
+		max_exit_code="$exit_code"
+	fi
+}
+
+function get_child_pids_regex() {
+	local child_pids=" ${pids[*]}"
+	child_pids="${child_pids// -1/}"
+	child_pids="${child_pids:1}"
+	# Match *stopped* child processes:
+	echo "\<(${child_pids// /|})\> T"
+}
+
+
+function wait_for_state_change() {
+	# Determined empirically to be optimal, under very specific circumstances: RPi 5, -j4.
+	# TODO: Does this generalize?
+	local POLL_INTERVAL=0.01
+
+	local eregex
+	eregex=$(get_child_pids_regex)
+
+	# NOTE: The Bash 'wait' builtin *cannot* be used to wait for a running->stopped state
+	#  change. (With only one process for testing purposes, it returns with code 127. From
+	#  the documentation:
+	#
+	#   If the -n option is supplied, `wait` waits for any one of the given ids or, if no
+	#   ids are supplied, any job or process substitution, to complete and returns its exit
+	#   status. If none of the supplied ids is a child of the shell, or if no ids are
+	#   supplied and the shell has no unwaited-for children, the exit status is 127.
+	#
+	#  So, resort to periodic polling.
+
+	#  ... A few steps back, why the STOP -> CONT dance at all? Well, as far as I can see,
+	#  lack of good alternatives.
+	#
+	#  1. We **cannot** read the file descriptor after a Bash 'wait' on a child process:
+	#     It may appear as if we could, but it is made invalid shortly *after* return of
+	#     'wait' -- as it seems, asynchronously, by the Linux kernel.
+	#  2. Bash does not expose 'poll()' to wait for availability of data to read.
+	#
+	#  ... We *could* go another route and use one sink for the different sources.
+	#  Then we'd have to implement some kind of "protocol" to reassemble fragments.
+	#  Up-front, the many-file-descriptor solution seemed easier. Not so sure now...
+
+	while true; do
+		sleep "$POLL_INTERVAL"
+		# shellcheck disable=SC2009
+		procs=$(ps -o pid,stat | grep -E "$eregex" | tr -cd ' [:digit:]')
+
+		# If any child process stopped, return-print the PID of the first one.
+		for proc in $procs; do
+			echo "$proc"
+			return 0
+		done
+	done
+}
+
+while [ "$to_reap_count" -gt 0 ]; do
+	stopped_pid=$(wait_for_state_change)
+	to_reap_count=$((to_reap_count - 1))
+
+	# If we can, first spawn a new child.
+	if [ "$ci" -lt "$command_count" ]; then
+		spawn_coprocess "$ci"
+		ci=$((ci + 1))
+	fi
+
+	# Take care of the terminated one.
+
+	assert -n "$stopped_pid"
+	finished_ci=$(find_command_index "$stopped_pid")
+	finished_fd="${fds[$finished_ci]}"
+
+	pids[finished_ci]=-1
+	fds[finished_ci]=-1
+
+	kill -CONT "$stopped_pid"
+	## Output:
+	# TODO: in serial order?
+	cat <&"$finished_fd"
+	if [ "$to_reap_count" -gt 0 ]; then
+		echo
+	fi
+	## ---
+	wait -f "$stopped_pid"
+	update_max_exit_code "$?"
+
+	exec {finished_fd}>&-
+done
+
+exit "$max_exit_code"
