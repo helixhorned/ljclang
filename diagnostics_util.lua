@@ -155,7 +155,7 @@ function api.FormattedDiagSet_Deserialize(diagsStr, useColors)
 
     if (fDiagSet.info ~= nil) then
         local good = (#fDiagSet.info == 1 and not fDiagSet.info[1]:find(Sep.EmptyInfo))
-        check(good, InvalidStringMsg..", or INTERNAL ERROR", 2)
+        check(good, InvalidStringMsg..", or INTERNAL ERROR")
     else
         -- TODO: also have a check?
     end

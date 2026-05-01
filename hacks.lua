@@ -13,7 +13,7 @@ function api.addSystemInclude(compilerArgs, language)
     checktype(compilerArgs, 1, "table", 2)
     checktype(language, 2, "string", 2)
 
-    check(language == "c", "argument #2 must be 'c'", 2)
+    check(language == "c", "argument #2 must be 'c'")
 
     compilerArgs[#compilerArgs + 1] = "-isystem"
     -- Fixes extractdecls.lua on <signal.h>:

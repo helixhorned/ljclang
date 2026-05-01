@@ -24,7 +24,7 @@ local api = {}
 local function SVTableAddOrGet(tab, key, value)
     checktype(tab, 1, "table", 2)
     checktype(key, 1, "string", 2)
-    check(value ~= nil, "argument #3 must be non-nil", 2)
+    check(value ~= nil, "argument #3 must be non-nil")
 
     if (tab[key] == nil) then
         tab[#tab + 1] = key
@@ -111,7 +111,7 @@ local InvalidStringMsg = "passed string that is not a graph serialization"
 api.Deserialize = function(graphStr)
     checktype(graphStr, 1, "string", 2)
     check(#graphStr >= 2, "argument #1 must have length of at least two")
-    check(graphStr:sub(-2) == "\0\0", InvalidStringMsg, 2)
+    check(graphStr:sub(-2) == "\0\0", InvalidStringMsg)
 
     local graph = InclusionGraph()
 
@@ -131,7 +131,7 @@ api.Deserialize = function(graphStr)
     end
 
     check(totalEdgeCount == doubleZeroCount - ((totalEdgeCount == 0) and 1 or 0),
-          InvalidStringMsg..", or INTERNAL ERROR", 2)
+          InvalidStringMsg..", or INTERNAL ERROR")
 
     return graph
 end
@@ -150,8 +150,8 @@ InclusionGraph = class
         checktype(aFile, 1, "string", 2)
         checktype(bFile, 2, "string", 2)
 
-        check(not aFile:find('%z'), "argument #1 must not contain NUL bytes", 2)
-        check(not bFile:find('%z'), "argument #2 must not contain NUL bytes", 2)
+        check(not aFile:find('%z'), "argument #1 must not contain NUL bytes")
+        check(not bFile:find('%z'), "argument #2 must not contain NUL bytes")
 
         local aNode = addOrGetNode(self, aFile)
         local bNode = addOrGetNode(self, bFile)

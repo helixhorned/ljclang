@@ -15,7 +15,7 @@ local check = require("error_util").check
 local api = {}
 
 function api.class(tab)
-    check(type(tab) == "table", "argument must be a table", 2)
+    check(type(tab) == "table", "argument must be a table")
 
     -- The generated metatable
     local mt = { __metatable="class" }
@@ -31,14 +31,14 @@ function api.class(tab)
             -- containing struct definition.
             local isCType = (type(v) == "cdata" and tostring(v):match("^ctype<"))
             check(type(v) == "function" or type(v) == "string" or isCType,
-                  "tab[1] must be a function, string or ctype", 2)
+                  "tab[1] must be a function, string or ctype")
             ctor = v
         elseif (type(k) == "string") then
             check(type(v) == "function" or type(v) == "string",
-                  "tab[<string>] must be a function or a string", 2)
+                  "tab[<string>] must be a function or a string")
             if (k:sub(1,2) == "__") then
                 if (k == "__index") then
-                    check(type(v) == "function", "tab.__index must be a function", 2)
+                    check(type(v) == "function", "tab.__index must be a function")
                 elseif (k == "__gc") then
                     error("__gc does not work, use ffi.gc() instead", 2)
                 end
@@ -86,7 +86,7 @@ function api.class(tab)
     if (type(ctor) == "function") then
         local factory = function(...)
             local t = ctor(...)
-            check(t == nil or type(t) == "table", "constructor must return nil or a table", 2)
+            check(t == nil or type(t) == "table", "constructor must return nil or a table")
             if (t ~= nil) then
                 return setmetatable(t, mt)
             end

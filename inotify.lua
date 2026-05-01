@@ -38,7 +38,7 @@ api.init = class
 {
     function(flags)
         check(flags == nil or type(flags) == "number",
-              "<flags> must be nil or a number", 2)
+              "<flags> must be nil or a number")
 
         local fd = (flags == nil) and C.inotify_init() or C.inotify_init1(flags)
 
@@ -58,7 +58,7 @@ api.init = class
     end,
 --]]
     getRawFd = function(self)
-        check(self.fd.fd ~= -1, "must call before closing", 2)
+        check(self.fd.fd ~= -1, "must call before closing")
         return self.fd.fd
     end,
 
@@ -69,8 +69,8 @@ api.init = class
     end,
 
     add_watch = function(self, pathname, mask)
-        check(type(pathname) == "string", "<pathname> must be a string", 2)
-        check(type(mask) == "number", "<mask> must be a number", 2)
+        check(type(pathname) == "string", "<pathname> must be a string")
+        check(type(mask) == "number", "<mask> must be a number")
 
         local wd = C.inotify_add_watch(self.fd.fd, pathname, mask)
 

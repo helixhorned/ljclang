@@ -233,10 +233,10 @@ local function getPchGenArgs(args)
 end
 
 function api.sanitize_args(args, directory)
-    check(type(args) == "table", "<args> must be a table", 2)
-    check(type(directory) == "string", "<directory> must be a string", 2)
+    check(type(args) == "table", "<args> must be a table")
+    check(type(directory) == "string", "<directory> must be a string")
 
-    check(directory:sub(1,1) == "/", "<directory> must start with '/'", 2)  -- XXX: Windows
+    check(directory:sub(1,1) == "/", "<directory> must start with '/'")  -- XXX: Windows
 
     local localArgs = {}
     local argCountToIgnore = 0

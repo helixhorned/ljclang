@@ -132,7 +132,7 @@ local FD_MASK_BIT_COUNT = 8 * ffi.sizeof(fd_mask_t)
 
 local function checkSetFd(fd)
     checktype(fd, 1, "number", 4)
-    check(fd >= 0 and fd < FD_SETSIZE, "file descriptor value is too large", 3)
+    check(fd >= 0 and fd < FD_SETSIZE, "file descriptor value is too large", 1)
 end
 
 fd_set_t = class
@@ -232,7 +232,7 @@ local function makeArgv(tab)
 
     for i = 0, argc - 1 do
         local str = tab[i]
-        check(type(str) == "string", "table values must be strings", 3)
+        check(type(str) == "string", "table values must be strings", 1)
 
         local charArray = char_array_t(#str + 1, str)
         assert(charArray[#str] == 0)
@@ -277,7 +277,7 @@ api.Fd = class
 
     read = function(self, byteCount)
         checktype(byteCount, 1, "number", 2)
-        check(byteCount >= 1, "argument must be at least 1", 2)
+        check(byteCount >= 1, "argument must be at least 1")
         local buf = uint8_array_t(byteCount)
         local bytesRead = call("read", self.fd, buf, byteCount)
         assert(bytesRead <= byteCount)
@@ -287,7 +287,7 @@ api.Fd = class
     -- Read from a file descriptor previously opened with O_NONBLOCK.
     readNonblocking = function(self, byteCount)
         checktype(byteCount, 1, "number", 2)
-        check(byteCount >= 1, "argument must be at least 1", 2)
+        check(byteCount >= 1, "argument must be at least 1")
         local buf = uint8_array_t(byteCount)
         local bytesRead, errno = callAllowing(Allow_EAGAIN, "read", self.fd, buf, byteCount)
         assert(bytesRead <= byteCount)
@@ -311,8 +311,8 @@ api.Fd = class
         checktype(allowPartial, 2, "boolean", 3)
 
         local length = ffi.sizeof(obj)
-        check(length ~= nil, "argument #1 must have ffi.sizeof() ~= nil", 3)
-        check(length >= 1, "argument #1 must have ffi.sizeof() >= 1", 3)
+        check(length ~= nil, "argument #1 must have ffi.sizeof() ~= nil", 1)
+        check(length >= 1, "argument #1 must have ffi.sizeof() >= 1", 1)
 
         local bytePtr = ffi.cast(uint8_ptr_t, obj)
         local bytesRead = 0
@@ -335,9 +335,9 @@ api.Fd = class
 
     write = function(self, obj)
         check(type(obj) == "string" or type(obj) == "cdata",
-              "argument #1 must be a string or cdata", 2)
+              "argument #1 must be a string or cdata")
         local length = (type(obj) == "string") and #obj or ffi.sizeof(obj)
-        check(length > 0, "argument must have non-zero length", 2)
+        check(length > 0, "argument must have non-zero length")
         local bytesWritten = call("write", self.fd, obj, length)
         assert(bytesWritten <= length)
         -- TODO: check non-discarding at all usage sites.
@@ -346,15 +346,15 @@ api.Fd = class
 
     writeFull = function(self, obj, length)
         check(type(obj) == "cdata",
-              "argument #1 must be a cdata", 2)
+              "argument #1 must be a cdata")
         check(length == nil or type(length) == "number",
-              "argument #2 must be nil or a number", 2)
+              "argument #2 must be nil or a number")
 
         local objLength = ffi.sizeof(obj)
         local writeLength = (length ~= nil) and length or objLength
 
-        check(writeLength > 0, "must request to write at least one byte", 2)
-        check(writeLength <= objLength, "requested write length greater than object size", 2)
+        check(writeLength > 0, "must request to write at least one byte")
+        check(writeLength <= objLength, "requested write length greater than object size")
 
         local bytePtr = ffi.cast(uint8_ptr_t, obj)
         local bytesWritten = 0
@@ -371,9 +371,9 @@ api.Fd = class
     -- Write to a file descriptor, catching EPIPE instead of propagating it as Lua error.
     writePipe = function(self, obj)
         check(type(obj) == "string" or type(obj) == "cdata",
-              "argument #1 must be a string or cdata", 2)
+              "argument #1 must be a string or cdata")
         local length = (type(obj) == "string") and #obj or ffi.sizeof(obj)
-        check(length > 0, "argument must have non-zero length", 2)
+        check(length > 0, "argument must have non-zero length")
         local bytesWritten, errno = callAllowing(Allow_EPIPE, "write", self.fd, obj, length)
         assert(bytesWritten <= length)
         return (errno == nil) and bytesWritten or nil
@@ -464,9 +464,9 @@ end
 
 api.poll = function(tab, timeoutMs)
     checktype(tab, 1, "table", 2)
-    check(#tab > 0, "passed table must not be empty", 2)
+    check(#tab > 0, "passed table must not be empty")
     check(timeoutMs == nil or type(timeoutMs) == "number",
-          "argument #2 must be nil or a number", 2)
+          "argument #2 must be nil or a number")
 
     local homogenousEventSet = (tab.events ~= nil) and tab.events or nil
     assert(homogenousEventSet ~= nil, "must provide <tab>.events: "..
@@ -475,7 +475,7 @@ api.poll = function(tab, timeoutMs)
     local pollfds = pollfd_array_t(#tab, pollfd_t{0, tab.events, 0})
 
     for i, fd in ipairs(tab) do
-        check(type(fd) == "number", "numeric elements of passed table must be numbers", 2)
+        check(type(fd) == "number", "numeric elements of passed table must be numbers")
         pollfds[i - 1].fd = fd
     end
 
@@ -516,7 +516,7 @@ api.getPageSize = getPageSize
 local function CheckCommonMemMapArgs(argIdxOffset, length, prot, flags, fd)
     local o = argIdxOffset
     checktype(length, o+1, "number", 3)
-    check(length > 0, "'length' argument must be greater than zero", 3)
+    check(length > 0, "'length' argument must be greater than zero", 1)
 
     checktype(prot, o+2, "number", 3)
     checktype(flags, o+3, "number", 3)
@@ -524,19 +524,19 @@ local function CheckCommonMemMapArgs(argIdxOffset, length, prot, flags, fd)
     do
         local MAP, PROT = decls.MAP, decls.PROT
         check(bit.band(prot, bit.bnot(PROT.READ + PROT.WRITE)) == 0,
-              "Only PROT.READ and/or PROT.WRITE allowed", 3)
+              "Only PROT.READ and/or PROT.WRITE allowed", 1)
         local allowedFlags = bit.bnot(MAP.SHARED + MAP.PRIVATE + linux_decls.MAP.ANONYMOUS)
         check(bit.band(flags, allowedFlags) == 0,
-              "Only MAP.{SHARED,PRIVATE,ANONYMOUS} allowed", 3)
+              "Only MAP.{SHARED,PRIVATE,ANONYMOUS} allowed", 1)
         check(bit.band(flags, linux_decls.MAP.ANONYMOUS) == 0 or fd == -1,
-              "'fd' argument must be -1 when 'flags' argument has MAP.ANONYMOUS set", 3)
+              "'fd' argument must be -1 when 'flags' argument has MAP.ANONYMOUS set", 1)
     end
 
     checktype(fd, o+4, "number", 3)
 end
 
 api.mmap = function(addr, length, prot, flags, fd, offset)
-    check(addr == nil, "argument #1 must be nil", 2)
+    check(addr == nil, "argument #1 must be nil")
     CheckCommonMemMapArgs(1, length, prot, flags, fd)
     checktype(offset, 6, "number", 2)
 
@@ -557,10 +557,10 @@ function api.memMapWithPadding(totalLength, length, prot, flags, fd)
     checktype(totalLength, 1, "number", 2)
     CheckCommonMemMapArgs(1, length, prot, flags, fd)
 
-    check(totalLength >= length, "argument #1 must be greater than or equal to argument #2", 2)
+    check(totalLength >= length, "argument #1 must be greater than or equal to argument #2")
     local haveUnderlay = (totalLength > length)
     check(not haveUnderlay or (length % getPageSize() == 0),
-          "with padding, argument #2 must be a multiple of the page size", 2)
+          "with padding, argument #2 must be a multiple of the page size")
 
     -- First, request the mapping containing the padding if needed. (The "underlay".)
     local unPtr = haveUnderlay and
@@ -608,16 +608,16 @@ local function checkMemRemapPtr(ptr, pageIdx)
     local memMapSize = activeMemMapSizes[ptr]
     -- NOTE: this check may wrongly pass, namely in case we are called with a pointer that
     --  is not reachable from Lua but has not yet been garbage-collected.
-    check(ptr ~= nil, "pointer argument must have been obtained by posix.mmap()", 3)
+    check(ptr ~= nil, "pointer argument must have been obtained by posix.mmap()", -1)
 
     local pageSize = getPageSize()
     check(pageIdx >= 0 and pageIdx < math.floor(memMapSize / pageSize),
-          "page index argument must refer to a full page of the memory mapping", 3)
+          "page index argument must refer to a full page of the memory mapping", 1)
     return ffi.cast(uint8_ptr_t, ptr)
 end
 
 api.memRemapSinglePage = function(srcBasePtr, srcPageIdx, dstBasePtr, dstPageIdx)
-    check(jit.os == "Linux", "This function is available only on Linux", 2)
+    check(jit.os == "Linux", "This function is available only on Linux")
 
     srcBasePtr = checkMemRemapPtr(srcBasePtr, srcPageIdx)
     dstBasePtr = checkMemRemapPtr(dstBasePtr, dstPageIdx)
@@ -651,9 +651,9 @@ end
 api.exec = function(fileName, args)
     checktype(fileName, 1, "string", 2)
     check(#fileName > 0 and fileName:sub(1,1) == '/',
-          "argument #1 must be an absolute file name", 2)
+          "argument #1 must be an absolute file name")
     checktype(args, 2, "table", 2)
-    check(args[0] == nil, "argument #2 must not contain an entry at index 0", 2)
+    check(args[0] == nil, "argument #2 must not contain an entry at index 0")
 
     args[0] = fileName
 
@@ -666,7 +666,7 @@ api.freopen = function(pathname, mode, stream)
     checktype(pathname, 1, "string", 2)
     checktype(mode, 2, "string", 2)
 
-    check(ffi.istype("FILE *", stream), "argument #3 must be a FILE *", 2)
+    check(ffi.istype("FILE *", stream), "argument #3 must be a FILE *")
     check(stream ~= nil, "argument #3 must be non-NULL")
 
     local retPtr = C.freopen(pathname, mode, stream)
@@ -698,11 +698,11 @@ local function isPid(v)
 end
 
 api.waitpid = function(pid, options)
-    check(isPid(pid), "argument #1 must be a pid", 2)
+    check(isPid(pid), "argument #1 must be a pid")
     -- Exclude other conventions other than passing -1 or an exact PID:
-    check(pid == -1 or pid > 0, "argument #1 must be -1 or strictly positive", 2)
+    check(pid == -1 or pid > 0, "argument #1 must be -1 or strictly positive")
     checktype(options, 2, "number", 2)
-    check(options == 0, "argument #2 must be 0 (not yet implemented)", 2)
+    check(options == 0, "argument #2 must be 0 (not yet implemented)")
 
     local stat_loc = ffi.new("int [1]")
     local ret_pid = call("waitpid", pid, stat_loc, options)
@@ -730,8 +730,8 @@ api.pipe = function()
 end
 
 api.signal = function(sig, handler)
-    check(sig == SIG.INT, "argument #1 must be SIG.INT", 2)
-    check(handler == external_SIG.DFL, "argument #2 must be SIG.DFL", 2)
+    check(sig == SIG.INT, "argument #1 must be SIG.INT")
+    check(handler == external_SIG.DFL, "argument #2 must be SIG.DFL")
 
     ffi.errno(0)
     C.signal(sig, handler)

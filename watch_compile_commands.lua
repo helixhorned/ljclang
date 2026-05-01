@@ -1376,7 +1376,7 @@ local OnDemandParser = class
 
     getResults = function(self, i)
         checktype(i, 1, "number", 2)
-        check(i >= 1 and i <= self:getCount(), "argument #1 must be in [1, self:getCount()]", 2)
+        check(i >= 1 and i <= self:getCount(), "argument #1 must be in [1, self:getCount()]")
 
 --        local tus, errorCodes = self.tus, self.errorCodes
 

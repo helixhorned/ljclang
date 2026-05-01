@@ -232,14 +232,14 @@ end
 -- whitespace in the "command" key in form (2) are rejected.
 function api.parse_compile_commands(compile_commands_string)
     check(type(compile_commands_string) == "string",
-          "<compile_commands_string> must be a string", 2)
+          "<compile_commands_string> must be a string")
 
     local str = tweak_json_string_for_load_as_lua_table(compile_commands_string)
     return load_json_as_lua_string(str)
 end
 
 function api.read_compile_commands(filename)
-    check(type(filename) == "string", "<filename> must be a string", 2)
+    check(type(filename) == "string", "<filename> must be a string")
     local f, msg1 = io.open(filename)
 
     if (f == nil) then

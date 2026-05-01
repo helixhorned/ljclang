@@ -18,7 +18,7 @@ local api = {}
 
 -- argstab = splitAtWhitespace(args)
 function api.splitAtWhitespace(args)
-    check(type(args) == "string", "<args> must be a string", 2)
+    check(type(args) == "string", "<args> must be a string")
 
     local argstab = {}
     -- Split delimited by whitespace.
@@ -55,7 +55,7 @@ function api.checkOptionsArgAndGetDefault(opts, defaultValue)
         opts = defaultValue;
     else
         check(type(opts)=="number" or type(opts)=="table",
-              "argument #1 must be a number or a table", 4)
+              "argument #1 must be a number or a table", 2)
         api.check_iftab_iscellstr(opts, "<opts>", 4)
     end
 
@@ -79,11 +79,11 @@ end
 function api.getCommonPrefix(getString, commonPrefix, ...)
     checktype(getString, 1, "function", 2)
     check(commonPrefix == nil or type(commonPrefix) == "string",
-          "argument #2 must be nil or a string", 2)
+          "argument #2 must be nil or a string")
 
     for key, value in ... do
         local str = getString(key, value)
-        check(type(str) == "string", "getString(k, v) for iterated k, v should return a string", 2)
+        check(type(str) == "string", "getString(k, v) for iterated k, v should return a string")
 
         if (commonPrefix == nil) then
             commonPrefix = str
@@ -122,7 +122,7 @@ api.Bimap = class
     function(firstType, secondType)
         checktype(firstType, 1, "string", 2)
         checktype(secondType, 2, "string", 2)
-        check(firstType ~= secondType, "arguments #1 and #2 must be distinct", 2)
+        check(firstType ~= secondType, "arguments #1 and #2 must be distinct")
 
         return {
             [BimapTags.FIRST_TYPE] = firstType,
@@ -167,8 +167,8 @@ end
 
 local function CheckIsFiniteInt(number, argIdx)
     checktype(number, argIdx, "number", 3)
-    check(number >= 1 and number < math.huge, "argument must be a finite number", 3)
-    check(math.floor(number) == number, "argument must be an integral number", 3)
+    check(number >= 1 and number < math.huge, "argument must be a finite number", -1)
+    check(math.floor(number) == number, "argument must be an integral number", -1)
 end
 
 api.BoolArray = function(size, initialValue)

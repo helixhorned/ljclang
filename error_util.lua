@@ -9,9 +9,15 @@ local api = {}
 -- TODO: default 'level' to 2 for the following two functions?
 
 -- Wrap 'error' in assert-like call to write type checks in one line instead of three.
-function api.check(pred, msg, level)
+function api.check(pred, msg, additional_level)
+    if (additional_level == nil) then
+        additional_level = 0
+    end
+	assert(type(msg) == "string")
+    assert(type(additional_level) == "number")
+
     if (not pred) then
-        error(msg, level+1)
+        error(msg, 3 + additional_level)
     end
 end
 

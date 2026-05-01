@@ -71,14 +71,14 @@ api.SymbolIndex = class
     remapLocalToGlobalPage = function(self, localPageArrayIdx, srcPageIdx, globalPageIdx)
         checktype(localPageArrayIdx, 1, "number", 2)
         check(localPageArrayIdx >= 1 and localPageArrayIdx <= #self.localPageArrays,
-              "argument #1 must be a valid local page array index" ,2)
+              "argument #1 must be a valid local page array index")
 
         checktype(srcPageIdx, 2, "number", 2)
         check(srcPageIdx >= 0 and srcPageIdx < MaxSymPages.Local,
-              "argument #2 must be a valid local page index", 2)
+              "argument #2 must be a valid local page index")
         checktype(globalPageIdx, 3, "number", 2)
         check(globalPageIdx >= 0 and globalPageIdx < MaxSymPages.Global,
-              "argument #3 must be a valid global page index", 2)
+              "argument #3 must be a valid global page index")
 
         posix.memRemapSinglePage(
             self:getLocalPageArrayVoidPtr(localPageArrayIdx), srcPageIdx,

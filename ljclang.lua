@@ -128,8 +128,8 @@ local function HandleNumberOrStringTabOption(
 end
 
 local function PrepareParse(srcfile, args, opts)
-    check(type(srcfile)=="string", "<srcfile> must be a string", 3)
-    check(type(args)=="string" or type(args)=="table", "<args> must be a string or table", 3)
+    check(type(srcfile)=="string", "<srcfile> must be a string", 1)
+    check(type(args)=="string" or type(args)=="table", "<args> must be a string or table", 1)
     util.check_iftab_iscellstr(args, "<args>", 3)
 
     if (srcfile == "") then
@@ -179,8 +179,8 @@ local function WrappedArrayType(elementCType, elementWrapFunc, methods)
                 return methods[i]
             end
 
-            check(type(i) == "number", "<i> must be a number", 2)
-            check(i >= 1 and i <= self._length, "<i> must be in [1, #self]", 2)
+            check(type(i) == "number", "<i> must be a number")
+            check(i >= 1 and i <= self._length, "<i> must be in [1, #self]")
 
             return elementWrapFunc(self._ptr[i - 1])
         end,
@@ -233,7 +233,7 @@ local WrappedAttrInfoArray = WrappedArrayType(CXIdxAttrInfoPtr, function(cxIdxAt
     return CXIdxObjectWrapper(cxIdxAttrInfoPtr)
 end, {
     has = function(self, attrKind)
-        check(type(attrKind) == "string", "attribute #2 must be a string", 2)
+        check(type(attrKind) == "string", "attribute #2 must be a string")
 
         local attr = C['CXCursor_'..attrKind]
 
@@ -276,7 +276,7 @@ CXIdxObjectWrapper = class
     end,
 
     __index = function(self, key)
-        check(type(key) == "string", "key must be a string", 2)
+        check(type(key) == "string", "key must be a string")
 
         local value = self._obj[key]
 
@@ -331,7 +331,7 @@ local function WrapIndexerCallback(funcName, userCallback)
     local wrappers = {
         abortQuery = function(_, _)
             local shouldAbort = userCallback()
-            check(type(shouldAbort) == "boolean", "return value must be boolean", 2)
+            check(type(shouldAbort) == "boolean", "return value must be boolean")
             return (shouldAbort and 1 or 0)
         end,
 
@@ -378,28 +378,28 @@ local function WrapIndexerCallback(funcName, userCallback)
 
     local wrapper = wrappers[funcName]
     check(wrapper ~= nil,
-          "unknown or unsupported indexer callback '"..funcName.."'", 3)
+          "unknown or unsupported indexer callback '"..funcName.."'", 1)
     return wrapper
 end
 
 local allIndexerCallbackFuncs = {}
 
 function api.IndexerCallbacks(tab)
-    check(type(tab) == "table", "argument must be a table", 2)
+    check(type(tab) == "table", "argument must be a table")
 
     local callbacks = ffi.new("IndexerCallbacks")
     local noGcCheck = false
     local isEmpty = true
 
     for funcName, func in pairs(tab) do
-        check(type(funcName) == "string", "argument table must contain string keys", 2)
+        check(type(funcName) == "string", "argument table must contain string keys")
 
         if (funcName == "diagnostic") then
             -- do nothing
         elseif (funcName == "_noGcCheck") then
             noGcCheck = true
         else
-            check(type(func) == "function", "argument table must contain function values", 2)
+            check(type(func) == "function", "argument table must contain function values")
             -- TODO [LUA_FUNC_INTO_CDATA_FPTR]: without anchoring the Lua function here, the
             --  returned 'IndexerCallbacks' cdata value *does* get GC-collected! Why?
             allIndexerCallbackFuncs[#allIndexerCallbackFuncs + 1] = func
@@ -438,7 +438,7 @@ local IndexSession = class
             indexOpts, C.CXIndexOpt_None, "CXIndexOpt_")
 
         check(ffi.istype("IndexerCallbacks", callbacks),
-              "<callback> must be a an object obtained with IndexerCallbacks()", 2)
+              "<callback> must be a an object obtained with IndexerCallbacks()")
 
         local errorCode = clang.clang_indexSourceFile(
             self._idxact,
@@ -471,7 +471,7 @@ local Index = class
     end,
 
     loadTranslationUnit = function(self, filename)
-        check(type(filename) == "string", "<filename> must be a string", 2)
+        check(type(filename) == "string", "<filename> must be a string")
 
         local cxtuAr = ffi.new("CXTranslationUnit [1]")
         local cxErrorCode = clang.clang_createTranslationUnit2(
@@ -763,7 +763,7 @@ end
 File = class
 {
     function(cxfile, parent)
-        check(ffi.istype(CXFile, cxfile), "<cxfile> must be a CXFile object", 2)
+        check(ffi.istype(CXFile, cxfile), "<cxfile> must be a CXFile object")
         assert(cxfile ~= nil) -- TODO: handle?
 
         -- table can be: SourceLocation, TranslationUnit_t
@@ -837,7 +837,7 @@ local function getCursor(cxcur)
 end
 
 local function getFile(tu, filename)
-    check(type(filename) == "string", "<filename> must be a string", 3)
+    check(type(filename) == "string", "<filename> must be a string", 1)
     return clang.clang_getFile(tu, filename)
 end
 
@@ -863,7 +863,7 @@ TranslationUnit_t = class
 
     save = function(self, filename)
         check_tu_valid(self)
-        check(type(filename) == "string", "<filename> must be a string", 2)
+        check(type(filename) == "string", "<filename> must be a string")
         local intRes = clang.clang_saveTranslationUnit(self._tu, filename, 0)
         local res = ffi.new("enum CXSaveError", intRes)
         assert(res ~= 'CXSaveError_InvalidTU')
@@ -880,14 +880,14 @@ TranslationUnit_t = class
     -- Incompatible with luaclang-parser: returns a File object (a wrapped CXFile).
     file = function(self, filename)
         check_tu_valid(self)
-        check(type(filename) == "string", "<filename> must be a string", 3)
+        check(type(filename) == "string", "<filename> must be a string", 1)
         local cxfile = clang.clang_getFile(self._tu, filename)
         return (cxfile ~= nil) and File(cxfile, self) or nil
     end,
 
     inclusions = function(self, visitor)
         check_tu_valid(self)
-        check(type(visitor) == "function", "<visitor> must be a Lua function", 2)
+        check(type(visitor) == "function", "<visitor> must be a Lua function")
 
         -- Create a "loose" translation unit from us, that is, one that is not associated
         -- with a finalizer. If we were to pass 'self' instead of 'looseTU', we would never
@@ -977,7 +977,7 @@ end
 -- particular callback invocation. If it is to be used after the function has
 -- returned, it **must** be copied using the `Cursor` constructor mentioned below.
 local function wrapCursorVisitor(visitorFunc)
-    check(type(visitorFunc)=="function", "<visitorfunc> must be a Lua function", 2)
+    check(type(visitorFunc)=="function", "<visitorfunc> must be a Lua function")
     return LJCX_CursorVisitor(visitorFunc)
 end
 
@@ -989,7 +989,7 @@ local Cursor_ptr_t = ffi.typeof("$ *", Cursor_t)
 --
 -- Creates a permanent cursor from one received by the visitor callback.
 function api.Cursor(cur)
-    check(ffi.istype(Cursor_ptr_t, cur), "<cur> must be a cursor as passed to the visitor callback", 2)
+    check(ffi.istype(Cursor_ptr_t, cur), "<cur> must be a cursor as passed to the visitor callback")
     return Cursor_t(cur[0])
 end
 
@@ -1028,7 +1028,7 @@ class
                 visitor = wrapCursorVisitor(visitor)
             else
                 check(ffi.istype(LJCX_CursorVisitor, visitor),
-                      "<visitor> must be a handle obtained with regCursorVisitor() or a Lua function", 2)
+                      "<visitor> must be a handle obtained with regCursorVisitor() or a Lua function")
             end
 
             local ret = support.ljclang_visitChildrenWith(self._cur, visitor)
@@ -1172,7 +1172,7 @@ class
     end,
 
     isVirtualBase = function(self)
-        check(self:haskind("CXXBaseSpecifier"), "cursor must have kind CXXBaseSpecifier", 2)
+        check(self:haskind("CXXBaseSpecifier"), "cursor must have kind CXXBaseSpecifier")
         return clang.clang_isVirtualBase(self._cur) ~= 0
     end,
 
@@ -1302,14 +1302,14 @@ class
     end,
 
     enumIntegerType = function(self)
-        check(self:haskind("EnumDecl"), "cursor must have kind EnumDecl", 2)
+        check(self:haskind("EnumDecl"), "cursor must have kind EnumDecl")
         local typ = getType(clang.clang_getEnumDeclIntegerType(self._cur))
         assert(typ ~= nil)
         return typ
     end,
 
     enumValue = function(self)
-        check(self:haskind("EnumConstantDecl"), "cursor must have kind EnumConstantDecl", 2)
+        check(self:haskind("EnumConstantDecl"), "cursor must have kind EnumConstantDecl")
 
         local typ = self:parent():enumIntegerType()
         local obtainAsUnsigned = typ:haskind("ULongLong")
@@ -1434,7 +1434,7 @@ class
     end,
 
     bitOffsetOf = function(self, member)
-        check(type(member) == "string", "argument must be a string", 2)
+        check(type(member) == "string", "argument must be a string")
         return TypeLayoutResult(clang.clang_Type_getOffsetOf(self._typ, member))
     end,
 
