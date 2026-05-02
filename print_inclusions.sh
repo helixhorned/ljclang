@@ -236,8 +236,8 @@ export LC_ALL=C
 
 PIPE_BUF=4096
 
-pids=()
-fds=()
+g_pids=()
+g_fds=()
 
 to_reap_count=0
 
@@ -273,10 +273,10 @@ function process_tu() {
 function find_command_index() {
 	local pid="$1"
 	assert -n "$pid"
-	pid_count="${#pids[@]}"
+	pid_count="${#g_pids[@]}"
 
 	for ((i=0; i < pid_count; i++)); do
-		if [ "${pids[i]}" -eq "$pid" ]; then
+		if [ "${g_pids[i]}" -eq "$pid" ]; then
 			echo "$i"
 			return
 		fi
@@ -305,8 +305,8 @@ function spawn_coprocess() {
 	# Not needed in the following, so close:
 	exec {fd_for_writing}>&-
 
-	fds[ci]="${COPROC[0]}"
-	pids[ci]="$COPROC_PID"
+	g_fds[ci]="${COPROC[0]}"
+	g_pids[ci]="$COPROC_PID"
 	unset COPROC_PID
 	unset COPROC
 }
@@ -321,7 +321,7 @@ function update_max_exit_code() {
 }
 
 function get_child_pids_regex() {
-	local child_pids=" ${pids[*]}"
+	local child_pids=" ${g_pids[*]}"
 	child_pids="${child_pids// -1/}"
 	child_pids="${child_pids:1}"
 	# Match *stopped* child processes:
@@ -398,10 +398,10 @@ while [ "$to_reap_count" -gt 0 ]; do
 
 	assert -n "$stopped_pid"
 	finished_ci=$(find_command_index "$stopped_pid")
-	finished_fd="${fds[$finished_ci]}"
+	finished_fd="${g_fds[$finished_ci]}"
 
-	pids[finished_ci]=-1
-	fds[finished_ci]=-1
+	g_pids[finished_ci]=-1
+	g_fds[finished_ci]=-1
 
 	kill -CONT "$stopped_pid"
 	## Output:
