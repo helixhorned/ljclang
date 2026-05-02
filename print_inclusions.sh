@@ -236,6 +236,13 @@ export LC_ALL=C
 
 PIPE_BUF=4096
 
+pids=()
+fds=()
+
+to_reap_count=0
+
+# ----------
+
 function process_tu() {
 	ci="$1"
 	read -r -N 8 my_pid
@@ -263,9 +270,6 @@ function process_tu() {
 	kill -STOP "$my_pid"
 }
 
-pids=()
-fds=()
-
 function find_command_index() {
 	local pid="$1"
 	assert -n "$pid"
@@ -281,8 +285,6 @@ function find_command_index() {
 	assert -z unreachable
 	exit 101
 }
-
-to_reap_count=0
 
 function spawn_coprocess() {
 	local ci="$1"
@@ -308,15 +310,6 @@ function spawn_coprocess() {
 	unset COPROC_PID
 	unset COPROC
 }
-
-for ((ci=0; ci < max_jobs; ci++)); do
-	spawn_coprocess "$ci"
-done
-
-labeled_assert to_reap_count "$to_reap_count" -eq "$max_jobs"
-
-max_exit_code=0
-ci="$max_jobs"
 
 function update_max_exit_code() {
 	local exit_code="$1"
@@ -379,6 +372,17 @@ function wait_for_state_change() {
 		done
 	done
 }
+
+# ----------
+
+for ((ci=0; ci < max_jobs; ci++)); do
+	spawn_coprocess "$ci"
+done
+
+labeled_assert to_reap_count "$to_reap_count" -eq "$max_jobs"
+
+max_exit_code=0
+ci="$max_jobs"
 
 while [ "$to_reap_count" -gt 0 ]; do
 	stopped_pid=$(wait_for_state_change)
