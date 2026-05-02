@@ -360,6 +360,12 @@ function wait_for_state_change() {
 	#  Then we'd have to implement some kind of "protocol" to reassemble fragments.
 	#  Up-front, the many-file-descriptor solution seemed easier. Not so sure now...
 
+	# Q: Why not: create a pipe up-front (named first, file removed to only keep the
+	#    descriptor), use that as control mechanism children -> parent?
+	# A: Tried that. Got into trouble at spawning the first child of the follow-up batch
+	#    ('coproc' failed -- none of the out-vars were set; inconsistently, $? was 0).
+	#    Did not have time to pursue debugging.
+
 	while true; do
 		sleep "$POLL_INTERVAL"
 		# shellcheck disable=SC2009
