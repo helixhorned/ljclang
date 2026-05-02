@@ -99,8 +99,8 @@ source_files=()
 function error_and_exit() {
 	local cmd="$1"
 	local msg="$2"
-	assert -n "$msg"
-	assert -n "$cmd"
+	labeled_assert msg -n "$msg"
+	labeled_assert cmd -n "$cmd"
 	exec >&2
 	echo "ERROR: $msg."
 	echo " NOTE: fails: $cmd"
@@ -109,7 +109,7 @@ function error_and_exit() {
 
 function extract_arguments() {
 	local ci="$1"
-	assert -n "$ci"
+	labeled_assert extract_arguments:ci -n "$ci"
 	local command="${commands[$ci]}"
 
 	local new_args=()
@@ -180,7 +180,7 @@ function grep_and_strip() {
 
 function process_translation_unit() {
 	local ci="$1"
-	assert -n "$ci"
+	labeled_assert process_translation_unit:ci -n "$ci"
 	local new_args_str="${new_args_lists[ci]}"
 	local source_file="${source_files[ci]}"
 	echo -n "="
@@ -272,7 +272,7 @@ function process_tu() {
 
 function find_command_index() {
 	local pid="$1"
-	assert -n "$pid"
+	labeled_assert find_command_index:pid -n "$pid"
 	pid_count="${#g_pids[@]}"
 
 	for ((i=0; i < pid_count; i++)); do
@@ -288,7 +288,7 @@ function find_command_index() {
 
 function spawn_coprocess() {
 	local ci="$1"
-	assert -n "$ci"
+	labeled_assert spawn_coprocess:ci -n "$ci"
 	coproc COPROC { process_tu "$ci"; }
 	labeled_assert COPROC_PID "$COPROC_PID" -eq $!
 	to_reap_count=$((to_reap_count + 1))
@@ -313,7 +313,7 @@ function spawn_coprocess() {
 
 function update_max_exit_code() {
 	local exit_code="$1"
-	assert -n "$exit_code"
+	labeled_assert exit_code -n "$exit_code"
 
 	if [ "$exit_code" -gt "$max_exit_code" ]; then
 		max_exit_code="$exit_code"
@@ -396,7 +396,7 @@ while [ "$to_reap_count" -gt 0 ]; do
 
 	# Take care of the terminated one.
 
-	assert -n "$stopped_pid"
+	labeled_assert stopped_pid -n "$stopped_pid"
 	finished_ci=$(find_command_index "$stopped_pid")
 	finished_fd="${g_fds[$finished_ci]}"
 
