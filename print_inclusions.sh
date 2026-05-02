@@ -26,7 +26,7 @@ compile_commands_file="$2"
 
 if [[ -z "$compiler_arg" || -z "$compile_commands_file" ]]; then
 	exec >&2
-	echo "Usage: $0 [-j<concurrency>] <compiler> <compile_commands.json>"
+	echo "Usage: $0 [-j<concurrency>][+] <compiler> <compile_commands.json>"
 	echo
 	echo "- <compiler> may be an absolute or relative path. Each compile"
 	echo "   command must start with the canonicalized <compiler>."
@@ -54,11 +54,18 @@ if ! project_dir=$(dirname "$compile_commands_file"); then
 fi
 
 max_jobs=1
+use_job_control=
+
 if [ -n "$concurrency_arg" ]; then
-	if [[ ! "$concurrency_arg" =~ ^-j[1-9][0-9]?$ ]]; then
-		echo "ERROR: malformed third argument, expecting '-j[1-9][0-9]?'." >&2
+	if [[ ! "$concurrency_arg" =~ ^-j[1-9][0-9]?[+]?$ ]]; then
+		echo "ERROR: malformed third argument, expecting '-j[1-9][0-9]?[+]?'." >&2
 		exit 1
 	fi
+	if [[ "${concurrency_arg}" =~ [+]$ ]]; then
+		concurrency_arg="${concurrency_arg%+}"
+		use_job_control=true
+	fi
+
 	max_jobs=${concurrency_arg:2}
 fi
 
@@ -207,8 +214,10 @@ fi
 
 ## Concurrent processing
 
-# For 'wait' to also react to stopping of a process:
-set -m
+if [ "$use_job_control" ]; then
+	# For 'wait' to also react to stopping of a process:
+	set -m
+fi
 
 labeled_assert max_jobs "$max_jobs" -ge 2
 
@@ -243,15 +252,23 @@ to_reap_count=0
 
 # ----------
 
+function maybe_kill() {
+	if [ "$use_job_control" ]; then
+		kill "$@"
+	fi
+}
+
 function process_tu() {
 	ci="$1"
-	read -r -N 8 my_pid
+	if [ "$use_job_control" ]; then
+		read -r -N 8 my_pid
+	fi
 
 	local result
 	if ! result=$(process_translation_unit "$ci"); then
 		local exit_code=$?
 		echo "ERROR: command $ci: compiler returned exit code $exit_code" >&2
-		kill -STOP "$my_pid"
+		maybe_kill -STOP "$my_pid"
 		exit "$exit_code"
 	fi
 
@@ -260,14 +277,14 @@ function process_tu() {
 
 	if [ "$result_size" -ge "$PIPE_BUF" ]; then
 		echo "NYI: command $ci: result too large: $result_size" >&2
-		kill -STOP "$my_pid"
+		maybe_kill -STOP "$my_pid"
 		exit 100
 	fi
 
 	# The following should not block:
 	echo "$result"
 
-	kill -STOP "$my_pid"
+	maybe_kill -STOP "$my_pid"
 }
 
 function find_command_index() {
@@ -289,6 +306,15 @@ function find_command_index() {
 function spawn_coprocess() {
 	local ci="$1"
 	labeled_assert spawn_coprocess:ci -n "$ci"
+
+	if [ ! "$use_job_control" ]; then
+		{ if process_tu "$ci"; then echo; fi } &
+		local pid=$!
+		to_reap_count=$((to_reap_count + 1))
+		g_pids[ci]="$pid"
+		return
+	fi
+
 	coproc COPROC { process_tu "$ci"; }
 	labeled_assert COPROC_PID "$COPROC_PID" -eq $!
 	to_reap_count=$((to_reap_count + 1))
@@ -391,7 +417,15 @@ max_exit_code=0
 ci="$max_jobs"
 
 while [ "$to_reap_count" -gt 0 ]; do
-	stopped_pid=$(wait_for_state_change)
+	stopped_pid=
+	if [ "$use_job_control" ]; then
+		stopped_pid=$(wait_for_state_change)
+	else
+		wait -nf -p stopped_pid
+		exit_code=$?
+		update_max_exit_code "$exit_code"
+	fi
+
 	to_reap_count=$((to_reap_count - 1))
 
 	# If we can, first spawn a new child.
@@ -407,6 +441,11 @@ while [ "$to_reap_count" -gt 0 ]; do
 	finished_fd="${g_fds[$finished_ci]}"
 
 	g_pids[finished_ci]=-1
+
+	if [ ! "$use_job_control" ]; then
+		continue
+	fi
+
 	g_fds[finished_ci]=-1
 
 	kill -CONT "$stopped_pid"
