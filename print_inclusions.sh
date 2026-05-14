@@ -26,7 +26,7 @@ compile_commands_file="$2"
 
 if [[ -z "$compiler_arg" || -z "$compile_commands_file" ]]; then
 	exec >&2
-	echo "Usage: $0 [-j<concurrency>][+] <compiler> <compile_commands.json>"
+	echo "Usage: $0 [-j<concurrency>] <compiler> <compile_commands.json>"
 	echo
 	echo "- <compiler> may be an absolute or relative path. Each compile"
 	echo "   command must start with the canonicalized <compiler>."
@@ -54,7 +54,6 @@ if ! project_dir=$(dirname "$compile_commands_file"); then
 fi
 
 max_jobs=1
-use_job_control=
 
 if [ -n "$concurrency_arg" ]; then
 	if [[ ! "$concurrency_arg" =~ ^-j[1-9][0-9]?[+]?$ ]]; then
@@ -63,7 +62,6 @@ if [ -n "$concurrency_arg" ]; then
 	fi
 	if [[ "${concurrency_arg}" =~ [+]$ ]]; then
 		concurrency_arg="${concurrency_arg%+}"
-		use_job_control=true
 	fi
 
 	max_jobs=${concurrency_arg:2}
@@ -214,10 +212,64 @@ fi
 
 ## Concurrent processing
 
-if [ "$use_job_control" ]; then
-	# For 'wait' to also react to stopping of a process:
-	set -m
-fi
+# An earlier revision of this script contained an implementation using 'coproc'. This did
+# not work out well. The initial assumption was that the following is possible from Bash:
+#
+#  1. Have an anonymous pipe for child->parent process communication -> yes.
+#  2. Being able to read from it after the child has terminated AND the parent has 'waited'
+#     for it to gather its exit status (POSIX waitpid(), Bash 'wait') -> NO!
+#
+# Point 2 seems intuitively expected, even after waiting. The expectation is that the pipe
+# as a resource is managed independently of the process: as long as the parent has not
+# closed the read end of the pipe, it is possible to obtain from it the unread tail of what
+# the child has written into it.
+#
+# However, this behavior is not mimicked by the Bash builtin 'coproc'. Example:
+#
+#  $ coproc COPROC { echo qwe; sleep 10; }
+#  $ pid=$COPROC_PID && test -n $pid
+#  $ echo $?
+#  0
+#  $ read_fd=${COPROC[0]}
+#  $ echo $read_fd
+#  63
+#  $ sleep 10  # Wait for the child to exit, but do not 'wait'.
+#  $ echo $COPROC_PID  # -> empty, cleared from under our feet
+#  $ echo ${COPROC[@]} # -> dito
+#  $ read -r -u $read_fd
+#  bash: read: 63: invalid file descriptor: Bad file descriptor
+#
+#
+# Thus began a journey of workarounds.
+#
+# Idea A: when a child is done, it communicates this fact to the parent by stopping itself
+#  -- sending itself a SIGSTOP signal. However, The Bash 'wait' builtin *cannot* be used to
+#  wait for a running->stopped state change. (With only one process for testing purposes,
+#  it returns with code 127.) From the documentation:
+#
+#   If the -n option is supplied, `wait` waits for any one of the given ids or, if no
+#   ids are supplied, any job or process substitution, to complete and returns its exit
+#   status. If none of the supplied ids is a child of the shell, or if no ids are
+#   supplied and the shell has no unwaited-for children, the exit status is 127.
+#
+# Workaround A.1: Resort to periodic polling. Worked, but it was not pretty.
+#
+#
+#  ... A few steps back, why the STOP -> CONT dance at all? Well, as far as I can see,
+#  lack of good alternatives.
+#
+#  1. (See 'coproc' example above)
+#  2. Bash does not expose 'poll()' to wait for availability of data to read.
+#
+#  ... We *could* go another route and use one sink for the different sources.
+#  Then we'd have to implement some kind of "protocol" to reassemble fragments.
+#  Up-front, the many-file-descriptor solution seemed easier. Not so sure now...
+#
+# Q: Why not: create a pipe up-front (named first, file removed to only keep the
+#    descriptor), use that as control mechanism children -> parent?
+# A: Tried that. Got into trouble at spawning the first child of the follow-up batch
+#    ('coproc' failed -- none of the out-vars were set; inconsistently, $? was 0).
+#    Did not have time to pursue debugging.
 
 labeled_assert max_jobs "$max_jobs" -ge 2
 
@@ -246,29 +298,18 @@ export LC_ALL=C
 PIPE_BUF=4096
 
 g_pids=()
-g_fds=()
 
 to_reap_count=0
 
 # ----------
 
-function maybe_kill() {
-	if [ "$use_job_control" ]; then
-		kill "$@"
-	fi
-}
-
 function process_tu() {
 	ci="$1"
-	if [ "$use_job_control" ]; then
-		read -r -N 8 my_pid
-	fi
 
 	local result
 	if ! result=$(process_translation_unit "$ci"); then
 		local exit_code=$?
 		echo "ERROR: command $ci: compiler returned exit code $exit_code" >&2
-		maybe_kill -STOP "$my_pid"
 		exit "$exit_code"
 	fi
 
@@ -277,14 +318,11 @@ function process_tu() {
 
 	if [ "$result_size" -ge "$PIPE_BUF" ]; then
 		echo "NYI: command $ci: result too large: $result_size" >&2
-		maybe_kill -STOP "$my_pid"
 		exit 100
 	fi
 
 	# The following should not block:
 	echo "$result"
-
-	maybe_kill -STOP "$my_pid"
 }
 
 function find_command_index() {
@@ -307,34 +345,10 @@ function spawn_coprocess() {
 	local ci="$1"
 	labeled_assert spawn_coprocess:ci -n "$ci"
 
-	if [ ! "$use_job_control" ]; then
-		{ if process_tu "$ci"; then echo; fi } &
-		local pid=$!
-		to_reap_count=$((to_reap_count + 1))
-		g_pids[ci]="$pid"
-		return
-	fi
-
-	coproc COPROC { process_tu "$ci"; }
-	labeled_assert COPROC_PID "$COPROC_PID" -eq $!
+	{ if process_tu "$ci"; then echo; fi } &
+	local pid=$!
 	to_reap_count=$((to_reap_count + 1))
-
-	# Apparently, the coprocess has no means to access its own PID. From the Bash
-	# documentation:
-	#
-	#  ($$) Expands to the process ID of the shell.  In a subshell, it
-	#       expands to the process ID of the parent shell, not the subshell.
-	#
-	# So, send it that information.
-	local fd_for_writing="${COPROC[1]}"
-	printf "% 8d" "$COPROC_PID" >&"$fd_for_writing"
-	# Not needed in the following, so close:
-	exec {fd_for_writing}>&-
-
-	g_fds[ci]="${COPROC[0]}"
-	g_pids[ci]="$COPROC_PID"
-	unset COPROC_PID
-	unset COPROC
+	g_pids[ci]="$pid"
 }
 
 function update_max_exit_code() {
@@ -344,65 +358,6 @@ function update_max_exit_code() {
 	if [ "$exit_code" -gt "$max_exit_code" ]; then
 		max_exit_code="$exit_code"
 	fi
-}
-
-function get_child_pids_regex() {
-	local child_pids=" ${g_pids[*]}"
-	child_pids="${child_pids// -1/}"
-	child_pids="${child_pids:1}"
-	# Match *stopped* child processes:
-	echo "\<(${child_pids// /|})\> T"
-}
-
-
-function wait_for_state_change() {
-	# Determined empirically to be optimal, under very specific circumstances: RPi 5, -j4.
-	# TODO: Does this generalize?
-	local POLL_INTERVAL=0.01
-
-	local eregex
-	eregex=$(get_child_pids_regex)
-
-	# NOTE: The Bash 'wait' builtin *cannot* be used to wait for a running->stopped state
-	#  change. (With only one process for testing purposes, it returns with code 127. From
-	#  the documentation:
-	#
-	#   If the -n option is supplied, `wait` waits for any one of the given ids or, if no
-	#   ids are supplied, any job or process substitution, to complete and returns its exit
-	#   status. If none of the supplied ids is a child of the shell, or if no ids are
-	#   supplied and the shell has no unwaited-for children, the exit status is 127.
-	#
-	#  So, resort to periodic polling.
-
-	#  ... A few steps back, why the STOP -> CONT dance at all? Well, as far as I can see,
-	#  lack of good alternatives.
-	#
-	#  1. We **cannot** read the file descriptor after a Bash 'wait' on a child process:
-	#     It may appear as if we could, but it is made invalid shortly *after* return of
-	#     'wait' -- as it seems, asynchronously, by the Linux kernel.
-	#  2. Bash does not expose 'poll()' to wait for availability of data to read.
-	#
-	#  ... We *could* go another route and use one sink for the different sources.
-	#  Then we'd have to implement some kind of "protocol" to reassemble fragments.
-	#  Up-front, the many-file-descriptor solution seemed easier. Not so sure now...
-
-	# Q: Why not: create a pipe up-front (named first, file removed to only keep the
-	#    descriptor), use that as control mechanism children -> parent?
-	# A: Tried that. Got into trouble at spawning the first child of the follow-up batch
-	#    ('coproc' failed -- none of the out-vars were set; inconsistently, $? was 0).
-	#    Did not have time to pursue debugging.
-
-	while true; do
-		sleep "$POLL_INTERVAL"
-		# shellcheck disable=SC2009
-		procs=$(ps -o pid,stat | grep -E "$eregex" | tr -cd ' [:digit:]')
-
-		# If any child process stopped, return-print the PID of the first one.
-		for proc in $procs; do
-			echo "$proc"
-			return 0
-		done
-	done
 }
 
 # ----------
@@ -417,14 +372,9 @@ max_exit_code=0
 ci="$max_jobs"
 
 while [ "$to_reap_count" -gt 0 ]; do
-	stopped_pid=
-	if [ "$use_job_control" ]; then
-		stopped_pid=$(wait_for_state_change)
-	else
-		wait -nf -p stopped_pid
-		exit_code=$?
-		update_max_exit_code "$exit_code"
-	fi
+	wait -nf -p stopped_pid
+	exit_code=$?
+	update_max_exit_code "$exit_code"
 
 	to_reap_count=$((to_reap_count - 1))
 
@@ -438,28 +388,8 @@ while [ "$to_reap_count" -gt 0 ]; do
 
 	labeled_assert stopped_pid -n "$stopped_pid"
 	finished_ci=$(find_command_index "$stopped_pid")
-	finished_fd="${g_fds[$finished_ci]}"
 
 	g_pids[finished_ci]=-1
-
-	if [ ! "$use_job_control" ]; then
-		continue
-	fi
-
-	g_fds[finished_ci]=-1
-
-	kill -CONT "$stopped_pid"
-	## Output:
-	# TODO: in serial order?
-	cat <&"$finished_fd"
-	if [ "$to_reap_count" -gt 0 ]; then
-		echo
-	fi
-	## ---
-	wait -f "$stopped_pid"
-	update_max_exit_code "$?"
-
-	exec {finished_fd}>&-
 done
 
 exit "$max_exit_code"
