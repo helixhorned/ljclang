@@ -313,16 +313,16 @@ function process_tu() {
 		exit "$exit_code"
 	fi
 
-	# Check if we can write "$result\n" (implicit newline via echo) without blocking.
+	# Check if we can write "$result\n\n" without blocking.
 	result_size="${#result}"
 
-	if [ "$result_size" -ge "$PIPE_BUF" ]; then
+	if [ "$result_size" -ge $((PIPE_BUF - 1)) ]; then
 		echo "NYI: command $ci: result too large: $result_size" >&2
 		exit 100
 	fi
 
 	# The following should not block:
-	echo "$result"
+	printf "%s\n\n" "$result"
 }
 
 function find_command_index() {
@@ -345,7 +345,7 @@ function spawn_coprocess() {
 	local ci="$1"
 	labeled_assert spawn_coprocess:ci -n "$ci"
 
-	{ if process_tu "$ci"; then echo; fi } &
+	process_tu "$ci" &
 	local pid=$!
 	to_reap_count=$((to_reap_count + 1))
 	g_pids[ci]="$pid"
