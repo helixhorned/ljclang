@@ -158,12 +158,23 @@ function extract_arguments() {
 	new_args_lists+=("${new_args[*]}")
 }
 
+# We *want* the backslash:
+# shellcheck disable=1003
+BS='\'
+DQ='"'
+escaped_BS="$BS$BS"
+escaped_DQ="$BS$BS$DQ"
+
 for ci in "${!commands[@]}"; do
 	command="${commands[$ci]}"
 	if [ "${command:0:$compiler_len_p1}" != "$compiler " ]; then
 		error_and_exit "$command" "all commands must start with '$compiler '"
 	elif [[ "$command" =~ \\ ]]; then
-		error_and_exit "$command" "no command may contain a backslash"
+		command=${command//"$escaped_BS"/$BS}
+		command=${command//"$escaped_DQ"/$DQ}
+		if [[ "$command" =~ \\ ]]; then		
+			error_and_exit "$command" "no command may contain a backslash, except before another one or a double quote"
+		fi
 	fi
 
 	extract_arguments "$ci"
