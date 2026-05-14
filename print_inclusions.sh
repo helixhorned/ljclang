@@ -218,7 +218,7 @@ function process_translation_unit() {
 if [ "$max_jobs" -eq 1 ]; then
 	## Serial processing
 	for ci in "${!new_args_lists[@]}"; do
-		if ! process_translation_unit "$ci"; then
+		if process_translation_unit "$ci"; then true; else
 			exit $?
 		fi
 	done
@@ -322,7 +322,7 @@ function process_tu() {
 	ci="$1"
 
 	local result
-	if ! result=$(process_translation_unit "$ci"); then
+	if result=$(process_translation_unit "$ci"); then true; else
 		local exit_code=$?
 		echo "ERROR: command $ci: compiler returned exit code $exit_code" >&2
 		exit "$exit_code"
