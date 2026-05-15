@@ -2,6 +2,7 @@
 -- SPDX-License-Identifier: MIT
 -- Copyright (C) 2026 Philipp Kutin
 
+local bit = require("bit")
 local io = require("io")
 local os = require("os")
 local math = require("math")
@@ -10,6 +11,7 @@ local table = require("table")
 local assert = assert
 local ipairs = ipairs
 local pairs = pairs
+local tonumber = tonumber
 local type = type
 
 local arg = arg
@@ -35,13 +37,39 @@ local function abort(fmt, ...)
 end
 
 local inFileName = arg[1]
+local formatOpt = arg[2]
 
 if not inFileName then
-    io.stderr:write("Usage: "..arg[0]..[[ <inclusions-file>
+    io.stderr:write("Usage: "..arg[0]..[[ <inclusions-file> [--format=...]
 
   <inclusions-file> should be in a format as produced by 'print_inclusions.sh'.
+
+  Permissible characters to '--format' are:
+   - d: output number of hops N as number instead of '.' repeated N times
 ]])
     os.exit(1)
+end
+
+local FormatFlag = {
+    NumericHopCount = 1,
+}
+
+local g_formatFlags = 0
+
+if formatOpt ~= nil then
+    if (formatOpt:sub(1,9) ~= "--format=") then
+        abort("the second argument, when passed, must start with '--format='")
+    end
+
+    local chars = formatOpt:sub(10)
+    for i = 1, #chars do
+        local char = chars:sub(i, i)
+        if (char == 'd') then
+            g_formatFlags = bit.bor(g_formatFlags, FormatFlag.NumericHopCount)
+        else
+            abort("unrecognized character '%s' to '--format'", char)
+        end
+    end
 end
 
 local inFile, errMsg = io.open(inFileName)
@@ -78,6 +106,7 @@ local function PrintResult(result, tuNums)
     assert(type(result) == "table")
     assert(type(tuNums) == "table")
 
+    local numericHops = bit.band(g_formatFlags, FormatFlag.NumericHopCount) ~= 0
     local includees = _collectKeys(result)
     table.sort(includees)
 
@@ -100,7 +129,7 @@ local function PrintResult(result, tuNums)
         for _, includer in ipairs(includers) do
             local hops = hopsToIncluder[includer]
             local tuIdx = tuNums[includer]
-            local hopsStr = ('.'):rep(hops)
+            local hopsStr = numericHops and tonumber(hops) or ('.'):rep(hops)
             printf("%s %s%s", hopsStr, includer, tuIdx and (" [TU_%d]"):format(tuIdx) or "")
         end
 
