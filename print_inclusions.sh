@@ -202,6 +202,16 @@ function process_translation_unit() {
 	local ci="$1"
 	labeled_assert process_translation_unit:ci -n "$ci"
 	local new_args_str="${new_args_lists[ci]}"
+
+	# shellcheck disable=SC2206
+	local new_args=($new_args_str)
+	local new_args_count="${#new_args[@]}"
+	labeled_assert new_args_count "$new_args_count" -ge 3
+	for ((i = 0; i < 3; i++)) do
+		unset new_args[new_args_count - 1 - i]
+	done
+	printf "# [TU_%d] %s\n" $((ci + 1)) "${new_args[*]}"
+
 	local source_file="${source_files[ci]}"
 	echo -n "="
 	echo_without_prefix " $source_file"

@@ -194,7 +194,7 @@ local function New_State()
                 _abort("inclusion line before any translation unit")
             end
             _handleInclusion(#dots, fileName)
-        elseif (#line > 0) then
+        elseif (#line > 0 and line:sub(1,1) ~= '#') then
             _abort("malformed line: unexpected prefix")
         end
     end
