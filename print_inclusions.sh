@@ -281,35 +281,7 @@ fi
 #
 #
 # Thus began a journey of workarounds.
-#
-# Idea A: when a child is done, it communicates this fact to the parent by stopping itself
-#  -- sending itself a SIGSTOP signal. However, The Bash 'wait' builtin *cannot* be used to
-#  wait for a running->stopped state change. (With only one process for testing purposes,
-#  it returns with code 127.) From the documentation:
-#
-#   If the -n option is supplied, `wait` waits for any one of the given ids or, if no
-#   ids are supplied, any job or process substitution, to complete and returns its exit
-#   status. If none of the supplied ids is a child of the shell, or if no ids are
-#   supplied and the shell has no unwaited-for children, the exit status is 127.
-#
-# Workaround A.1: Resort to periodic polling. Worked, but it was not pretty.
-#
-#
-#  ... A few steps back, why the STOP -> CONT dance at all? Well, as far as I can see,
-#  lack of good alternatives.
-#
-#  1. (See 'coproc' example above)
-#  2. Bash does not expose 'poll()' to wait for availability of data to read.
-#
-#  ... We *could* go another route and use one sink for the different sources.
-#  Then we'd have to implement some kind of "protocol" to reassemble fragments.
-#  Up-front, the many-file-descriptor solution seemed easier. Not so sure now...
-#
-# Q: Why not: create a pipe up-front (named first, file removed to only keep the
-#    descriptor), use that as control mechanism children -> parent?
-# A: Tried that. Got into trouble at spawning the first child of the follow-up batch
-#    ('coproc' failed -- none of the out-vars were set; inconsistently, $? was 0).
-#    Did not have time to pursue debugging.
+# [Dropped detail text. See Git history.]
 
 labeled_assert max_jobs "$max_jobs" -ge 2
 
