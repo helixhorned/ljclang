@@ -180,6 +180,10 @@ for ci in "${!commands[@]}"; do
 	extract_arguments "$ci"
 done
 
+new_command_count="${#new_args_lists[@]}"
+unset command_count
+unset commands
+
 ### 2. Functions common to serial and concurrent cases
 
 to_replace=" $project_dir/"
@@ -404,7 +408,7 @@ while [ "$to_reap_count" -gt 0 ]; do
 	to_reap_count=$((to_reap_count - 1))
 
 	# If we can, first spawn a new child.
-	if [ "$ci" -lt "$command_count" ]; then
+	if [ "$ci" -lt "$new_command_count" ]; then
 		spawn_coprocess "$ci"
 		ci=$((ci + 1))
 	fi
