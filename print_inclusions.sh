@@ -101,7 +101,6 @@ fi
 ### 1. Validate expectations on the command strings, then prepare array 'new_args_lists'.
 
 compiler_len="${#compiler}"
-compiler_len_p1=$((compiler_len + 1))
 new_args_lists=()
 source_files=()
 
@@ -131,8 +130,7 @@ function extract_arguments() {
 			state=
 		elif [ "$state" == EXPECT_FINAL_ARG ]; then
 			project_dir_len="${#project_dir}"
-			project_dir_len_p1=$((project_dir_len + 1))
-			if [ "${word:0:$project_dir_len_p1}" != "$project_dir/" ]; then
+			if [ "${word:0:$project_dir_len+1}" != "$project_dir/" ]; then
 				error_and_exit "$command" "for all commands, the item following '-c' must start with '$project_dir/'"
 			fi
 			source_files+=("$word")
@@ -167,7 +165,7 @@ escaped_DQ="$BS$BS$DQ"
 
 for ci in "${!commands[@]}"; do
 	command="${commands[$ci]}"
-	if [ "${command:0:$compiler_len_p1}" != "$compiler " ]; then
+	if [ "${command:0:$compiler_len+1}" != "$compiler " ]; then
 		continue
 	fi
 
