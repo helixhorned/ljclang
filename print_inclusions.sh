@@ -64,12 +64,9 @@ fi
 max_jobs=1
 
 if [ -n "$concurrency_arg" ]; then
-	if [[ ! "$concurrency_arg" =~ ^-j[1-9][0-9]?[+]?$ ]]; then
-		echo "ERROR: malformed third argument, expecting '-j[1-9][0-9]?[+]?'." >&2
+	if [[ ! "$concurrency_arg" =~ ^-j[1-9][0-9]?$ ]]; then
+		echo "ERROR: malformed third argument, expecting '-j[1-9][0-9]?'." >&2
 		exit 1
-	fi
-	if [[ "${concurrency_arg}" =~ [+]$ ]]; then
-		concurrency_arg="${concurrency_arg%+}"
 	fi
 
 	max_jobs=${concurrency_arg:2}
