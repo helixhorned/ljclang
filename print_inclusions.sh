@@ -268,7 +268,7 @@ if [ "$max_jobs" -eq 1 ]; then
 	for ci in "${!new_args_lists[@]}"; do
 		if process_translation_unit "$ci"; then true; else
 			exit_code=$?
-			echo "ERROR: command $ci: compiler returned exit code $exit_code" >&2
+			echo "ERROR: TU_$((ci + 1)): compiler returned exit code $exit_code" >&2
 			exit $exit_code
 		fi
 	done
@@ -346,7 +346,7 @@ function process_tu() {
 	local result
 	if result=$(process_translation_unit "$ci"); then true; else
 		local exit_code=$?
-		echo "ERROR: command $ci: compiler returned exit code $exit_code" >&2
+		echo "ERROR: TU_$((ci + 1)): compiler returned exit code $exit_code" >&2
 		exit "$exit_code"
 	fi
 
@@ -354,7 +354,7 @@ function process_tu() {
 	result_size="${#result}"
 
 	if [ "$result_size" -ge $((PIPE_BUF - 1)) ]; then
-		echo "NYI: command $ci: result too large: $result_size" >&2
+		echo "NYI: TU_$((ci + 1)): result too large: $result_size" >&2
 		exit 100
 	fi
 
