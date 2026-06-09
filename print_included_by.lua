@@ -102,7 +102,7 @@ local function _collectKeys(tab)
     return keys
 end
 
-local function PrintResult(result, tuNums)
+local function PrintResult(result, tuNums, tuTags)
     assert(type(result) == "table")
     assert(type(tuNums) == "table")
 
@@ -129,8 +129,9 @@ local function PrintResult(result, tuNums)
         for _, includer in ipairs(includers) do
             local hops = hopsToIncluder[includer]
             local tuIdx = tuNums[includer]
+            local tuTag = tuIdx and tuTags[tuIdx] or nil
             local hopsStr = numericHops and tonumber(hops) or ('.'):rep(hops)
-            printf("%s %s%s", hopsStr, includer, tuIdx and (" [TU_%d]"):format(tuIdx) or "")
+            printf("%s %s%s", hopsStr, includer, tuTag and (" [%s]"):format(tuTag) or "")
         end
 
         if (i ~= #includees) then
@@ -146,8 +147,12 @@ local function New_State()
         result = {},
         -- [<index>] = filename, [filename] = <index>
         tuNums = {},
+        -- [<index>] = tag, [tag] = <index>
+        tuTags = {},
         -- [depth] = filename; depth one is TU
         stack = {},
+        -- string or nil
+        tuTag = nil,
     }
 
     local _abort = function(...)
@@ -176,8 +181,24 @@ local function New_State()
         assert(type(line) == "string")
         s.lineNum = s.lineNum + 1
 
-        if (line:sub(1,2) == "= ") then
+        if (line:sub(1,1) == '#') then
+            if (s.tuTag ~= nil) then
+                _abort("malformed line: unexpected additional comment")
+            end
+            local tag = line:match"^# %[(TU_[1-9][0-9]*)%] "
+            if (tag == nil) then
+                _abort("malformed line: expected '# [TU_<number>] ...'")
+            elseif (s.tuTags[tag] ~= nil) then
+                _abort("duplicate TU tag")
+            end
+            s.tuTag = tag
+        elseif (line:sub(1,2) == "= ") then
             -- New translation unit
+            local tag = s.tuTag
+            if (tag == nil) then
+                _abort("new translation unit without preceding tag comment")
+            end
+            s.tuTag = nil
             local tuFileName = line:sub(3)
             if #tuFileName == 0 then
                 _abort("empty translation unit name")
@@ -186,6 +207,8 @@ local function New_State()
             local tuCount = #s.tuNums
             s.tuNums[tuCount + 1] = tuFileName
             s.tuNums[tuFileName] = tuCount + 1
+            s.tuTags[tuCount + 1] = tag
+            s.tuTags[tag] = tuCount + 1
         elseif (line:sub(1,1) == '.') then
             local dots, fileName = line:match("^(%.+) (.+)$")
             if (dots == nil) then
@@ -194,13 +217,13 @@ local function New_State()
                 _abort("inclusion line before any translation unit")
             end
             _handleInclusion(#dots, fileName)
-        elseif (#line > 0 and line:sub(1,1) ~= '#') then
+        elseif (#line > 0) then
             _abort("malformed line: unexpected prefix")
         end
     end
 
     local printResult = function(_)
-        PrintResult(s.result, s.tuNums)
+        PrintResult(s.result, s.tuNums, s.tuTags)
     end
 
     return {
