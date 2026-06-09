@@ -187,6 +187,16 @@ for ci in "${!commands[@]}"; do
 		# NOTE: if the quoted part contains whitespace, CMake surrounds the whole argument
 		#  by double quotes. We currently don't handle this, but at least we exit with an
 		#  error instead of proceeding and improperly word-splitting the command string.
+		#
+		# Handle one special case: double-quote-enclosed "words":
+		while [[ "$command" =~ ^(.*)\\\"([A-Za-z0-9#-]+)\\\"(.*)$ ]]; do
+			temp_len=${#command}
+			# e.g. \"-Wno-#warnings\"
+			command="${BASH_REMATCH[1]}${BASH_REMATCH[2]}${BASH_REMATCH[3]}"
+			# -> -Wno-#warnings
+			labeled_assert temp_len ${#command} -eq $((temp_len - 4))
+		done
+
 		if [[ "$command" =~ \\ ]]; then		
 			error_and_exit "$command" "no command may contain a backslash, except in certain hardcoded cases"
 		fi
