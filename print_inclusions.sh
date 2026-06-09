@@ -339,29 +339,11 @@ fi
 
 labeled_assert max_jobs "$max_jobs" -ge 2
 
+lock_file=/proc/$$/status
+
 # Report string sizes in bytes:
 export LANG=C
 export LC_ALL=C
-
-# We are Linux-only for now. See 'man 7 pipe':
-#
-#  POSIX.1 says that writes of less than PIPE_BUF bytes must be atomic: (...).
-#  (On Linux, PIPE_BUF is 4096 bytes.)
-#
-# and in section "Pipe capacity"
-#
-#  Since Linux 2.6.11, the pipe capacity is 16 pages (...). Since Linux 4.5, the default
-#  pipe capacity is lower than 16 pages when the pipe-user-pages-soft limit is exceeded.
-#
-# Also, from Linux 'Documentation/admin-guide/sysctl/fs.rst':
-#
-#  pipe-user-pages-soft
-#  --------------------
-#
-#  Maximum total number of pages a non-privileged user may allocate for pipes
-#  before the pipe size gets limited to a single page. (...)
-
-PIPE_BUF=4096
 
 g_pids=()
 
@@ -379,15 +361,9 @@ function process_tu() {
 		exit "$exit_code"
 	fi
 
-	# Check if we can write "$result\n\n" without blocking.
-	result_size="${#result}"
+	exec {lock_fd}< "$lock_file"
+	flock "$lock_fd"
 
-	if [ "$result_size" -ge $((PIPE_BUF - 1)) ]; then
-		echo "NYI: TU_$((ci + 1)): result too large: $result_size" >&2
-		exit 100
-	fi
-
-	# The following should not block:
 	printf "%s\n\n" "$result"
 }
 
