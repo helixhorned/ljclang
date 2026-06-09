@@ -414,8 +414,11 @@ max_exit_code=0
 ci="$max_jobs"
 
 while [ "$to_reap_count" -gt 0 ]; do
-	wait -nf -p stopped_pid
-	exit_code=$?
+	if wait -nf -p stopped_pid; then
+		exit_code=0
+	else
+		exit_code=$?
+	fi
 	update_max_exit_code "$exit_code"
 
 	to_reap_count=$((to_reap_count - 1))
