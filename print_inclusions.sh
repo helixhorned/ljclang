@@ -192,6 +192,8 @@ for ci in "${!commands[@]}"; do
 		fi
 	fi
 
+	commands[ci]="$command"
+
 	# Will word-split 'command' to reconstruct (and then tweak) the argument array:
 	extract_arguments "$ci"
 done
