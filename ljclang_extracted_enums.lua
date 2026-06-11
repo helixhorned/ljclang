@@ -313,6 +313,7 @@ CursorKindName = {
 [308] = "OMPInterchangeDirective";
 [309] = "OMPAssumeDirective";
 [310] = "OMPStripeDirective";
+[311] = "OMPFuseDirective";
 [320] = "OpenACCComputeConstruct";
 [321] = "OpenACCLoopConstruct";
 [322] = "OpenACCCombinedConstruct";

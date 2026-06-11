@@ -997,6 +997,8 @@ enum CXCursorKind {
 
   CXCursor_OMPStripeDirective = 310,
 
+  CXCursor_OMPFuseDirective = 311,
+
   CXCursor_OpenACCComputeConstruct = 320,
 
   CXCursor_OpenACCLoopConstruct = 321,
@@ -2403,6 +2405,7 @@ enum CXUnaryOperatorKind {
 clang_getUnaryOperatorKindSpelling(enum CXUnaryOperatorKind kind);
  enum CXUnaryOperatorKind
 clang_getCursorUnaryOperatorKind(CXCursor cursor);
+/*  - disabled to silence MSVC deprecation warnings */
 typedef void *CXRemapping;
   CXRemapping clang_getRemappings(const char *);
   CXRemapping
