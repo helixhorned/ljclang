@@ -341,10 +341,6 @@ labeled_assert max_jobs "$max_jobs" -ge 2
 
 lock_file=/proc/$$/status
 
-# Report string sizes in bytes:
-export LANG=C
-export LC_ALL=C
-
 g_pids=()
 
 to_reap_count=0
