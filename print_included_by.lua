@@ -156,7 +156,7 @@ local function New_State()
     }
 
     local _abort = function(...)
-        abort("line %d: %s", s.lineNum, ...)
+        abort("%s:%d: %s", inFileName, s.lineNum, ...)
     end
 
     local _handleInclusion = function(incomingDepth, fileName)
