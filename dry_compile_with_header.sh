@@ -247,6 +247,12 @@ function spawn_coprocess() {
 
 # ----------
 
+# Make Ctrl-C terminate all children (and self -- cannot recurse 'SIGINT').
+#
+# shellcheck disable=SC2064
+# We *want* our PID to expand now:
+trap "kill -SIGTERM -$$" SIGINT
+
 for ((ci=0; ci < max_jobs; ci++)); do
 	spawn_coprocess "$ci"
 done
