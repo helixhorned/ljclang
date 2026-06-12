@@ -30,10 +30,11 @@ compiler_arg="$1"
 inclusions_file="$2"
 orig_header_name="$3"
 mod_header_file="$4"
+no_color_opt="$5"
 
 if [[ -z "$compiler_arg" || -z "$inclusions_file" || -z "$orig_header_name" || -z "$mod_header_file" ]]; then
 	exec >&2
-	echo "Usage: $0 [-j<concurrency>] <compiler> <inclusions-file> <orig-header-name> <modified-header>"
+	echo "Usage: $0 [-j<concurrency>] <compiler> <inclusions-file> <orig-header-name> <modified-header> [--no-color]"
 	echo
 	echo "- <compiler> may be an absolute or relative path"
 	echo "- <inclusions-file> must name a file containing the output of 'print_inclusions.sh'"
@@ -50,6 +51,11 @@ fi
 
 if [ ! -r "$mod_header_file" ]; then
 	echo "ERROR: '$mod_header_file' does not exist or is not readable." >&2
+	exit 1
+fi
+
+if [[ -n "$no_color_opt" && "$no_color_opt" != '--no-color' ]]; then
+	echo "ERROR: malformed last (optional) argument: must be '--no-color'." >&2
 	exit 1
 fi
 
@@ -122,6 +128,10 @@ function filter_arguments() {
 		local keep=1
 		if [[ "$arg" =~ ^-O || "$arg" =~ ^--optimize ]]; then
 			keep=
+		elif [[ -n "$no_color_opt" ]]; then
+			if [[ "$arg" == -fcolor-diagnostics || "$arg" == -fdiagnostics-color=always ]]; then
+				keep=
+			fi
 		fi
 
 		if [[ -n "$keep" ]]; then
