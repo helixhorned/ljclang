@@ -69,3 +69,36 @@ if [[ "$max_jobs" -gt 1 && "${BASH_VERSINFO[0]}" -lt 5 ]]; then
 	echo "ERROR: for concurrent processing, need at least Bash 5.0" >&2
 	exit 1
 fi
+
+### 1. Obtain the included-by listing and from it, extract affected TU indexes.
+
+function handle_included_by() {
+	local enable=
+	local to_match="$1"
+
+	while read -r line; do
+		if [ -z $enable ]; then
+			if [[ "$line" == "$to_match" ]]; then
+				enable=1
+			fi
+		else
+			if [[ -z "$line" ]]; then
+				break
+			fi
+
+			if [[ "$line" =~ \[TU_([0-9]+)\] ]]; then
+				echo "${BASH_REMATCH[1]}"
+			fi
+		fi
+	done
+}
+
+readarray -t tu_idxs < \
+	<("$print_included_by" "$inclusions_file" | handle_included_by "* $orig_header_name" | sort -un)
+
+affected_tu_count="${#tu_idxs[@]}"
+
+if [ "$affected_tu_count" -eq 0 ]; then
+	echo "ERROR: <orig-header-name> did not yield any affected translation units." >&2
+	exit 1
+fi
