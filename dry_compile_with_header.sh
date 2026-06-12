@@ -102,3 +102,47 @@ if [ "$affected_tu_count" -eq 0 ]; then
 	echo "ERROR: <orig-header-name> did not yield any affected translation units." >&2
 	exit 1
 fi
+
+### 2. From inclusions file, extract+tweak compile commands corresponding to affected TUs.
+
+tu_idxs_str="${tu_idxs[*]}"
+tu_header_regex="^# \\[TU_(${tu_idxs_str// /|})\\] (.*) -E -H$"
+
+new_args_lists=()
+
+function extract_compile_commands() {
+	local src_file_regex="^= (.+)$"
+	local tentative_tu_idx=
+	local tentative_command=
+
+	while read -r line; do
+		if [ -z "$tentative_command" ]; then
+			if [[ "$line" =~ $tu_header_regex ]]; then
+				tentative_tu_idx="${BASH_REMATCH[1]}"
+				tentative_command="${BASH_REMATCH[2]}"
+			fi
+		else
+			if [[ ! "$line" =~ $src_file_regex ]]; then
+				echo "ERROR: [TU_$tentative_tu_idx] line is not followed by '= <source-file>' line." >&2
+				exit 1
+			fi
+
+			# -S (--assemble): Only run preprocess and compilation steps
+			new_args_lists+=("$tentative_command -S ${BASH_REMATCH[1]} -include ${mod_header_file}")
+			tentative_command=
+			tentative_tu_idx=
+		fi
+	done
+}
+
+extract_compile_commands < "$inclusions_file"
+new_command_count="${#new_args_lists[@]}"
+
+if [ "$new_command_count" -ne "$affected_tu_count" ]; then
+	echo "ERROR: did not extract exactly $affected_tu_count compile commands from affected TU indexes." >&2
+	exit 1
+fi
+
+if [ "$max_jobs" -gt "$new_command_count" ]; then
+	max_jobs="$new_command_count"
+fi
