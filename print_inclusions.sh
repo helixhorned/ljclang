@@ -68,7 +68,7 @@ max_jobs=1
 
 if [ -n "$concurrency_arg" ]; then
 	if [[ ! "$concurrency_arg" =~ ^-j[1-9][0-9]?$ ]]; then
-		echo "ERROR: malformed third argument, expecting '-j[1-9][0-9]?'." >&2
+		echo "ERROR: malformed concurrency specification, expecting '-j[1-9][0-9]?'." >&2
 		exit 1
 	fi
 
