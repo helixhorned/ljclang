@@ -110,6 +110,28 @@ tu_header_regex="^# \\[TU_(${tu_idxs_str// /|})\\] (.*) -E -H$"
 
 new_args_lists=()
 
+function filter_arguments() {
+	# shellcheck disable=SC2206
+	# We *want* the word splitting:
+	local args=($1)
+	local new_args=()
+
+	for arg in "${args[@]}"; do
+		# Drop arguments specifying optimization as they have a impact even with '-S'.
+		# (Unless, presumably, with '-O0', but don't handle that specially.)
+		local keep=1
+		if [[ "$arg" =~ ^-O || "$arg" =~ ^--optimize ]]; then
+			keep=
+		fi
+
+		if [[ -n "$keep" ]]; then
+			new_args+=("$arg")
+		fi
+	done
+
+	echo "${new_args[*]}"
+}
+
 function extract_compile_commands() {
 	local src_file_regex="^= (.+)$"
 	local tentative_tu_idx=
@@ -119,7 +141,7 @@ function extract_compile_commands() {
 		if [ -z "$tentative_command" ]; then
 			if [[ "$line" =~ $tu_header_regex ]]; then
 				tentative_tu_idx="${BASH_REMATCH[1]}"
-				tentative_command="${BASH_REMATCH[2]}"
+				tentative_command=$(filter_arguments "${BASH_REMATCH[2]}")
 			fi
 		else
 			if [[ ! "$line" =~ $src_file_regex ]]; then
