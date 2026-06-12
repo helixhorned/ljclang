@@ -168,3 +168,97 @@ fi
 if [ "$max_jobs" -gt "$new_command_count" ]; then
 	max_jobs="$new_command_count"
 fi
+
+### 3a. Functions common to serial and concurrent cases
+
+function process_translation_unit() {
+	local ci="$1"
+	# shellcheck disable=SC2086
+	"$compiler" ${new_args_lists[ci]} || true
+}
+
+### 3b. Invoke compiler with prepared commands
+
+if [ "$max_jobs" -eq 1 ]; then
+	## Serial processing
+	for ci in "${!new_args_lists[@]}"; do
+		process_translation_unit "$ci"
+	done
+	exit 0
+fi
+
+## Concurrent processing
+
+labeled_assert max_jobs "$max_jobs" -ge 2
+
+lock_file=/proc/$$/status
+g_pids=()
+to_reap_count=0
+
+# ----------
+
+function process_tu() {
+	ci="$1"
+
+	local result
+	result=$(process_translation_unit "$ci")
+
+	exec {lock_fd}< "$lock_file"
+	flock "$lock_fd"
+
+	printf "%s" "$result"
+}
+
+function find_command_index() {
+	local pid="$1"
+	labeled_assert find_command_index:pid -n "$pid"
+	pid_count="${#g_pids[@]}"
+
+	for ((i=0; i < pid_count; i++)); do
+		if [ "${g_pids[i]}" -eq "$pid" ]; then
+			echo "$i"
+			return
+		fi
+	done
+
+	assert -z unreachable
+	exit 101
+}
+
+function spawn_coprocess() {
+	local ci="$1"
+	labeled_assert spawn_coprocess:ci -n "$ci"
+
+	process_tu "$ci" &
+	local pid=$!
+	to_reap_count=$((to_reap_count + 1))
+	g_pids[ci]="$pid"
+}
+
+# ----------
+
+for ((ci=0; ci < max_jobs; ci++)); do
+	spawn_coprocess "$ci"
+done
+
+labeled_assert to_reap_count "$to_reap_count" -eq "$max_jobs"
+
+ci="$max_jobs"
+
+while [ "$to_reap_count" -gt 0 ]; do
+	wait -nf -p stopped_pid || ignore_failure
+	to_reap_count=$((to_reap_count - 1))
+
+	# If we can, first spawn a new child.
+	if [ "$ci" -lt "$new_command_count" ]; then
+		spawn_coprocess "$ci"
+		ci=$((ci + 1))
+	fi
+
+	# Take care of the terminated one.
+
+	labeled_assert stopped_pid -n "$stopped_pid"
+	finished_ci=$(find_command_index "$stopped_pid")
+
+	g_pids[finished_ci]=-1
+done
