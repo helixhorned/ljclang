@@ -123,12 +123,8 @@ function filter_arguments() {
 	local new_args=()
 
 	for arg in "${args[@]}"; do
-		# Drop arguments specifying optimization as they have a impact even with '-S'.
-		# (Unless, presumably, with '-O0', but don't handle that specially.)
 		local keep=1
-		if [[ "$arg" =~ ^-O || "$arg" =~ ^--optimize ]]; then
-			keep=
-		elif [[ -n "$no_color_opt" ]]; then
+		if [[ -n "$no_color_opt" ]]; then
 			if [[ "$arg" == -fcolor-diagnostics || "$arg" == -fdiagnostics-color=always ]]; then
 				keep=
 			fi
@@ -159,8 +155,8 @@ function extract_compile_commands() {
 				exit 1
 			fi
 
-			# -S (--assemble): Only run preprocess and compilation steps
-			new_args_lists+=("$tentative_command -S ${BASH_REMATCH[1]} -include ${mod_header_file}")
+			# -fsyntax-only: Run the preprocessor, parser and semantic analysis stages
+			new_args_lists+=("$tentative_command -fsyntax-only ${BASH_REMATCH[1]} -include ${mod_header_file}")
 			tentative_command=
 			tentative_tu_idx=
 		fi
