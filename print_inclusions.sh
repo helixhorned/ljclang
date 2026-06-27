@@ -218,7 +218,7 @@ for ci in "${!commands[@]}"; do
 			labeled_assert temp_len ${#command} -eq $((temp_len - 4))
 		done
 
-		if [[ "$command" =~ \\ ]]; then		
+		if [[ "$command" =~ \\ ]]; then
 			error_and_exit "$command" "no command may contain a backslash, except in certain hardcoded cases"
 		fi
 	fi
@@ -290,18 +290,28 @@ function process_translation_unit() {
 	return "$exit_code"
 }
 
+max_exit_code=0
+
+function update_max_exit_code() {
+	local exit_code="$1"
+	labeled_assert exit_code -n "$exit_code"
+
+	if [ "$exit_code" -gt "$max_exit_code" ]; then
+		max_exit_code="$exit_code"
+	fi
+}
+
 ### 3. Invoke compiler with prepared commands and filter its output
 
 if [ "$max_jobs" -eq 1 ]; then
 	## Serial processing
 	for ci in "${!new_args_lists[@]}"; do
 		if process_translation_unit "$ci"; then true; else
-			exit_code=$?
+			update_max_exit_code $?
 			echo "ERROR: TU_$((ci + 1)): compiler returned exit code $exit_code" >&2
-			exit $exit_code
 		fi
 	done
-	exit 0
+	exit "$max_exit_code"
 fi
 
 ## Concurrent processing
@@ -389,15 +399,6 @@ function spawn_coprocess() {
 	g_pids[ci]="$pid"
 }
 
-function update_max_exit_code() {
-	local exit_code="$1"
-	labeled_assert exit_code -n "$exit_code"
-
-	if [ "$exit_code" -gt "$max_exit_code" ]; then
-		max_exit_code="$exit_code"
-	fi
-}
-
 # ----------
 
 for ((ci=0; ci < max_jobs; ci++)); do
@@ -406,16 +407,12 @@ done
 
 labeled_assert to_reap_count "$to_reap_count" -eq "$max_jobs"
 
-max_exit_code=0
 ci="$max_jobs"
 
 while [ "$to_reap_count" -gt 0 ]; do
-	if wait -nf -p stopped_pid; then
-		exit_code=0
-	else
-		exit_code=$?
+	if wait -nf -p stopped_pid; then true; else
+		update_max_exit_code $?
 	fi
-	update_max_exit_code "$exit_code"
 
 	to_reap_count=$((to_reap_count - 1))
 
